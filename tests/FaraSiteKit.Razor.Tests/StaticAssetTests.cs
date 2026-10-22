@@ -30,4 +30,26 @@ public class StaticAssetTests
         Assert.Equal("Theme", SiteThemeState.ThemeProperty);
         Assert.Equal("dark", SiteThemeState.Dark);
     }
+
+    [Fact]
+    public void BootIndicatorTimingsMatchTheStylesheetAndTheScript()
+    {
+        var js = ReadRazorFile("wwwroot/js/boot-indicator.js");
+        var template = File.ReadAllText(Path.Combine(RepoRoot(), "docs", "index-template.html"));
+
+        // 60 秒で外れる（JS の RELEASE_MS と、CSS の保険 boot-indicator-release）。45 秒で再読み込みの案内（SLOW_MS）
+        Assert.Contains("var RELEASE_MS = 60000;", js);
+        Assert.Contains("var SLOW_MS = 45000;", js);
+        Assert.Contains("boot-indicator-release 0s linear 60s", template);
+    }
+
+    [Fact]
+    public void TemplateScriptAttributesMatchTheSiteOptionsDefaults()
+    {
+        var options = new FaraSiteKit.Core.SiteOptions();
+        var template = File.ReadAllText(Path.Combine(RepoRoot(), "docs", "index-template.html"));
+
+        Assert.Contains($"data-storage-key=\"{options.StorageKey}\"", template);
+        Assert.Contains($"data-sidebar-key=\"{options.SidebarKey}\"", template);
+    }
 }
