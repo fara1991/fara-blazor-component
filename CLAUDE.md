@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）で共通に使う部品のリポジトリ（fara-site-kit、公開）。計画は fara-avatar-modding-guide の `docs/wasm-migration-plan.md` の §10。使い方は `docs/usage.md`、README は構成の説明。
+Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）で共通に使う部品のリポジトリ（fara-site-kit、公開）。移行の計画は fara-avatar-modding-guide リポジトリの `docs/wasm-migration-plan.md`（§10）を参照。使い方は `docs/usage.md`、README は構成の説明。
 
 ## ブランチ運用（必ず守る）
 
@@ -14,11 +14,11 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 
 - 利用するサイトは、このリポジトリを git submodule（`external/fara-site-kit`）として取り込み、必要なファイルを参照する。NuGet では配らない（決定事項）
 - C# は ProjectReference で参照する（ステップ 2 以降）
-- 利用するサイトの例: pokemon（`external/fara-site-kit`）。avatar は移行計画の K0・P1 以降で使う
+- 利用するサイトの例: pokemon（`external/fara-site-kit`）
 
 ## 共有ファイルのルール
 
-- `worker/maintenance.js`・`worker/report.js` と、そのテストは、pokemon・avatar・bot（FaraBotModerator の `site/worker/`）・portfolio の 4 リポジトリで同じ内容だった（sha256 で確認済み）。直すときは kit で直し、各サイトは submodule を上げて取り込む。各サイトに同じファイルを残さない
+- `worker/maintenance.js`・`worker/report.js` と、そのテストは、develop 時点で同一内容（pokemon・avatar・bot の site/worker・portfolio。sha256 で確認）。直すときは kit で直し、各サイトは submodule を上げて取り込む。各サイトに同じファイルを残さない
 - サイト固有の変更は、サイトのリポジトリに置く（kit に入れない）
 - 公開される API（関数名・ファイル名・戻り値の形）を変えるときは、利用中のサイトが壊れないか確認してから。破壊的変更はメジャーを上げる
 - 変更のたびにテストを付ける（`npm test`）

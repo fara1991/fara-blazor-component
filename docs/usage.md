@@ -8,7 +8,7 @@ git submodule update --init --recursive
 ```
 
 - 固定するコミット（タグ）は、各サイトのリポジトリで決める。kit の develop の最新を追わない。
-- CI のチェックアウトは `submodules: true` にする（`actions/checkout@v4`）。
+- CI のチェックアウトは `submodules: true` にする（`actions/checkout@v4`）。worker や kit を使わない CI は不要。
 
 ## 2. Worker の共有 JS を使う
 

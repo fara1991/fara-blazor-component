@@ -2,14 +2,14 @@
 
 Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）で共通に使う部品をまとめるリポジトリ。
 
-- 計画: fara-avatar-modding-guide の `docs/wasm-migration-plan.md` の §10（フェーズ K0 が今の段階）
+- 計画: fara-avatar-modding-guide リポジトリの `docs/wasm-migration-plan.md`（§10）
 - 本番・確認用のサイトそのものは、このリポジトリには無い（各サイトのリポジトリにある）
 
 ## 構成
 
 | 場所 | 中身 | 状態 |
 | --- | --- | --- |
-| `worker/` | Worker の共有 JS（`maintenance.js`: メンテナンス表示、`report.js`: 作者への報告の受け口）と、そのテスト | K0 で取り込み（pokemon の origin/develop と同じ内容） |
+| `worker/` | Worker の共有 JS（`maintenance.js`: メンテナンス表示、`report.js`: 作者への報告の受け口）と、そのテスト | K0 で取り込み（develop 時点で pokemon と同一内容） |
 | `docs/` | 利用方法・変更履歴 | K0 で作成 |
 | `.github/workflows/ci.yml` | `npm test`（Node 22、ubuntu） | K0 |
 | `src/`（Razor クラスライブラリ・C# の共通コード） | — | ステップ 2 以降で作る |
