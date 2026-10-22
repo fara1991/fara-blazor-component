@@ -132,19 +132,37 @@ export function checkSite(site, problems) {
     };
 }
 
-/** テンプレートの区切りが 1 つずつあるか。#app の中に SEO-BODY があるか。 */
+/**
+ * テンプレートを検査する。区切りは 1 つずつ、SEO-BODY は #app の直下（最初の </div> より前）にあること。
+ * SEO-BODY の中は空（白だけ）であること。生成済みの index.html（本文が入ったもの）を渡すと、404 や SPA のフォールバックに本文が残るため。
+ */
 export function checkTemplate(template, problems) {
     if (typeof template !== "string") {
         problems.push("テンプレート（index.html）が読めません");
         return;
     }
+    let markersOk = true;
     for (const marker of [HEAD_START, HEAD_END, BODY_START, BODY_END]) {
         const count = template.split(marker).length - 1;
-        if (count !== 1) problems.push(`テンプレートの区切り ${marker} が ${count} 個です（1 個にしてください）`);
+        if (count !== 1) {
+            problems.push(`テンプレートの区切り ${marker} が ${count} 個です（1 個にしてください）`);
+            markersOk = false;
+        }
     }
     const app = template.indexOf('<div id="app">');
     if (app < 0) problems.push('テンプレートに <div id="app"> がありません');
-    else if (template.indexOf(BODY_START) < app) problems.push("SEO-BODY の区切りは #app の中に置いてください");
+    if (markersOk && app >= 0) {
+        const bodyStart = template.indexOf(BODY_START);
+        const bodyEnd = template.indexOf(BODY_END);
+        const appClose = template.indexOf("</div>", app);
+        if (bodyStart < app || appClose < 0 || bodyEnd > appClose) {
+            problems.push('SEO-BODY の区切りは <div id="app"> の直下（#app を閉じる </div> より前）に置いてください');
+        }
+        const body = template.slice(bodyStart + BODY_START.length, bodyEnd);
+        if (body.trim() !== "") {
+            problems.push("テンプレートの SEO-BODY の中が空ではありません。生成済みの index.html の可能性があります（dotnet publish の出力を使ってください）");
+        }
+    }
     if (!/<html\b[^>]*>/i.test(template)) problems.push("テンプレートに <html> がありません");
 }
 

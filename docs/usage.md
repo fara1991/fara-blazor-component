@@ -61,7 +61,8 @@ node external/fara-site-kit/build/build-pages.mjs \
 
 ### テンプレート
 
-- 区切りは `<!-- SEO-HEAD:START -->`・`<!-- SEO-HEAD:END -->`（`<head>` の中）と `<!-- SEO-BODY:START -->`・`<!-- SEO-BODY:END -->`（`<div id="app">` の中）。各 1 つだけ。区切りの外（読み込み表示など）は変えない。
+- 区切りは `<!-- SEO-HEAD:START -->`・`<!-- SEO-HEAD:END -->`（`<head>` の中）と `<!-- SEO-BODY:START -->`・`<!-- SEO-BODY:END -->`。各 1 つだけ。SEO-BODY は `<div id="app">` の直下（最初の `</div>` より前）に置く。区切りの外（読み込み表示など）は変えない。
+- SEO-BODY の中は空にしておく。本文が入った HTML（生成済みの `index.html` など）を `--template` に渡すとエラーになる（404 や SPA のフォールバックに本文が残るのを防ぐ）。`dotnet publish` の出力を使う。
 - 本文（`bodyHtml`）は `SEO-BODY` の中に入る。Blazor が起動すると `#app` の中身ごと置き換わる。`bodyHtml` に区切りの文字列を入れるとエラーになる。
 
 ### サイト設定（`site.json`）

@@ -242,12 +242,23 @@ test("知らない項目（綴りの間違い）は失敗する", () => {
     assert.ok(problems.some((p) => /知らない項目 "robotDisallow"/.test(p)));
 });
 
-test("テンプレートの区切りが無い・重複・#app が無い・SEO-BODY が #app の外にあると失敗する", () => {
+test("テンプレートの区切りが無い・重複・#app が無いと失敗する", () => {
     assert.ok(problemsOf(() => build({ template: "<html><head></head><body></body></html>" })).some((p) => /区切り/.test(p)));
     assert.ok(problemsOf(() => build({ template: TEMPLATE.replace(BODY_END, BODY_END + BODY_END) })).some((p) => /区切り/.test(p)));
     assert.ok(problemsOf(() => build({ template: TEMPLATE.replace('<div id="app">', '<div id="other">') })).some((p) => /<div id="app">/.test(p)));
-    const outside = `<html><head>${HEAD_START}${HEAD_END}</head><body>${BODY_START}${BODY_END}<div id="app"></div></body></html>`;
-    assert.ok(problemsOf(() => build({ template: outside })).some((p) => /#app の中/.test(p)));
+});
+
+test("SEO-BODY は #app の直下にだけ置ける（#app の外・#app を閉じた後は失敗する）", () => {
+    const before = `<html><head>${HEAD_START}${HEAD_END}</head><body>${BODY_START}${BODY_END}<div id="app"></div></body></html>`;
+    assert.ok(problemsOf(() => build({ template: before })).some((p) => /の直下/.test(p)));
+    const after = `<html><head>${HEAD_START}${HEAD_END}</head><body><div id="app"></div>${BODY_START}${BODY_END}</body></html>`;
+    assert.ok(problemsOf(() => build({ template: after })).some((p) => /の直下/.test(p)));
+});
+
+test("SEO-BODY の中が空でないテンプレート（生成済みの index.html）は失敗する。404 と SPA のフォールバックに本文を残さないため", () => {
+    const generated = TEMPLATE.replace(BODY_END, `<main>home</main>${BODY_END}`);
+    const problems = problemsOf(() => build({ template: generated }));
+    assert.ok(problems.some((p) => /生成済みの index.html/.test(p)));
 });
 
 test("env が不正・homeFile と spaFallback が index.html で重なる・出力名が重複すると失敗する", () => {

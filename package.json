@@ -8,8 +8,8 @@
   "scripts": {
     "test:report": "node --test worker/report.test.mjs",
     "test:maintenance": "node --test worker/maintenance.test.mjs",
-    "test:build": "node --test tests/build/build-pages.test.mjs tests/build/pokemon-equivalence.test.mjs",
+    "test:build": "node --test tests/build/build-pages.test.mjs tests/build/pokemon-equivalence.test.mjs tests/build/boot-indicator.test.mjs",
     "test:csp": "node --test tests/csp/render-headers.test.mjs",
-    "test": "node --test worker/report.test.mjs worker/maintenance.test.mjs tests/build/build-pages.test.mjs tests/build/pokemon-equivalence.test.mjs tests/csp/render-headers.test.mjs"
+    "test": "node --test worker/report.test.mjs worker/maintenance.test.mjs tests/build/build-pages.test.mjs tests/build/pokemon-equivalence.test.mjs tests/build/boot-indicator.test.mjs tests/csp/render-headers.test.mjs"
   }
 }
