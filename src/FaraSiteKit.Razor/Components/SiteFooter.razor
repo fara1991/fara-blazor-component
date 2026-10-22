@@ -1,0 +1,46 @@
+@* フッター: サイト名 | 問い合わせ | プライバシーポリシー | © 公開年 作者（作者のホームページへ）と、SNS のアイコン（SocialLinks）。
+   「問い合わせ」には、いま見ているページを ?from= で付ける（報告に、どのページかが分かるように）。問い合わせ・プライバシーの自身のページからは付けない *@
+@inject SiteOptions Site
+@inject NavigationManager Nav
+@implements IDisposable
+
+<footer class="site-footer">
+    <div class="site-footer-line">
+        <span class="site-footer-name">@Site.Name</span>
+        <span class="site-footer-sep" aria-hidden="true">|</span>
+        <a href="@ReportHref">問い合わせ</a>
+        <span class="site-footer-sep" aria-hidden="true">|</span>
+        <a href="@Site.PrivacyPath">プライバシーポリシー</a>
+        <span class="site-footer-sep" aria-hidden="true">|</span>
+        <span>© @Site.PublishedYear @if (!string.IsNullOrEmpty(Site.AuthorHomeUrl)) {
+            <a href="@SiteLinks.Localize(Site.AuthorHomeUrl)">@Site.Author</a>
+        } else {
+            @Site.Author
+        }</span>
+        <span class="site-footer-socials">
+            <SocialLinks />
+        </span>
+    </div>
+</footer>
+
+@code {
+    /// <summary>問い合わせのリンク。今のページのパスを ?from= で渡す（パスとして安全な形のときだけ）。</summary>
+    private string ReportHref
+    {
+        get
+        {
+            var path = "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0];
+            var report = Site.ReportPath.Trim('/');
+            var privacy = Site.PrivacyPath.Trim('/');
+            if (path.Trim('/') == report || path.Trim('/') == privacy) return Site.ReportPath;
+            var clean = ReportForm.CleanPage(path);
+            return clean.Length == 0 ? Site.ReportPath : Site.ReportPath + "?from=" + Uri.EscapeDataString(clean);
+        }
+    }
+
+    protected override void OnInitialized() => Nav.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

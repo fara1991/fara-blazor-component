@@ -1,0 +1,12 @@
+@* フッターの SNS のアイコン。出すサービスと URL は SiteOptions.Social で決める（URL が空のものは出さない）。
+   名前・色・アイコンは kit が持つ（SocialServices）。サービスの色は、リンクの --brand に入る（CSS で地色にする） *@
+@inject SiteOptions Site
+
+@foreach (var social in Site.VisibleSocial)
+{
+    var service = SocialServices.Find(social.Service);
+    <a class="site-footer-social service-@social.Service" href="@social.Url" target="_blank" rel="noopener noreferrer"
+       aria-label="@service.Label" title="@service.Label" style="--brand: @service.Color">
+        <SocialIcon Name="@social.Service" Size="13" />
+    </a>
+}
