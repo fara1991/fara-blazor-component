@@ -204,7 +204,10 @@
     // 画面を移ったら、開いている検索欄を閉じる（ページの切り替えで、欄が残らないように）
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
+        // 項目を選んで画面が移ったら、スマホのメニューを閉じる（SiteNavMenu の項目は <a href> のまま）
+        CloseOnMobile();
         if (searchOpen) HideSearch(focusButton: true);
+        StateHasChanged();
     }
 
     public void Dispose()

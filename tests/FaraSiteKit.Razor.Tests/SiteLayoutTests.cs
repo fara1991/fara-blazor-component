@@ -180,4 +180,16 @@ public class SiteLayoutTests : SiteKitTestContext
         var line = cut.Find("header .scroll-progress");
         Assert.Equal("true", line.GetAttribute("aria-hidden"));
     }
+
+    [Fact]
+    public void OnAPhoneOpeningTheMenuAndMovingToAPageClosesIt()
+    {
+        var cut = RenderLayout(mobile: true);
+        cut.Find("button.sidebar-toggle").Click();
+        Assert.True(cut.FindComponent<MudDrawer>().Instance.Open);
+
+        Services.GetRequiredService<NavigationManager>().NavigateTo("http://localhost/damage-calculator");
+
+        Assert.False(cut.FindComponent<MudDrawer>().Instance.Open);
+    }
 }
