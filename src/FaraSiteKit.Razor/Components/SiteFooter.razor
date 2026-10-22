@@ -12,7 +12,7 @@
         <span class="site-footer-sep" aria-hidden="true">|</span>
         <a href="@Site.PrivacyPath">プライバシーポリシー</a>
         <span class="site-footer-sep" aria-hidden="true">|</span>
-        <span>© @Site.PublishedYear @if (!string.IsNullOrEmpty(Site.AuthorHomeUrl)) {
+        <span>© @Site.PublishedYear@(" ")@if (!string.IsNullOrEmpty(Site.AuthorHomeUrl)) {
             <a href="@SiteLinks.Localize(Site.AuthorHomeUrl)">@Site.Author</a>
         } else {
             @Site.Author

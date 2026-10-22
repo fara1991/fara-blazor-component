@@ -3,6 +3,7 @@
 // - sidebarChanged(hidden, key): PC のサイドバーの開閉を html のクラス（sidebar-hidden）と localStorage（key）に反映する
 // - searchSheet(open, focus): スマホの検索欄の開閉（html の search-open クラス）。閉じるときは、フォーカスを検索ボタンへ移す
 // - focusMain(): 「本文へ移動」（スキップリンク）の先の main にフォーカスを移す
+// - フッターの高さを、CSS 変数 --footer-height に入れる（フッターは画面の下に固定。本文の領域は、その分だけ短い）
 // 検索ボタン（.fsk-search-toggle）の click は、Blazor を待たずに欄を開く（iOS は、タップの流れの中でフォーカスしないとキーボードが出ないため）
 (function () {
     "use strict";
@@ -42,6 +43,23 @@
         var main = document.getElementById("fsk-main");
         if (main) main.focus();
     };
+
+    // フッターの高さを --footer-height（CSS 変数）に入れる。フッターは描画の後に出るので、#app の変化を見て付け直す
+    if (window.ResizeObserver && window.MutationObserver) {
+        var watched = null;
+        var footerSize = new ResizeObserver(function () {
+            if (watched) document.documentElement.style.setProperty("--footer-height", watched.offsetHeight + "px");
+        });
+        var watchFooter = function () {
+            var footer = document.querySelector(".site-footer");
+            if (!footer || footer === watched) return;
+            if (watched) footerSize.unobserve(watched);
+            watched = footer;
+            footerSize.observe(footer);
+        };
+        watchFooter();
+        new MutationObserver(watchFooter).observe(document.getElementById("app") || document.body, { childList: true, subtree: true });
+    }
 
     document.addEventListener("click", function (e) {
         if (e.target && e.target.closest && e.target.closest(".fsk-search-toggle")) api.searchSheet(true, true);

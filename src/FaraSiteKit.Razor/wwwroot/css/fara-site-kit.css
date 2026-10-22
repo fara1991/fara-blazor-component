@@ -13,6 +13,8 @@
     --fsk-muted: #6b5f8a;
     --fsk-field-bg: rgba(255, 255, 255, 0.7);
     --fsk-brand: #7c3aed;
+    --fsk-grad: linear-gradient(120deg, #c084fc 0%, #e879f9 45%, #818cf8 100%);
+    --footer-height: 2.6rem;
     --fsk-notice-bg: #f59e0b;
     --fsk-notice-text: #1a0b33;
     --fsk-maintenance-bg: #0c0616;
@@ -30,7 +32,14 @@
 
 html,
 body {
+    height: 100%;
     background: var(--fsk-body-bg);
+}
+
+/* 本文へ移動の先（main と見出し）は、プログラムでフォーカスするだけなので、枠を出さない */
+#fsk-main:focus,
+[tabindex="-1"]:focus:not(:focus-visible) {
+    outline: none;
 }
 
 /* 「本文へ移動」（キーボードの利用者向け）。普段は画面の外に置き、Tab で出る */
@@ -55,7 +64,9 @@ body {
 
 .fsk-page.mud-layout {
     position: relative;
-    min-height: 100vh;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
 }
 
 .app-header.mud-appbar {
@@ -221,59 +232,59 @@ body {
     opacity: 0;
 }
 
-@media (min-width: 768px) {
-    /* PC: ページ全体はスクロールさせず、画面の高さに収める。一覧や長い本文の中だけがスクロールする */
-    .fsk-page.mud-layout {
-        height: 100vh;
-        overflow: hidden;
-    }
-
-    .fsk-page .mud-main-content {
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        min-height: 0;
-    }
-
-    .fsk-page .mud-main-content > main {
-        flex: 1;
-        min-width: 0;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .content {
-        flex: 1 1 auto;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        overflow-y: auto;
-        padding-bottom: 1rem;
-    }
-
-    .content > * {
-        flex-shrink: 0;
-    }
-
-    /* 隠している間は、細い列にマウスを乗せて広げても、中身は動かさない（広げた分は、上にかぶせる） */
-    html.sidebar-hidden .fsk-page .mud-main-content {
-        margin-left: var(--mud-drawer-width-mini-left) !important;
-    }
-
-    /* 枠の中だけがスクロールする（問い合わせなどの画面の枠） */
-    .pane-scroll {
-        flex: 1 1 0;
-        min-height: 0;
-        overflow-y: auto;
-        overflow-x: hidden;
-        scrollbar-gutter: stable;
-    }
-
-    .page-pane {
-        scrollbar-gutter: stable both-edges;
-    }
+/* ページ全体は画面の高さに収める（PC もスマホも同じ）。ヘッダーとフッターは動かず、本文の領域（.content・.pane-scroll）だけがスクロールする */
+/* PC: ページ全体はスクロールさせず、画面の高さに収める。一覧や長い本文の中だけがスクロールする */
+.fsk-page.mud-layout {
+    height: 100vh;
+    overflow: hidden;
 }
+
+.fsk-page .mud-main-content {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    min-height: 0;
+}
+
+.fsk-page .mud-main-content > main {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.content {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding-bottom: 1rem;
+}
+
+.content > * {
+    flex-shrink: 0;
+}
+
+/* 隠している間は、細い列にマウスを乗せて広げても、中身は動かさない（広げた分は、上にかぶせる） */
+html.sidebar-hidden .fsk-page .mud-main-content {
+    margin-left: var(--mud-drawer-width-mini-left) !important;
+}
+
+/* 枠の中だけがスクロールする（問い合わせなどの画面の枠） */
+.pane-scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+}
+
+.page-pane {
+    scrollbar-gutter: stable both-edges;
+}
+
 
 @media (max-width: 767.98px) {
     .fsk-page .mud-main-content > main {
@@ -304,6 +315,29 @@ body {
 }
 
 /* ---- 内容の列・報告フォーム ---- */
+
+/* 画面の題名（見出しの下に区切り線）。カードは薄い枠で囲む */
+.page-header {
+    margin-bottom: 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--fsk-border);
+}
+
+.page-header h1,
+.page-header h3 {
+    margin-bottom: 0.25rem;
+}
+
+.card {
+    border: 1px solid var(--fsk-border);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* ライト／ダークのスイッチ: ダークのとき、つまみ（紫）の上のアイコンを白にする */
+.theme-switch .mud-switch-base.mud-checked [class*="mud-switch-thumb"] svg {
+    color: #fff !important;
+    fill: #fff !important;
+}
 
 /* 内容の列（見出し・説明・カード）は読みやすい幅で、横の中央に置く */
 .page-column {
@@ -344,7 +378,9 @@ body {
 
 .site-footer {
     flex: none;
-    padding: 0.45rem 1rem 0.55rem;
+    min-height: var(--footer-height);
+    box-sizing: border-box;
+    padding: 0.45rem 1rem calc(0.55rem + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--fsk-border);
     font-size: 0.78rem;
     color: var(--fsk-muted);
@@ -485,4 +521,61 @@ a.site-footer-social:focus-visible {
     color: #fff;
     text-decoration: none;
     font-weight: 700;
+}
+
+/* ---- 日本語の本文の改行（.page-column の中）。語の途中で切らず、句の単位で折り返す。対応しないブラウザでは通常の折り返し ---- */
+.page-column,
+.page-column p,
+.page-column li,
+.page-column dd,
+.page-column td {
+    word-break: normal;
+    word-break: auto-phrase;
+    line-break: strict;
+    overflow-wrap: break-word;
+    text-wrap: pretty;
+}
+
+/* 日付・数値・短い語のまとまりを、途中で切らない */
+.nowrap {
+    white-space: nowrap;
+}
+
+/* ---- 404（ページが見つからない）。FaraSiteKit.Razor の NotFoundView ---- */
+.fsk-not-found {
+    display: grid;
+    justify-items: center;
+    gap: 0.5rem;
+    padding: 2rem 0.5rem;
+    text-align: center;
+}
+
+.fsk-not-found-code {
+    margin: 0;
+    font-size: clamp(96px, 20vw, 180px);
+    font-weight: 800;
+    line-height: 1;
+    background: var(--fsk-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.fsk-not-found h1 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.fsk-not-found-lead {
+    margin: 0 0 0.75rem;
+    color: var(--fsk-muted);
+}
+
+.fsk-btn-primary.mud-button-root {
+    padding: 0.6rem 1.4rem;
+    border-radius: 999px;
+    text-transform: none;
+    color: #fff;
+    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    box-shadow: 0 10px 30px -8px rgba(168, 85, 247, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
