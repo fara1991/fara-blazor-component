@@ -13,7 +13,7 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 ## 目的と使われ方
 
 - 利用するサイトは、このリポジトリを git submodule（`external/fara-site-kit`）として取り込み、必要なファイルを参照する。NuGet では配らない（決定事項）
-- C# は ProjectReference で参照する（`src/FaraSiteKit.Core`、net8.0）
+- C# は ProjectReference で参照する（`src/FaraSiteKit.Core`、net10.0）
 - 利用するサイトの例: pokemon（`external/fara-site-kit`）
 
 ## C# 共通コードのルール
@@ -39,7 +39,7 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 - `worker/`: Worker の共有 JS と Node テスト（`node --test`、Node 22）
 - `docs/`: 利用方法（`usage.md`）と変更履歴（`changelog.md`）
 - `src/FaraSiteKit.Core/`: C#（`SiteLinks`・`MaintenanceInfo`・`ReportForm`）。UI と通信に依存しない純粋なコードだけを置く（Razor・MudBlazor は K0-4 で別のプロジェクトに）
-- `tests/FaraSiteKit.Core.Tests/`: C# のテスト（xUnit）。`global.json` の SDK（8.0.x）で実行する
+- `tests/FaraSiteKit.Core.Tests/`: C# のテスト（xUnit）。`global.json` の SDK（10.0.x）で実行する
 - `.github/workflows/ci.yml`: `npm test`（Node 22）と `dotnet test` を、ubuntu と windows の matrix で並列に実行
 
 ## 変更の流れ
