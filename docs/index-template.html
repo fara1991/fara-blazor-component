@@ -1,0 +1,57 @@
+<!-- index.html の断片（サイトの wwwroot/index.html に、この内容を合わせる）。
+     Fara のサイトの共通の決まり: 起動までの読み込み表示（#boot-indicator）・テーマの反映（theme-init.js）・
+     JS の読み込み（kit の静的ファイル）。サイト固有の部分（title・フォント・サイトの CSS・スクリプト）は、サイトが書く。
+     CSP: インラインの script は使わない。インラインの style は、読み込み表示の CSS（起動の前に当てるため）だけ。 -->
+
+<!-- head の中。テーマは描画の前に反映する（data-storage-key・data-sidebar-key は SiteOptions.StorageKey・SidebarKey と同じ値にする） -->
+<script src="_content/FaraSiteKit.Razor/js/theme-init.js" data-storage-key="fara-site-kit.settings" data-sidebar-key="fara-site-kit.sidebar-hidden"></script>
+<link href="_content/FaraSiteKit.Razor/css/fara-site-kit.css" rel="stylesheet" />
+
+<!-- head の中（読み込み表示の CSS。起動の前から当てる。60 秒の保険は、JS の RELEASE_MS と同じ秒数） -->
+<style>
+    html, body { background: #f7f4fd; }
+    html[data-bs-theme="dark"], html[data-bs-theme="dark"] body { background: #0c0616; }
+    #boot-indicator {
+        position: fixed; inset: 0; z-index: 2147483000;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.1rem;
+        box-sizing: border-box; padding: 1.5rem;
+        background: #f7f4fd; color: #3b2a5c;
+        font-family: "Zen Kaku Gothic New", "Yu Gothic", system-ui, sans-serif;
+        animation: boot-indicator-release 0s linear 60s forwards;
+    }
+    @keyframes boot-indicator-release { to { visibility: hidden; } }
+    html[data-bs-theme="dark"] #boot-indicator { background: #0c0616; color: #e9e3f5; }
+    .boot-indicator-spinner {
+        width: 3rem; height: 3rem; box-sizing: border-box;
+        border: 0.3rem solid #7c3aed; border-right-color: transparent; border-radius: 50%;
+        animation: boot-indicator-spin 0.75s linear infinite;
+    }
+    html[data-bs-theme="dark"] .boot-indicator-spinner { border-color: #a855f7; border-right-color: transparent; }
+    .boot-indicator-label { font-size: 0.95rem; font-weight: 700; line-height: 1.6; text-align: center; max-width: 24rem; }
+    .boot-indicator-label:empty::before { content: "読み込み中…"; }
+    .boot-indicator-label a { color: #7c3aed; font-weight: 700; text-decoration: underline; pointer-events: auto; }
+    html[data-bs-theme="dark"] .boot-indicator-label a { color: #a855f7; }
+    #boot-indicator[data-state="slow"] .boot-indicator-spinner { animation: none; }
+    @keyframes boot-indicator-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+        .boot-indicator-spinner { animation: none; }
+    }
+</style>
+<noscript><style>#boot-indicator { display: none; }</style></noscript>
+
+<!-- body の先頭。#app の外に置く（Blazor が #app の中身を置き換えても残るので、boot-indicator.js が起動後に外す）。
+     静的な本文（class="entry-static"）は、このオーバーレイの下に DOM として残す（検索エンジン・JavaScript が無い環境のため）。文言は CSS で出す -->
+<div id="boot-indicator" class="boot-indicator">
+    <div class="boot-indicator-spinner" aria-hidden="true"></div>
+    <span class="boot-indicator-label" role="status" aria-live="polite" aria-label="読み込み中"></span>
+</div>
+<div id="app">
+    <!-- 静的な本文（任意。class="entry-static" を付けた要素だけ、読み込み中は inert になる） -->
+</div>
+
+<!-- body の末尾（この順番で読む） -->
+<script src="_content/FaraSiteKit.Razor/js/boot-indicator.js"></script>
+<script src="_content/FaraSiteKit.Razor/js/fara-site-kit.js"></script>
+<script src="_content/FaraSiteKit.Razor/js/scroll-progress.js"></script>
+<script src="_content/FaraSiteKit.Razor/js/report.js"></script>
+<script src="_framework/blazor.webassembly.js"></script>

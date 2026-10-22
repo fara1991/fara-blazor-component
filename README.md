@@ -14,7 +14,8 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 | `src/FaraSiteKit.Core/` | C#（UI と通信に依存しない共通コード）: `SiteLinks`（確認用ホストへの切り替え）・`MaintenanceInfo`（メンテナンス状態の読み取り）・`ReportForm`（報告の入力の検査） | K0-2 |
 | `tests/FaraSiteKit.Core.Tests/` | 上の C# の xUnit テスト（`dotnet test`） | K0-2 |
 | `.github/workflows/ci.yml` | `npm test`（Node 22、ubuntu）と `dotnet test`（global.json の SDK） | K0 |
-| `src/`（Razor クラスライブラリ） | — | K0-4 で作る |
+| `src/FaraSiteKit.Razor/` | Razor 部品（MudBlazor。SiteLayout・MudProviders・ThemeSwitch・SiteFooter・ReportFormView・NotFoundView など）と静的ファイル | K0-4・K0-5 |
+| `samples/MinimalSite/` | Razor 部品を使う最小のサイト（CI でビルドのみ。公開しない） | K0-4 |
 
 ## 使い方
 
@@ -33,7 +34,8 @@ git submodule add https://github.com/fara1991/fara-site-kit.git external/fara-si
 npm test                  # worker/ の Node テストすべて（Node 22 以上）
 npm run test:report
 npm run test:maintenance
-dotnet test tests/FaraSiteKit.Core.Tests   # C#（.NET 8 SDK）
+dotnet test tests/FaraSiteKit.Core.Tests   # C#（.NET 10 SDK）
+dotnet test tests/FaraSiteKit.Razor.Tests  # Razor 部品（bUnit）
 ```
 
 ## 関連

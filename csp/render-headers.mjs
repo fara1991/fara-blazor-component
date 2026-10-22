@@ -70,6 +70,26 @@ function checkHeaderLimits(lines) {
 }
 
 /**
+ * 外部サービスの既定の欄（展開して renderHeaders に渡す。例: renderHeaders({ ...presets.turnstile, ...presets.googleFonts })）。
+ * 追加する前に、サービスの公式の要件を確かめる。ホストは https の固定の値だけ（ワイルドカードは無い）。
+ *   turnstile: 報告フォームの Cloudflare Turnstile（script・frame・確認の通信）
+ *   googleFonts: Google Fonts（CSS と フォントファイル）
+ * Blazor WebAssembly の 'wasm-unsafe-eval' と MudBlazor の style の 'unsafe-inline' は、renderHeaders が常に入れる。
+ * 報告の API（/api/report）は同じオリジンなら 'self' で足りる（別のホストに置く場合は connectSrc に足す）。
+ */
+export const presets = Object.freeze({
+    turnstile: Object.freeze({
+        scriptSrc: Object.freeze(["https://challenges.cloudflare.com"]),
+        frameSrc: Object.freeze(["https://challenges.cloudflare.com"]),
+        connectSrc: Object.freeze(["https://challenges.cloudflare.com"]),
+    }),
+    googleFonts: Object.freeze({
+        styleSrc: Object.freeze(["https://fonts.googleapis.com"]),
+        fontSrc: Object.freeze(["https://fonts.gstatic.com"]),
+    }),
+});
+
+/**
  * _headers の本文を作る（末尾の改行つき）。
  * @param {object} options scriptSrc・styleSrc・fontSrc・imgSrc・connectSrc・frameSrc（ホストの配列）、
  *   noindex（true で X-Robots-Tag: noindex を全ページに付ける。確認用に使う）、cacheRules（[{ path, value }]）

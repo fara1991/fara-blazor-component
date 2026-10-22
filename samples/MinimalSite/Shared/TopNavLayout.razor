@@ -1,0 +1,19 @@
+@inherits LayoutComponentBase
+@inject MaintenanceInfo Maintenance
+
+@* サイドバーを使わない構成（上部ナビだけ）。PC はヘッダーに横に並べる。スマホは、ハンバーガーで開くメニューに畳む *@
+<SiteLayout Body="@Body" Maintenance="Maintenance" ShowDrawer="false" CollapseTopNavOnMobile="true">
+    <TopNav>
+        <a class="fsk-topnav-link" href="top">ホーム</a>
+        <a class="fsk-topnav-link" href="top/works">作品</a>
+        <a class="fsk-topnav-link" href="report">問い合わせ</a>
+        <a class="fsk-topnav-link" href="privacy">プライバシー</a>
+    </TopNav>
+    <HeaderEnd>
+        <ThemeSwitch />
+    </HeaderEnd>
+    <SearchSheet Context="close">
+        <input class="sample-search" type="search" aria-label="サイト内を検索" placeholder="検索（サンプル）" />
+        <button type="button" class="sample-close" @onclick="() => close.InvokeAsync()">閉じる</button>
+    </SearchSheet>
+</SiteLayout>

@@ -73,3 +73,21 @@ test("配列でない欄は失敗する", () => {
 function escapeRe(text) {
     return text.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
 }
+
+test("presets: Turnstile は script・frame・connect に、Google Fonts は style・font に入る（既存の拒否規則は保つ）", async () => {
+    const { renderHeaders, presets } = await import("../../csp/render-headers.mjs");
+    const text = renderHeaders({ ...presets.turnstile, ...presets.googleFonts });
+    assert.match(text, /script-src 'self' 'wasm-unsafe-eval' https:\/\/challenges\.cloudflare\.com/);
+    assert.match(text, /style-src 'self' 'unsafe-inline' https:\/\/fonts\.googleapis\.com/);
+    assert.match(text, /font-src 'self' https:\/\/fonts\.gstatic\.com/);
+    assert.match(text, /frame-src https:\/\/challenges\.cloudflare\.com/);
+    assert.match(text, /connect-src 'self' https:\/\/challenges\.cloudflare\.com/);
+    const csp = text.split(String.fromCharCode(10)).find((line) => line.includes("Content-Security-Policy"));
+    assert.doesNotMatch(csp, /'unsafe-eval'|script-src[^;]*'unsafe-inline'/);
+});
+
+test("presets は書き換えられない（渡した先で変えても、既定の値は変わらない）", async () => {
+    const { presets } = await import("../../csp/render-headers.mjs");
+    assert.throws(() => { presets.turnstile.scriptSrc.push("https://evil.example"); });
+    assert.equal(presets.turnstile.scriptSrc.length, 1);
+});

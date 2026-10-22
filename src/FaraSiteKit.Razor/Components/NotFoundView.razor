@@ -1,0 +1,36 @@
+@* 404（ページが見つからない）の表示。ポートフォリオ（fara-labs.com）の見栄えに合わせた共通の部品。レイアウトの本文の中に出す（SiteLayout の中）。
+   文言とホームの URL は引数で変えられる。noindex（検索に出さない）は既定で付ける（HeadOutlet が必要） *@
+@inject SiteOptions Site
+
+<PageTitle>@Title | @Site.Name</PageTitle>
+@if (NoIndex)
+{
+    <HeadContent><meta name="robots" content="noindex" /></HeadContent>
+}
+
+<section class="fsk-not-found">
+    <p class="fsk-not-found-code" aria-hidden="true">@Code</p>
+    <h1>@Title</h1>
+    <p class="fsk-not-found-lead">@Lead</p>
+    <MudButton Href="@HomeHref" Variant="Variant.Filled" Color="Color.Primary" Class="fsk-btn-primary" EndIcon="@Icons.Material.Filled.ArrowForward">@HomeText</MudButton>
+</section>
+
+@code {
+    /// <summary>大きく出す番号（既定は 404）。読み上げは見出しで伝える。</summary>
+    [Parameter] public string Code { get; set; } = "404";
+
+    /// <summary>見出し。</summary>
+    [Parameter] public string Title { get; set; } = "ページが見つかりません";
+
+    /// <summary>見出しの下の説明。</summary>
+    [Parameter] public string Lead { get; set; } = "URL が間違っているか、ページが移動した可能性があります。";
+
+    /// <summary>ホームへ戻るボタンの移動先（既定はサイトの先頭）。</summary>
+    [Parameter] public string HomeHref { get; set; } = "./";
+
+    /// <summary>ホームへ戻るボタンの文字。</summary>
+    [Parameter] public string HomeText { get; set; } = "ホームへ戻る";
+
+    /// <summary>検索に出さない（noindex）か。既定は出さない。</summary>
+    [Parameter] public bool NoIndex { get; set; } = true;
+}

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja" data-bs-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Minimal Site</title>
+    <base href="/" />
+    <!-- kit の断片（docs/index-template.html）。テーマ・起動前の表示・CSS -->
+    <script src="_content/FaraSiteKit.Razor/js/theme-init.js" data-storage-key="fara-site-kit.settings" data-sidebar-key="fara-site-kit.sidebar-hidden"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="_content/FaraSiteKit.Razor/css/fara-site-kit.css" rel="stylesheet" />
+    <style>
+        html, body { background: #f7f4fd; }
+        html[data-bs-theme="dark"], html[data-bs-theme="dark"] body { background: #0c0616; }
+        #boot-indicator {
+            position: fixed; inset: 0; z-index: 2147483000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.1rem;
+            box-sizing: border-box; padding: 1.5rem;
+            background: #f7f4fd; color: #3b2a5c;
+            font-family: "Zen Kaku Gothic New", "Yu Gothic", system-ui, sans-serif;
+            animation: boot-indicator-release 0s linear 60s forwards;
+        }
+        @keyframes boot-indicator-release { to { visibility: hidden; } }
+        html[data-bs-theme="dark"] #boot-indicator { background: #0c0616; color: #e9e3f5; }
+        .boot-indicator-spinner {
+            width: 3rem; height: 3rem; box-sizing: border-box;
+            border: 0.3rem solid #7c3aed; border-right-color: transparent; border-radius: 50%;
+            animation: boot-indicator-spin 0.75s linear infinite;
+        }
+        html[data-bs-theme="dark"] .boot-indicator-spinner { border-color: #a855f7; border-right-color: transparent; }
+        .boot-indicator-label { font-size: 0.95rem; font-weight: 700; line-height: 1.6; text-align: center; max-width: 24rem; }
+        .boot-indicator-label:empty::before { content: "読み込み中…"; }
+        .boot-indicator-label a { color: #7c3aed; font-weight: 700; text-decoration: underline; pointer-events: auto; }
+        html[data-bs-theme="dark"] .boot-indicator-label a { color: #a855f7; }
+        #boot-indicator[data-state="slow"] .boot-indicator-spinner { animation: none; }
+        @keyframes boot-indicator-spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) {
+            .boot-indicator-spinner { animation: none; }
+        }
+    </style>
+    <noscript><style>#boot-indicator { display: none; }</style></noscript>
+</head>
+<body>
+    <div id="boot-indicator" class="boot-indicator">
+        <div class="boot-indicator-spinner" aria-hidden="true"></div>
+        <span class="boot-indicator-label" role="status" aria-live="polite" aria-label="読み込み中"></span>
+    </div>
+    <div id="app"></div>
+    <div id="blazor-error-ui">
+        エラーが発生しました。ページを再読み込みしてください。
+        <a href="" class="reload">再読み込み</a>
+        <a class="dismiss">🗙</a>
+    </div>
+    <script src="_content/FaraSiteKit.Razor/js/boot-indicator.js"></script>
+    <script src="_content/FaraSiteKit.Razor/js/fara-site-kit.js"></script>
+    <script src="_content/FaraSiteKit.Razor/js/scroll-progress.js"></script>
+    <script src="_content/FaraSiteKit.Razor/js/report.js"></script>
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+</body>
+</html>

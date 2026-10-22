@@ -1,0 +1,35 @@
+@inherits LayoutComponentBase
+@inject MaintenanceInfo Maintenance
+
+<SiteLayout Body="@Body" Maintenance="Maintenance">
+    <DrawerContent>
+        <SiteNavMenu Groups="NavGroups" />
+    </DrawerContent>
+    <SearchBox>
+        <input class="sample-search" type="search" aria-label="サイト内を検索" placeholder="検索（サンプル）" />
+    </SearchBox>
+    <HeaderEnd>
+        <ThemeSwitch />
+    </HeaderEnd>
+    <SearchSheet Context="close">
+        <input class="sample-search" type="search" aria-label="サイト内を検索" placeholder="検索（サンプル）" />
+        <button type="button" class="sample-close" @onclick="() => close.InvokeAsync()">閉じる</button>
+    </SearchSheet>
+</SiteLayout>
+
+@code {
+    private static readonly IReadOnlyList<SiteNavGroup> NavGroups = new[]
+    {
+        new SiteNavGroup(null, new[] { new SiteNavItem("", "ホーム", Icons.Material.Filled.Home) }),
+        new SiteNavGroup("計算", new[]
+        {
+            new SiteNavItem("calculator", "ダメージ計算機", Icons.Material.Filled.Calculate),
+            new SiteNavItem("speed", "素早さ比較（未対応）", Icons.Material.Filled.Speed, Disabled: true, Title: "未対応です"),
+        }),
+        new SiteNavGroup("サポート", new[]
+        {
+            new SiteNavItem("report", "問い合わせ", Icons.Material.Filled.MailOutline),
+            new SiteNavItem("privacy", "プライバシーポリシー", Icons.Material.Filled.PrivacyTip),
+        }),
+    };
+}
