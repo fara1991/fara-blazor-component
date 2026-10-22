@@ -26,7 +26,7 @@ public class StaticAssetTests
 
         Assert.Contains("data-bs-theme", js);
         Assert.Contains("\"theme\"", js);
-        Assert.Contains("sidebar-hidden", js);
+        Assert.Contains("fsk-sidebar-hidden", js);
         Assert.Equal("Theme", SiteThemeState.ThemeProperty);
         Assert.Equal("dark", SiteThemeState.Dark);
     }
@@ -55,31 +55,31 @@ public class StaticAssetTests
 
     [Theory]
     [InlineData("fsk-page")]
-    [InlineData("app-header")]
-    [InlineData("sidebar")]
-    [InlineData("sidebar-toggle")]
-    [InlineData("app-brand")]
+    [InlineData("fsk-header")]
+    [InlineData("fsk-sidebar")]
+    [InlineData("fsk-menu-toggle")]
+    [InlineData("fsk-brand")]
     [InlineData("fsk-search-toggle")]
     [InlineData("fsk-search-sheet")]
-    [InlineData("scroll-progress")]
-    [InlineData("skip-link")]
-    [InlineData("nav-section")]
-    [InlineData("pane-scroll")]
-    [InlineData("page-pane")]
-    [InlineData("page-column")]
-    [InlineData("page-card")]
-    [InlineData("report-card")]
-    [InlineData("report-trap")]
-    [InlineData("app-field")]
-    [InlineData("app-select")]
-    [InlineData("site-footer")]
-    [InlineData("site-footer-line")]
-    [InlineData("site-footer-sep")]
-    [InlineData("site-footer-socials")]
-    [InlineData("site-footer-social")]
-    [InlineData("maintenance-notice")]
-    [InlineData("maintenance-screen")]
-    [InlineData("maintenance-link")]
+    [InlineData("fsk-scroll-progress")]
+    [InlineData("fsk-skip-link")]
+    [InlineData("fsk-nav-section")]
+    [InlineData("fsk-pane-scroll")]
+    [InlineData("fsk-page-pane")]
+    [InlineData("fsk-page-column")]
+    [InlineData("fsk-page-card")]
+    [InlineData("fsk-report-card")]
+    [InlineData("fsk-report-trap")]
+    [InlineData("fsk-field")]
+    [InlineData("fsk-select")]
+    [InlineData("fsk-footer")]
+    [InlineData("fsk-footer-line")]
+    [InlineData("fsk-footer-sep")]
+    [InlineData("fsk-footer-socials")]
+    [InlineData("fsk-footer-social")]
+    [InlineData("fsk-notice")]
+    [InlineData("fsk-maintenance")]
+    [InlineData("fsk-maintenance-link")]
     public void TheStylesheetDefinesEveryClassTheComponentsUse(string className)
     {
         var css = File.ReadAllText(Path.Combine(RepoRoot(), "src", "FaraSiteKit.Razor", "wwwroot", "css", "fara-site-kit.css"));
@@ -92,7 +92,7 @@ public class StaticAssetTests
     {
         var css = File.ReadAllText(Path.Combine(RepoRoot(), "src", "FaraSiteKit.Razor", "wwwroot", "css", "fara-site-kit.css"));
 
-        Assert.Contains(".report-trap {", css);
+        Assert.Contains(".fsk-report-trap {", css);
         Assert.Contains("left: -10000px;", css);
     }
 
@@ -103,5 +103,46 @@ public class StaticAssetTests
 
         Assert.Contains(":root[data-bs-theme=\"dark\"]", css);
         Assert.Contains("--fsk-body-bg: #0c0616;", css);
+    }
+
+    [Fact]
+    public void EveryViewportHeightFallsBackToVhBeforeDvh()
+    {
+        var css = File.ReadAllText(Path.Combine(RepoRoot(), "src", "FaraSiteKit.Razor", "wwwroot", "css", "fara-site-kit.css"));
+        var lines = css.Split('\n').Select(l => l.Trim()).ToArray();
+
+        for (var i = 0; i < lines.Length; i++)
+        {
+            if (lines[i] != "height: 100vh;" && lines[i] != "min-height: 100vh;") continue;
+            var next = i + 1 < lines.Length ? lines[i + 1] : "";
+            Assert.True(next.Contains("100dvh"), $"{i + 1} 行目の 100vh の次は 100dvh にする（古い端末は 100vh を使う）");
+        }
+    }
+
+    [Fact]
+    public void TheFooterHeightIsFlexOnlyWithoutAVariableOrScriptMeasuring()
+    {
+        var css = File.ReadAllText(Path.Combine(RepoRoot(), "src", "FaraSiteKit.Razor", "wwwroot", "css", "fara-site-kit.css"));
+        var js = File.ReadAllText(Path.Combine(RepoRoot(), "src", "FaraSiteKit.Razor", "wwwroot", "js", "fara-site-kit.js"));
+
+        Assert.DoesNotContain("footer-height", css);
+        Assert.DoesNotContain("footer-height", js);
+    }
+
+    [Fact]
+    public void ComponentsDoNotUseTheGenericClassNames()
+    {
+        var generic = new[] { "content", "page-header", "page-column", "card", "card-body", "nowrap", "sidebar", "app-header", "app-brand", "site-footer", "pane-scroll", "page-pane" };
+        var root = Path.Combine(RepoRoot(), "src", "FaraSiteKit.Razor");
+        foreach (var file in Directory.EnumerateFiles(root, "*.razor", SearchOption.AllDirectories))
+        {
+            var text = File.ReadAllText(file);
+            foreach (var attribute in text.Split(new[] { "class=\"", "Class=\"" }, StringSplitOptions.None).Skip(1))
+            {
+                var value = attribute.Split('"')[0];
+                foreach (var name in value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                    Assert.DoesNotContain(name, generic);
+            }
+        }
     }
 }

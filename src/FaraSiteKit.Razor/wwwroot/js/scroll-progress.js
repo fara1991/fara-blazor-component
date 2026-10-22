@@ -1,17 +1,17 @@
-// ページをどれだけ読んだかを、固定ヘッダーの下端の線で示す（SiteLayout の ScrollProgress・.scroll-progress）。
+// ページをどれだけ読んだかを、固定ヘッダーの下端の線で示す（SiteLayout の ScrollProgress・.fsk-scroll-progress）。
 // 測る要素を選ぶ:
 //  - スマホ: ページ全体（window）がスクロールするので、window を測る
-//  - PC（768px 以上）: .page は 100vh で固定され、スクロールは article.content か、その中の .pane-scroll で起きる。
-//    動かせる要素（.content 自体、または .pane-scroll で scrollHeight > clientHeight のもの）のうち、
+//  - PC（768px 以上）: .page は 100vh で固定され、スクロールは article.fsk-content か、その中の .fsk-pane-scroll で起きる。
+//    動かせる要素（.fsk-content 自体、または .fsk-pane-scroll で scrollHeight > clientHeight のもの）のうち、
 //    ほかの動かせる要素の中に入っていない一番外側のものを測る（複数あれば一番背の高いもの）。
 //    一覧の中の小さな入れ子スクロールは、外側が動いていれば対象外。
 // 候補は、スクロールのイベント（capture で受ける）と、画面の作り直し（#app の childList）のときだけ見直す。全要素は走査しない。
-// 値は線（.scroll-progress）自身の --scroll-progress（0〜1）に入れる。html に書くと文書全体のスタイルを計算し直すため。
+// 値は線（.fsk-scroll-progress）自身の --scroll-progress（0〜1）に入れる。html に書くと文書全体のスタイルを計算し直すため。
 // 前と同じ値なら書かない。
 (function () {
     "use strict";
-    var MAIN = "main > article.content";
-    var PANES = MAIN + ", " + MAIN + " .pane-scroll";
+    var MAIN = "main > article.fsk-content";
+    var PANES = MAIN + ", " + MAIN + " .fsk-pane-scroll";
     var active = null;          // 最後に測った PC の要素（画面が替わったら外れるので、そのつど確かめる）
     var pending = false;
     var bar = null, shown = "";
@@ -20,7 +20,7 @@
 
     function scrollable(el) { return !!el && el.isConnected && el.scrollHeight - el.clientHeight > 1; }
 
-    // 動かせる候補（.content と .pane-scroll）のうち、ほかの動かせる候補の中に入っていないもの
+    // 動かせる候補（.fsk-content と .fsk-pane-scroll）のうち、ほかの動かせる候補の中に入っていないもの
     function outerScrollers() {
         var list = Array.prototype.filter.call(document.querySelectorAll(PANES), scrollable);
         return list.filter(function (el) {
@@ -51,7 +51,7 @@
 
     function update() {
         pending = false;
-        if (!bar || !bar.isConnected) bar = document.querySelector(".scroll-progress");
+        if (!bar || !bar.isConnected) bar = document.querySelector(".fsk-scroll-progress");
         if (!bar) return;
         var value = progress().toFixed(4);
         if (value === shown) return;     // 前と同じなら書かない

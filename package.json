@@ -10,6 +10,7 @@
     "test:maintenance": "node --test worker/maintenance.test.mjs",
     "test:build": "node --test tests/build/build-pages.test.mjs tests/build/pokemon-equivalence.test.mjs tests/build/boot-indicator.test.mjs tests/build/hardening.test.mjs",
     "test:csp": "node --test tests/csp/render-headers.test.mjs tests/csp/limits.test.mjs",
-    "test": "node --test worker/report.test.mjs worker/maintenance.test.mjs tests/build/build-pages.test.mjs tests/build/pokemon-equivalence.test.mjs tests/build/boot-indicator.test.mjs tests/build/hardening.test.mjs tests/csp/render-headers.test.mjs tests/csp/limits.test.mjs"
+    "test": "node --test worker/report.test.mjs worker/maintenance.test.mjs tests/build/build-pages.test.mjs tests/build/pokemon-equivalence.test.mjs tests/build/boot-indicator.test.mjs tests/build/hardening.test.mjs tests/csp/render-headers.test.mjs tests/csp/limits.test.mjs tests/js/kit-js.test.mjs",
+    "test:js": "node --test tests/js/kit-js.test.mjs"
   }
 }

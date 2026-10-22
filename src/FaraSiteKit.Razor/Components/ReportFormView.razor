@@ -14,57 +14,57 @@
 }
 <PageTitle>@Title | @Site.Name</PageTitle>
 
-<div class="page-header page-column">
+<div class="fsk-page-header fsk-page-column">
     <h3>@Title</h3>
-    <p class="text-muted mb-0">@Lead</p>
+    <p class="fsk-muted fsk-mb-0">@Lead</p>
 </div>
 
 @* PC: 見出しは固定にして、カードの中だけがスクロールする *@
-<div class="pane-scroll page-pane">
-<MudCard Elevation="0" Class="card mb-3 report-card page-card">
-    <MudCardContent Class="card-body">
+<div class="fsk-pane-scroll fsk-page-pane">
+<MudCard Elevation="0" Class="fsk-card fsk-mb-3 fsk-report-card fsk-page-card">
+    <MudCardContent Class="fsk-card-body">
         @if (sent)
         {
             <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true" NoIcon="true">送信しました。ありがとうございます。返信が必要な場合は、書いていただいた連絡先にお返事することがあります。</MudAlert>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3" OnClick="StartOver">もう 1 件送る</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="fsk-mt-3" OnClick="StartOver">もう 1 件送る</MudButton>
         }
         else
         {
             @if (disabled)
             {
-                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" NoIcon="true" Class="mb-3">いまは報告を受け付けていません。@UnavailableNote</MudAlert>
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" NoIcon="true" Class="fsk-mb-3">いまは報告を受け付けていません。@UnavailableNote</MudAlert>
             }
-            <div class="form-group mb-3">
-                <label class="form-label" for="report-category">種類</label>
-                <MudSelect T="string" Value="@Form.Category" ValueChanged="@(v => Form.Category = v ?? "")" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Class="app-select" InputId="report-category" Placeholder="選んでください">
+            <div class="fsk-form-group fsk-mb-3">
+                <label class="fsk-form-label" for="report-category">種類</label>
+                <MudSelect T="string" Value="@Form.Category" ValueChanged="@(v => Form.Category = v ?? "")" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Class="fsk-select" InputId="report-category" Placeholder="選んでください">
                     @foreach (var (id, label) in ReportForm.Categories)
                     {
                         <MudSelectItem T="string" Value="@id">@label</MudSelectItem>
                     }
                 </MudSelect>
             </div>
-            <div class="form-group mb-3">
-                <label class="form-label" for="report-message">内容 <small class="text-muted">（@ReportForm.MinMessage〜@ReportForm.MaxMessage 文字。いま @Form.Message.Trim().Length 文字）</small></label>
-                <MudTextField T="string" Variant="Variant.Outlined" Margin="Margin.Dense" Class="app-field" InputId="report-message" Lines="6" MaxLength="@ReportForm.MaxMessage" Immediate="true"
+            <div class="fsk-form-group fsk-mb-3">
+                <label class="fsk-form-label" for="report-message">内容 <small class="fsk-muted">（@ReportForm.MinMessage〜@ReportForm.MaxMessage 文字。いま @ReportForm.CountCharacters(Form.Message.Trim()) 文字）</small></label>
+                <MudTextField T="string" Variant="Variant.Outlined" Margin="Margin.Dense" Class="fsk-field" InputId="report-message" Lines="6" MaxLength="@ReportForm.MaxMessage" Immediate="true"
                               Value="@Form.Message" ValueChanged="@(v => Form.Message = v ?? "")" Placeholder="@MessagePlaceholder" />
             </div>
-            <div class="form-group mb-3">
-                <label class="form-label" for="report-contact">連絡先（任意）</label>
-                <p class="small text-muted mb-1">@ContactHint</p>
-                <MudTextField T="string" Variant="Variant.Outlined" Margin="Margin.Dense" Class="app-field" InputId="report-contact" MaxLength="@ReportForm.MaxContact"
+            <div class="fsk-form-group fsk-mb-3">
+                <label class="fsk-form-label" for="report-contact">連絡先（任意）</label>
+                <p class="fsk-small fsk-muted fsk-mb-1">@ContactHint</p>
+                <MudTextField T="string" Variant="Variant.Outlined" Margin="Margin.Dense" Class="fsk-field" InputId="report-contact" MaxLength="@ReportForm.MaxContact"
                               Value="@Form.Contact" ValueChanged="@(v => Form.Contact = v ?? "")" Placeholder="返信が必要なときだけ" />
             </div>
             @* ボット対策の罠。人には見えない（CSS で画面の外に出す、.report-trap）。入っていたら、サーバーは何も送らずに成功を返す *@
-            <div class="report-trap" aria-hidden="true">
+            <div class="fsk-report-trap" aria-hidden="true">
                 <label>ウェブサイト <input type="text" tabindex="-1" autocomplete="off" @bind="Form.Website" /></label>
             </div>
-            <div id="@TurnstileId" class="mb-3"></div>
+            <div id="@TurnstileId" class="fsk-mb-3"></div>
             @if (!string.IsNullOrEmpty(error))
             {
-                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" NoIcon="true" Class="mb-3" role="alert">@error</MudAlert>
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" NoIcon="true" Class="fsk-mb-3" role="alert">@error</MudAlert>
             }
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SendAsync" Disabled="@(sending || disabled)">@(sending ? "送信中…" : "送信する")</MudButton>
-            <p class="small text-muted mt-3 mb-0">送信すると、<a href="@Site.PrivacyPath">プライバシーポリシー</a>に書いたとおり、内容が作者に通知されます。個人情報（パスワード・アクセスキーなど）は書かないでください。</p>
+            <p class="fsk-small fsk-muted fsk-mt-3 fsk-mb-0">送信すると、<a href="@Site.PrivacyPath">プライバシーポリシー</a>に書いたとおり、内容が作者に通知されます。個人情報（パスワード・アクセスキーなど）は書かないでください。</p>
         }
     </MudCardContent>
 </MudCard>

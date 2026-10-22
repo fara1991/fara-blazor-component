@@ -71,7 +71,7 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout();
 
-        var skip = cut.Find("a.skip-link");
+        var skip = cut.Find("a.fsk-skip-link");
         Assert.Equal("本文へ移動", skip.TextContent.Trim());
         Assert.EndsWith("#fsk-main", skip.GetAttribute("href"));
         var main = cut.Find("main#fsk-main");
@@ -83,7 +83,7 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout();
 
-        var brand = cut.Find("a.app-brand");
+        var brand = cut.Find("a.fsk-brand");
         Assert.Equal("テストサイト", brand.TextContent);
         Assert.Equal("./", brand.GetAttribute("href"));
     }
@@ -96,7 +96,7 @@ public class SiteLayoutTests : SiteKitTestContext
 
         var cut = RenderLayout();
 
-        Assert.Equal(name, cut.Find("a.app-brand").TextContent);
+        Assert.Equal(name, cut.Find("a.fsk-brand").TextContent);
     }
 
     [Fact]
@@ -146,10 +146,10 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout(mobile: false);
 
-        cut.Find("button.sidebar-toggle").Click();
+        cut.Find("button.fsk-menu-toggle").Click();
 
         Assert.False(cut.FindComponent<MudDrawer>().Instance.Open);
-        Assert.Equal("false", cut.Find("button.sidebar-toggle").GetAttribute("aria-expanded"));
+        Assert.Equal("false", cut.Find("button.fsk-menu-toggle").GetAttribute("aria-expanded"));
         Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.sidebarChanged" && i.Arguments[1]?.ToString() == SidebarKey);
     }
 
@@ -158,7 +158,7 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout();
 
-        Assert.Equal("項目", cut.Find(".sidebar .nav-item").TextContent);
+        Assert.Equal("項目", cut.Find(".fsk-sidebar .nav-item").TextContent);
         Assert.Equal("本文", cut.Find("main article .body-text").TextContent);
     }
 
@@ -177,7 +177,7 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout();
 
-        var line = cut.Find("header .scroll-progress");
+        var line = cut.Find("header .fsk-scroll-progress");
         Assert.Equal("true", line.GetAttribute("aria-hidden"));
     }
 
@@ -185,7 +185,7 @@ public class SiteLayoutTests : SiteKitTestContext
     public void OnAPhoneOpeningTheMenuAndMovingToAPageClosesIt()
     {
         var cut = RenderLayout(mobile: true);
-        cut.Find("button.sidebar-toggle").Click();
+        cut.Find("button.fsk-menu-toggle").Click();
         Assert.True(cut.FindComponent<MudDrawer>().Instance.Open);
 
         Services.GetRequiredService<NavigationManager>().NavigateTo("http://localhost/damage-calculator");

@@ -21,10 +21,10 @@ public class SiteFooterTests : SiteKitTestContext
     {
         var cut = RenderAt("");
 
-        var text = cut.Find(".site-footer").TextContent;
+        var text = cut.Find(".fsk-footer").TextContent;
         Assert.Contains("テストサイト", text);
         Assert.Contains("© 2026", text);
-        Assert.Equal("テスト作者", cut.Find(".site-footer a[href='https://example.test/']").TextContent);
+        Assert.Equal("テスト作者", cut.Find(".fsk-footer a[href='https://example.test/']").TextContent);
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public class SiteFooterTests : SiteKitTestContext
 
         var cut = RenderAt("");
 
-        var links = cut.FindAll("a.site-footer-social");
+        var links = cut.FindAll("a.fsk-footer-social");
         Assert.Single(links);
         Assert.Equal("GitHub", links[0].GetAttribute("aria-label"));
         Assert.Equal("noopener noreferrer", links[0].GetAttribute("rel"));
@@ -93,7 +93,7 @@ public class SiteFooterTests : SiteKitTestContext
 
         var cut = RenderAt("");
 
-        Assert.Empty(cut.FindAll(".site-footer a[href^='https://']"));
-        Assert.Contains("テスト作者", cut.Find(".site-footer").TextContent);
+        Assert.Empty(cut.FindAll(".fsk-footer a[href^='https://']"));
+        Assert.Contains("テスト作者", cut.Find(".fsk-footer").TextContent);
     }
 }

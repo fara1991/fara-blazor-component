@@ -59,8 +59,8 @@ public class ReportFormViewTests : SiteKitTestContext
         Assert.NotNull(cut.Find("#report-contact"));
         Assert.NotNull(cut.Find("#fsk-report-turnstile"));
         Assert.NotNull(cut.Find("button.mud-button-filled"));
-        Assert.Equal("true", cut.Find(".report-trap").GetAttribute("aria-hidden"));
-        Assert.Equal("-1", cut.Find(".report-trap input").GetAttribute("tabindex"));
+        Assert.Equal("true", cut.Find(".fsk-report-trap").GetAttribute("aria-hidden"));
+        Assert.Equal("-1", cut.Find(".fsk-report-trap input").GetAttribute("tabindex"));
     }
 
     [Fact]
@@ -68,8 +68,8 @@ public class ReportFormViewTests : SiteKitTestContext
     {
         var cut = RenderForm();
 
-        Assert.NotNull(cut.Find(".page-header.page-column"));
-        Assert.NotNull(cut.Find(".pane-scroll.page-pane .report-card"));
+        Assert.NotNull(cut.Find(".fsk-page-header.fsk-page-column"));
+        Assert.NotNull(cut.Find(".fsk-pane-scroll.fsk-page-pane .fsk-report-card"));
     }
 
     [Fact]

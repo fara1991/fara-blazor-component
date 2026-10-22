@@ -1,6 +1,8 @@
-@* サイトの共通のレイアウト（MudBlazor）。ヘッダー（ハンバーガー・名前・検索・設定）、サイドバー（Mini。PC は隠すと細い列、スマホは一時的なメニュー）、本文。
-   中身はサイトが決める（スロット）: 名前（Brand）、ヘッダーの中央・右（SearchBox・HeaderEnd・MobileHeaderActions）、スマホの検索欄（SearchSheet）、サイドバーの中身（DrawerContent）。
-   挙動（描画の前に保存の開閉とスマホの判定を同期で読む・検索欄の開閉・スキップリンク）は、pokemon の MainLayout と同じ。 *@
+@* サイトの共通のレイアウト（MudBlazor）。ヘッダー（名前・検索・設定・上部ナビ）、サイドバー（PC は Mini。隠すと細い列。スマホは一時的なメニュー）、本文、フッター。
+   サイドバーを使わない構成（ShowDrawer=false。上部ナビだけのサイト）も選べる。その場合、スマホでメニューに畳むか（CollapseTopNavOnMobile）を選べる。
+   中身はサイトが決める（スロット）: 名前（Brand）、ヘッダーの中央・右（SearchBox・HeaderEnd・MobileHeaderActions）、上部ナビ（TopNav）、
+   スマホの検索欄（SearchSheet）、サイドバーの中身（DrawerContent）。
+   挙動（描画の前に保存の開閉とスマホの判定を同期で読む・検索欄の開閉と Esc・スキップリンク・フッターは本文の外）は、pokemon の MainLayout と同じ。 *@
 @inherits LayoutComponentBase
 @implements IDisposable
 @using Microsoft.AspNetCore.Components.Routing
@@ -9,22 +11,29 @@
 @inject SiteOptions Site
 
 @* 本文へ移動（キーボードの利用者向け）。先頭に置く。href は今のページの URL にする（<base> の下で "#..." だけだと、ホームへ移ってしまうため） *@
-<a class="skip-link" href="@SkipHref" @onclick="FocusMain" @onclick:preventDefault="true">本文へ移動</a>
+<a class="fsk-skip-link" href="@SkipHref" @onclick="FocusMain" @onclick:preventDefault="true">本文へ移動</a>
 
 <MudProviders CustomTheme="CustomTheme" />
 
 <MudLayout Class="@PageClassName">
-    <MudAppBar Fixed="true" Elevation="0" Gutters="false" Class="app-header">
+    <MudAppBar Fixed="true" Elevation="0" Gutters="false" Class="fsk-header">
         <ScrollProgress />
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Class="sidebar-toggle" OnClick="ToggleDrawer"
-                       aria-label="サイドバーの表示・非表示" aria-controls="site-sidebar" aria-expanded="@(DrawerOpen ? "true" : "false")" title="サイドバーの表示・非表示" />
+        @if (HasMenu)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Class="fsk-menu-toggle" OnClick="ToggleDrawer"
+                           aria-label="メニューの表示・非表示" aria-controls="fsk-sidebar" aria-expanded="@(DrawerOpen ? "true" : "false")" title="メニューの表示・非表示" />
+        }
         @if (Brand is not null)
         {
             @Brand
         }
         else
         {
-            <a class="app-brand" href="@Site.HomeHref" title="ホームへ">@Site.Name</a>
+            <a class="fsk-brand" href="@Site.HomeHref" title="ホームへ">@Site.Name</a>
+        }
+        @if (TopNavInHeader)
+        {
+            <div class="fsk-topnav-bar">@TopNav</div>
         }
         @if (Mobile)
         {
@@ -42,20 +51,28 @@
         }
     </MudAppBar>
 
-    @* PC: 隠すと、アイコンだけの細い列になる。マウスを乗せている間は広がる（Mini）。スマホ: ハンバーガーで開く一時的なメニュー。
-       Breakpoint は Sm（既定の Md だと、768〜959px で Mini が画面の外に消えるため） *@
-    <MudDrawer Open="DrawerOpen" OpenChanged="OnDrawerOpenChanged" Variant="@(Mobile ? DrawerVariant.Temporary : DrawerVariant.Mini)" OpenMiniOnHover="true" Breakpoint="Breakpoint.Sm"
-               ClipMode="@(Mobile ? DrawerClipMode.Never : DrawerClipMode.Always)" Elevation="0" Class="sidebar" id="site-sidebar">
-        @if (DrawerContent is not null)
-        {
-            @DrawerContent(CloseOnNavigate)
-        }
-    </MudDrawer>
+    @if (HasMenu)
+    {
+        @* PC: 隠すと、アイコンだけの細い列になる。マウスを乗せている間は広がる（Mini）。スマホ: ハンバーガーで開く一時的なメニュー。
+           Breakpoint は Sm（既定の Md だと、768〜959px で Mini が画面の外に消えるため） *@
+        <MudDrawer Open="DrawerOpen" OpenChanged="OnDrawerOpenChanged" Variant="@(Mobile ? DrawerVariant.Temporary : DrawerVariant.Mini)" OpenMiniOnHover="true" Breakpoint="Breakpoint.Sm"
+                   ClipMode="@(Mobile ? DrawerClipMode.Never : DrawerClipMode.Always)" Elevation="0" Class="fsk-sidebar" id="fsk-sidebar">
+            @if (DrawerContent is not null)
+            {
+                @DrawerContent(CloseOnNavigate)
+            }
+            else if (!ShowDrawer && TopNav is not null)
+            {
+                <div class="fsk-topnav-drawer">@TopNav</div>
+            }
+        </MudDrawer>
+    }
 
     @if (Mobile && SearchSheet is not null)
     {
-        @* スマホの検索欄。ヘッダーの検索ボタンで、ヘッダーの下に開く（閉じているあいだは表示しない・CSS） *@
-        <div id="fsk-search-sheet" class="fsk-search-sheet">
+        @* スマホの検索欄。ヘッダーの検索ボタンで、ヘッダーの下に開く（閉じているあいだは表示しない・CSS）。
+           Esc で閉じる（欄の中で押したキーが、ここに届く。サイトの検索部品が Esc を止めないこと。docs/usage.md の「検索の契約」） *@
+        <div id="fsk-search-sheet" class="fsk-search-sheet" @onkeydown="OnSheetKeyDown">
             @SearchSheet(CloseSearchEvent)
         </div>
     }
@@ -63,11 +80,11 @@
     <MudMainContent>
         <main id="fsk-main" tabindex="-1">
             <MaintenanceBanner Info="Maintenance" />
-            <article class="content px-4">
+            <article class="fsk-content">
                 @Body
             </article>
-            <SiteFooter />
         </main>
+        <SiteFooter />
     </MudMainContent>
 </MudLayout>
 
@@ -84,6 +101,21 @@
     /// <summary>スマホのヘッダーに出す内容（対戦画面の切り替えなど）。</summary>
     [Parameter] public RenderFragment? MobileHeaderActions { get; set; }
 
+    /// <summary>
+    /// 上部ナビ（横に並ぶ項目。例: ホーム・プロフィール・作品）。中身は &lt;a class="fsk-topnav-link"&gt; の並び。
+    /// ShowDrawer=false のとき、PC はヘッダーに出す。スマホは、CollapseTopNavOnMobile が true なら、ハンバーガーで開くメニューに入れる。
+    /// </summary>
+    [Parameter] public RenderFragment? TopNav { get; set; }
+
+    /// <summary>
+    /// サイドバー（ドロワー）を出すか。既定は出す。false にすると、サイドバーもハンバーガーも描かない（上部ナビだけの構成）。
+    /// ただし CollapseTopNavOnMobile が true なら、スマホだけはハンバーガーで開くメニュー（TopNav を縦に並べて入れる）を出す。
+    /// </summary>
+    [Parameter] public bool ShowDrawer { get; set; } = true;
+
+    /// <summary>ShowDrawer=false のとき、スマホでは上部ナビをハンバーガーのメニューに畳むか（既定は畳まない。ヘッダーに横スクロールで出す）。</summary>
+    [Parameter] public bool CollapseTopNavOnMobile { get; set; }
+
     /// <summary>スマホの検索欄の中身。引数は「閉じる」（検索欄の × や、結果を開いたあとに呼ぶ）。省略すると、スマホに検索ボタンを出さない。</summary>
     [Parameter] public RenderFragment<EventCallback>? SearchSheet { get; set; }
 
@@ -99,13 +131,22 @@
     /// <summary>レイアウトの page クラスに足す追加のクラス（サイトの画面の状態に合わせる）。</summary>
     [Parameter] public string? PageClass { get; set; }
 
-    private string PageClassName => "fsk-page" + (string.IsNullOrWhiteSpace(PageClass) ? "" : " " + PageClass);
+    private string PageClassName =>
+        "fsk-page" + (ShowDrawer ? "" : " fsk-no-drawer") + (string.IsNullOrWhiteSpace(PageClass) ? "" : " " + PageClass);
+
+    /// <summary>メニュー（ハンバーガーとドロワー）を出すか。サイドバーがあるか、スマホで上部ナビを畳むとき。</summary>
+    private bool HasMenu => ShowDrawer || (CollapseTopNavOnMobile && TopNav is not null && Mobile);
+
+    /// <summary>上部ナビをヘッダーに出すか（畳んでいるスマホでは、メニューの中に入る）。</summary>
+    private bool TopNavInHeader => TopNav is not null && !ShowDrawer && !(CollapseTopNavOnMobile && Mobile);
 
     // 保存された PC の開閉（SiteOptions.SidebarKey が "1" なら隠す）
     private bool desktopOpen = true;
     private bool mobileOpen;
     private bool mobile;
     private bool searchOpen;
+    private bool checkedConfig;
+    private bool firstLocation = true;
 
     private DotNetObjectReference<SiteLayout>? self;
 
@@ -135,6 +176,17 @@
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // 最初の描画の後は、画面の移動（LocationChanged）を「移動」として扱う（最初の読み込みでは、フォーカスを動かさない）
+        if (firstRender) firstLocation = false;
+        // 起動の後に一度だけ、index.html の theme-init.js の設定（キー）が SiteOptions と同じかを確かめる（違えば、コンソールに警告）
+        if (!firstRender || checkedConfig) return;
+        checkedConfig = true;
+        try { await JS.InvokeVoidAsync("faraSiteKit.checkConfig", Site.StorageKey, Site.SidebarKey); }
+        catch { /* JS が使えないときは、確かめない */ }
+    }
+
     [JSInvokable]
     public void OnMobileChanged(bool matches)
     {
@@ -149,7 +201,7 @@
 
     private void ToggleDrawer()
     {
-        // ハンバーガーを押したら、開いている検索欄は閉じる（欄とサイドバーを同時に開かない）
+        // ハンバーガーを押したら、開いている検索欄は閉じる（欄とメニューを同時に開かない）
         if (searchOpen) HideSearch(focusButton: false);
         SetDrawerOpen(!DrawerOpen);
     }
@@ -181,6 +233,12 @@
 
     private void CloseSearch() => HideSearch(focusButton: true);
 
+    /// <summary>検索の欄の中で Esc が押されたら閉じる（検索の契約。サイトの検索部品が Esc を先に使うときは、その部品が止める）。</summary>
+    private void OnSheetKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") CloseSearch();
+    }
+
     private void HideSearch(bool focusButton)
     {
         if (!searchOpen) return;
@@ -206,13 +264,14 @@
         catch { /* JS が使えないときは、リンクの移動（現在のページの #fsk-main）に任せる */ }
     }
 
-    // 画面を移ったら、開いている検索欄を閉じる（ページの切り替えで、欄が残らないように）
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    // 画面を移ったら、スマホのメニューと検索欄を閉じ、本文へフォーカスを移す（項目は <a href> のまま。SiteNavMenu の項目は、OnClick を持たない）
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        // 項目を選んで画面が移ったら、スマホのメニューを閉じる（SiteNavMenu の項目は <a href> のまま）
         CloseOnMobile();
         if (searchOpen) HideSearch(focusButton: true);
         StateHasChanged();
+        // ページが移ったら、本文（main）へフォーカスを移す（スクリーンリーダーに、新しいページだと伝わる）。最初の読み込みでは動かさない
+        if (!firstLocation) await FocusMain();
     }
 
     public void Dispose()

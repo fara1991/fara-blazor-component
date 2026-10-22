@@ -2,7 +2,7 @@
    Worker の変数 MAINTENANCE を false に戻すと消える。通常・メンテナンス中（On）のときは何も出さない *@
 @if (Info is { State: MaintenanceState.Notice })
 {
-    <div class="maintenance-notice" role="status"><strong class="maintenance-notice-title">【お知らせ】</strong><span class="maintenance-notice-text">@Info.NoticeText</span></div>
+    <div class="fsk-notice" role="status"><strong class="fsk-notice-title">【お知らせ】</strong><span class="fsk-notice-text">@Info.NoticeText</span></div>
 }
 
 @code {

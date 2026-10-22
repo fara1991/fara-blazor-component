@@ -26,6 +26,6 @@
 
     // PC のサイドバーを隠しているとき（"1"）は、描画の前に html のクラスを付ける（開いたときのちらつきを防ぐ。切り替えは SiteLayout）
     try {
-        if (sidebarKey && localStorage.getItem(sidebarKey) === "1") root.classList.add("sidebar-hidden");
+        if (sidebarKey && localStorage.getItem(sidebarKey) === "1") root.classList.add("fsk-sidebar-hidden");
     } catch (e) { }
 })();

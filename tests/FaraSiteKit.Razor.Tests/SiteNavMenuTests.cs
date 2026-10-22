@@ -29,8 +29,8 @@ public class SiteNavMenuTests : SiteKitTestContext
     {
         var cut = Render();
 
-        Assert.Single(cut.FindAll(".nav-section"));
-        Assert.Equal("計算", cut.Find(".nav-section").TextContent);
+        Assert.Single(cut.FindAll(".fsk-nav-section"));
+        Assert.Equal("計算", cut.Find(".fsk-nav-section").TextContent);
         Assert.Equal("ダメージ計算機", cut.Find("a[href='damage-calculator']").TextContent.Trim());
     }
 
@@ -67,7 +67,7 @@ public class SiteNavMenuTests : SiteKitTestContext
     {
         var cut = Render(new[] { new SiteNavGroup(null, new[] { new SiteNavItem("x", "") }) });
 
-        Assert.Empty(cut.FindAll(".nav-section"));
+        Assert.Empty(cut.FindAll(".fsk-nav-section"));
         Assert.NotNull(cut.Find("a[href='x']"));
     }
 
@@ -89,7 +89,7 @@ public class SiteNavMenuTests : SiteKitTestContext
             p.Add(c => c.Top, builder => builder.AddMarkupContent(0, "<div class=\"top-settings\">設定</div>"));
         });
 
-        Assert.Equal("top-settings", cut.Find(".side-nav > *:first-child").ClassName);
+        Assert.Equal("top-settings", cut.Find(".fsk-nav > *:first-child").ClassName);
     }
 
     [Fact]
