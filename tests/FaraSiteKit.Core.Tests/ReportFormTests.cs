@@ -55,6 +55,29 @@ public class ReportFormTests
     }
 
     [Fact]
+    public void Emoji_count_as_one_character_like_the_server()
+    {
+        // 絵文字は UTF-16 で 2 文字だが、サーバー（Array.from）と同じく 1 文字として数える
+        var form = Valid();
+        form.Message = string.Concat(Enumerable.Repeat("😀", ReportForm.MaxMessage));
+        Assert.Null(form.Validate());
+        Assert.Equal(ReportForm.MaxMessage, ReportForm.CountCharacters(form.Message));
+        form.Message = string.Concat(Enumerable.Repeat("😀", ReportForm.MaxMessage + 1));
+        Assert.Contains("2000 文字までに", form.Validate());
+        Assert.Contains("いま 2001 文字", form.Validate());
+    }
+
+    [Fact]
+    public void Minimum_length_also_counts_code_points()
+    {
+        var form = Valid();
+        form.Message = "😀😀😀😀";   // 4 文字（UTF-16 では 8）
+        Assert.Contains("5 文字以上", form.Validate());
+        form.Message = "😀😀😀😀😀";
+        Assert.Null(form.Validate());
+    }
+
+    [Fact]
     public void A_long_contact_is_rejected_and_the_check_token_is_required()
     {
         var form = Valid();

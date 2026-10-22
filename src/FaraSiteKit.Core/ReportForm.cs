@@ -34,12 +34,19 @@ public sealed class ReportForm
     {
         if (!Categories.Any(c => c.Id == Category)) return "種類を選んでください";
         var message = Message.Trim();
-        if (message.Length < MinMessage) return $"内容を {MinMessage} 文字以上で書いてください";
-        if (message.Length > MaxMessage) return $"内容は {MaxMessage} 文字までにしてください（いま {message.Length} 文字）";
-        if (Contact.Trim().Length > MaxContact) return $"連絡先は {MaxContact} 文字までにしてください";
+        var length = CountCharacters(message);
+        if (length < MinMessage) return $"内容を {MinMessage} 文字以上で書いてください";
+        if (length > MaxMessage) return $"内容は {MaxMessage} 文字までにしてください（いま {length} 文字）";
+        if (CountCharacters(Contact.Trim()) > MaxContact) return $"連絡先は {MaxContact} 文字までにしてください";
         if (string.IsNullOrEmpty(TurnstileToken)) return "「ロボットではありません」の確認が終わっていません。表示された確認をしてから、もう一度押してください";
         return null;
     }
+
+    /// <summary>
+    /// 文字数（コードポイント単位）。絵文字などの、UTF-16 で 2 つになる文字も 1 文字と数える。
+    /// サーバー（worker/report.js の clean が Array.from で数える）と同じ数え方。UTF-16 の Length とは違う。
+    /// </summary>
+    public static int CountCharacters(string? text) => string.IsNullOrEmpty(text) ? 0 : text.EnumerateRunes().Count();
 
     /// <summary>サーバーへ送る JSON。</summary>
     public string ToJson() => JsonSerializer.Serialize(new
