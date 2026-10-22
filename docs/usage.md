@@ -29,7 +29,7 @@ import { getMaintenance, maintenanceResponse } from "../external/fara-site-kit/w
 ```
 
 - 対象は net8.0。net9.0 のサイトからも参照できる。`IsPackable` は false（NuGet では配らない）。
-- 名前空間は移す前と同じ（`FaraPokemonBattleAssistant.Core` の `SiteLinks`、`FaraPokemonBattleAssistant.Web.Services` の `MaintenanceInfo`・`ReportForm`）。`using` は書き換えなくてよい。
+- 名前空間は `FaraSiteKit.Core`（`SiteLinks`・`MaintenanceInfo`・`MaintenanceState`・`ReportForm`）。利用するサイトは `using FaraSiteKit.Core;` を書く。
 - 起動時に `SiteLinks.DevelopHost` へ、そのサイトの確認用ホスト名（例: `pokemon-dev.fara-labs.com`）を設定する。空のままなら、リンクは切り替えない。
 - サブモジュールの中の csproj を参照するため、CI のチェックアウトは `submodules: true`（ネストした submodule がある場合は `--recursive`）。
 

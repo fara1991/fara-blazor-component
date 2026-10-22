@@ -25,7 +25,7 @@ git submodule add https://github.com/fara1991/fara-site-kit.git external/fara-si
 ```
 
 - Worker: `worker/index.js` から `../external/fara-site-kit/worker/report.js` などを import する（wrangler がバンドルする）
-- C#: `ProjectReference` で `external/fara-site-kit/src/FaraSiteKit.Core/FaraSiteKit.Core.csproj` を参照する（net8.0。名前空間は `FaraPokemonBattleAssistant.*` のまま。詳しくは `docs/usage.md`）
+- C#: `ProjectReference` で `external/fara-site-kit/src/FaraSiteKit.Core/FaraSiteKit.Core.csproj` を参照する（net8.0。名前空間は `FaraSiteKit.Core`。詳しくは `docs/usage.md`）
 
 ## テスト
 

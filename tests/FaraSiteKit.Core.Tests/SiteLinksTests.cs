@@ -1,4 +1,4 @@
-using FaraPokemonBattleAssistant.Core;
+using FaraSiteKit.Core;
 using Xunit;
 
 namespace FaraSiteKit.Core.Tests;
@@ -25,6 +25,14 @@ public class SiteLinksTests
     public void Nothing_is_switched_when_the_site_has_no_develop_host()
     {
         SiteLinks.DevelopHost = "";
+        Assert.False(SiteLinks.IsDevelop("site-dev.fara-labs.com"));
+        Assert.Equal("https://fara-labs.com/", SiteLinks.Localize("https://fara-labs.com/", "site-dev.fara-labs.com"));
+    }
+
+    [Fact]
+    public void A_null_develop_host_does_not_throw_and_switches_nothing()
+    {
+        SiteLinks.DevelopHost = null!;
         Assert.False(SiteLinks.IsDevelop("site-dev.fara-labs.com"));
         Assert.Equal("https://fara-labs.com/", SiteLinks.Localize("https://fara-labs.com/", "site-dev.fara-labs.com"));
     }

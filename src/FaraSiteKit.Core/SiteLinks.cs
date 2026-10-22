@@ -1,4 +1,4 @@
-namespace FaraPokemonBattleAssistant.Core;
+namespace FaraSiteKit.Core;
 
 /// <summary>
 /// 確認用サイトで開いているときは、fara-labs.com 配下のリンクを確認用の URL に置き換える。
@@ -16,7 +16,7 @@ public static class SiteLinks
     /// <summary>このサイトの確認用ホスト名（例: pokemon-dev.fara-labs.com）。空なら切り替えない。各サイトの起動時に設定する。</summary>
     public static string DevelopHost { get; set; } = "";
 
-    public static bool IsDevelop(string host) => DevelopHost.Length > 0 && host.Equals(DevelopHost, StringComparison.OrdinalIgnoreCase);
+    public static bool IsDevelop(string host) => !string.IsNullOrEmpty(DevelopHost) && string.Equals(host, DevelopHost, StringComparison.OrdinalIgnoreCase);
 
     public static string Localize(string url) => Localize(url, CurrentHost);
 

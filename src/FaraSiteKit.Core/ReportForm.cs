@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace FaraPokemonBattleAssistant.Web.Services;
+namespace FaraSiteKit.Core;
 
 /// <summary>
 /// 「作者へ報告」の入力（各サイトの報告画面に置く）。送り先は同じサイトの POST /api/report（worker/report.js と同じ形）。

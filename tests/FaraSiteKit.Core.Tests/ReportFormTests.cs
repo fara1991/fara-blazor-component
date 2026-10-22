@@ -1,5 +1,5 @@
 using System.Text.Json;
-using FaraPokemonBattleAssistant.Web.Services;
+using FaraSiteKit.Core;
 using Xunit;
 
 namespace FaraSiteKit.Core.Tests;

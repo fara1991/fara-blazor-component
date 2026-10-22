@@ -54,4 +54,5 @@ npm test
 dotnet test tests/FaraSiteKit.Core.Tests
 ```
 
-- C# の名前空間は、移した元のサイトと同じ（`FaraPokemonBattleAssistant.*`）。名前空間を変えると、利用中のサイトが壊れる（破壊的変更）
+- C# の名前空間は `FaraSiteKit.Core`（`SiteLinks`・`MaintenanceInfo`・`MaintenanceState`・`ReportForm` すべて）。利用するサイトは `using FaraSiteKit.Core;` を書く。名前空間を変えると、利用中のサイトが壊れる（破壊的変更）
+- `tests/FaraSiteKit.Core.Tests` のテストが正。pokemon の `tests/FaraPokemonBattleAssistant.Web.Tests`（MaintenanceInfoTests・ReportFormTests）は kit の複製で、サイトの組み込みの確認として残す。挙動を変えるときは、kit のテストを先に直し、pokemon 側も同じ内容に揃える
