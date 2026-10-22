@@ -1,0 +1,49 @@
+@* ライト／ダークの切り替え。既定は MudSwitch（ヘッダー向け）。AsButton にすると、文字のボタン（サイドバーの中向け）。
+   値は SiteThemeState が持つので、どこで切り替えても全体が合う *@
+@implements IDisposable
+@inject SiteThemeState ThemeState
+@inject IJSRuntime Js
+
+@if (AsButton)
+{
+    <MudButton Variant="Variant.Outlined" Color="Color.Inherit" Size="Size.Small" FullWidth="true" Class="@Class" OnClick="ToggleAsync">
+        @(ThemeState.IsDark ? LightLabel : DarkLabel)
+    </MudButton>
+}
+else
+{
+    @* ON = ダークモード（月）、OFF = ライトモード（太陽） *@
+    <MudSwitch T="bool" Value="ThemeState.IsDark" ValueChanged="OnSwitched" Color="Color.Primary" Class="@Class" AriaLabel="ダークモード" title="ダークモードの ON / OFF"
+               ThumbIcon="@(ThemeState.IsDark ? Icons.Material.Filled.DarkMode : Icons.Material.Filled.LightMode)"
+               ThumbIconColor="@(ThemeState.IsDark ? Color.Primary : Color.Warning)" />
+}
+
+@code {
+    /// <summary>文字のボタンにするか（既定は MudSwitch）。</summary>
+    [Parameter] public bool AsButton { get; set; }
+
+    /// <summary>ボタンのときの文字（ダークのとき。押すとライトに戻る）。</summary>
+    [Parameter] public string LightLabel { get; set; } = "☀ ライトモード";
+
+    /// <summary>ボタンのときの文字（ライトのとき。押すとダークになる）。</summary>
+    [Parameter] public string DarkLabel { get; set; } = "🌙 ダークモード";
+
+    [Parameter] public string? Class { get; set; }
+
+    // 保存された値を、描画の前に読む（単独で置いても、正しい向きで出る）
+    protected override void OnInitialized()
+    {
+        ThemeState.Changed += OnChanged;
+        if (Js is IJSInProcessRuntime sync) ThemeState.TryLoadSync(sync);
+    }
+
+    protected override async Task OnInitializedAsync() => await ThemeState.InitializeAsync();
+
+    private Task ToggleAsync() => ThemeState.ToggleAsync();
+
+    private Task OnSwitched(bool _) => ThemeState.ToggleAsync();
+
+    private Task OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => ThemeState.Changed -= OnChanged;
+}

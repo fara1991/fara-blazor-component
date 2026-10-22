@@ -1,3 +1,4 @@
+#pragma warning disable MUD0012 // テストでは、部品の状態（IsDarkMode など）を直接読んで確かめる
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using FaraSiteKit.Razor.Components;
