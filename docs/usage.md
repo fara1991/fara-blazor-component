@@ -52,9 +52,11 @@ import { getMaintenance, maintenanceResponse } from "../external/fara-site-kit/w
 
 ```bash
 node external/fara-site-kit/build/build-pages.mjs \
-  --site site.json --pages pages.json --template publish/wwwroot/index.html \
+  --site site.json --pages pages.json --template artifacts/template/index.html \
   --out publish/wwwroot --env production
 ```
+
+テンプレート（`dotnet publish` の出力の `index.html`）は、出力先（`publish/wwwroot`）とは別のフォルダに置く。テンプレートを出力先で上書きする設定は、書き出す前にエラーにする（2 回目の実行が壊れるため）。同じ入力を 2 回実行すると同じ結果になる（テンプレートは変わらない）。
 
 - `--env production|develop`（確認用は `develop`）。`--site` `--pages` `--template` `--out` は必須。
 - モジュールとしても使える: `import { buildPages, writeFiles } from "../external/fara-site-kit/build/build-pages.mjs";`。`buildPages({ site, pages, redirects, template, env })` は、ファイル名 → 内容 の Map を返す（書き込みはしない）。
@@ -62,6 +64,8 @@ node external/fara-site-kit/build/build-pages.mjs \
 ### テンプレート
 
 - 区切りは `<!-- SEO-HEAD:START -->`・`<!-- SEO-HEAD:END -->`（`<head>` の中）と `<!-- SEO-BODY:START -->`・`<!-- SEO-BODY:END -->`。各 1 つだけ。SEO-BODY は `<div id="app">` の直下（最初の `</div>` より前）に置く。区切りの外（読み込み表示など）は変えない。
+- `#app` の開始タグは、class などの属性があっても受ける（`<div class="…" id="app">`）。
+- 本文の先頭の要素（`bodyHtml` の最初のタグ）には、`site.json` の `bodyRootClass` の class を付ける（pokemon は `entry-static`。例: `<main class="entry-static">`）。読み込み表示の JavaScript は、この class に依存する。JavaScript 本体とそのテストは、kit の Razor ライブラリ側（別の PR）で移す。
 - SEO-BODY の中は空にしておく。本文が入った HTML（生成済みの `index.html` など）を `--template` に渡すとエラーになる（404 や SPA のフォールバックに本文が残るのを防ぐ）。`dotnet publish` の出力を使う。
 - 本文（`bodyHtml`）は `SEO-BODY` の中に入る。Blazor が起動すると `#app` の中身ごと置き換わる。`bodyHtml` に区切りの文字列を入れるとエラーになる。
 
@@ -74,6 +78,7 @@ node external/fara-site-kit/build/build-pages.mjs \
 | `devOrigin` | ○ | 確認用のホスト（canonical・sitemap に使う。develop のとき） |
 | `lang` | ○ | `<html lang>` の既定（`ja` など）。ページの `lang` で上書きできる |
 | `locale` | ○ | `og:locale`（`ja_JP` など） |
+| `bodyRootClass` | | 本文の先頭の要素に付ける class（例: `entry-static`）。指定すると、`bodyHtml` の先頭の要素にこの class が無いとエラー |
 | `homeFile` | | `/` のファイル名。既定 `index.html`（avatar の形）。pokemon は `home.html` |
 | `urlStyle` | | `html`（既定。`<path>.html`。Cloudflare が拡張子を外す）か `directory`（`<path>/index.html`） |
 | `spaFallback` | | `{}` で、汎用の title だけの `index.html` を作る（存在しない URL の SPA フォールバック用）。`homeFile` を `index.html` 以外にする |
@@ -83,7 +88,8 @@ node external/fara-site-kit/build/build-pages.mjs \
 | `maxDescription` | | description の最大文字数（既定 160） |
 | `csp` | | あれば `_headers` を作る（下の「CSP」）。develop は `X-Robots-Tag: noindex` を付ける |
 
-- 知らない項目は、綴りの間違いとしてエラーにする。
+- 知らない項目（`spaFallback`・`notFoundPage`・ページ・redirects・pages.json の最上位も含む）は、綴りの間違いとしてエラーにする。
+- `lang`・`locale`・`ogImage` などは、BCP 47 や URL の形を検査する（`lang` は `ja`・`en-US` の形、`locale` は `ja_JP` の形）。
 - `developRobots` を既定の `disallow` にすると、クローラーは確認用の `X-Robots-Tag: noindex` を見られない。すでに検索に出ている確認用の URL が消えないことがある。確認用の URL が検索に出ても問題ないサイトは `allow` にする（pokemon は `allow`）。
 
 ### ページ一覧（`pages.json`）
@@ -106,7 +112,7 @@ node external/fara-site-kit/build/build-pages.mjs \
 | `jsonLd` | | JSON-LD のオブジェクト。`<script type="application/ld+json">` を、`<` などを \u の形にして出す |
 
 - `noindex` のページに別の `canonical` は指定できない。noindex のページを別のページの canonical にすることもできない（シグナルが矛盾するため）。
-- `redirects`: `[{ "from": "/glossary", "to": "/battle-terms", "status": 301 }]`。`from` は既存のページと同じにできない。`status` は 301・302・307・308（既定 301）。`_redirects` に 1 行ずつ書く。
+- `redirects`: `[{ "from": "/glossary", "to": "/battle-terms", "status": 301 }]`。`from` は既存のページと同じにできない。`to` は `/` で始まるパス、または `https://` の URL（空白・改行・制御文字は使えない。URL は正規化して書く）。`status` は 301・302・307・308（既定 301）。`_redirects` に 1 行ずつ書く（静的の規則は 2,000 件まで、1 行は 1,000 文字まで。超えるとエラー）。
 
 ### 出力
 
@@ -121,6 +127,7 @@ node external/fara-site-kit/build/build-pages.mjs \
 | `_redirects` | `redirects` が 1 つ以上あるとき |
 
 - 同じ入力は、同じバイト列を出す（決定論的）。
+- 出力先の古いファイルは消さない。例えば `urlStyle` を変えると、古い `.html` が残る。出力先を空にしてから実行する運用にする。
 - 入力の問題（path の重複・形・出力ファイル名の重複・区切りの不備など）は、まとめて 1 回のエラーで報告する。エラーのときは何も書き出さない。
 
 ### 使い方の例
@@ -150,5 +157,7 @@ renderHeaders({
 - 欄: `scriptSrc`・`styleSrc`・`fontSrc`・`imgSrc`・`connectSrc`（`https://` と `wss://`）・`frameSrc`。ホストは使うものだけ書く。`https://ホスト名` の形のみ（`*`・`https:` だけ・パス・`;`・空白は拒否する）。`scriptSrc` と `styleSrc` には `'sha256-…'` のハッシュを書ける（importmap などに使う）。
 - 固定の方針（`CLAUDE.md`）: `script-src` に `'unsafe-inline'` と `'unsafe-eval'` は書けない（拒否する）。`'wasm-unsafe-eval'` は固定で入る。`style-src` の `'unsafe-inline'` は MudBlazor のために固定で入る。
 - `noindex: true` で `X-Robots-Tag: noindex` を `/*` に付ける。`build-pages` は develop のとき自動で `true` にする。
+- Cloudflare の上限（超えるとエラー）: `_headers` はルール（`/*` を含むパスの行）が 100 個まで、1 行が 2,000 文字まで。
+- `scriptSrc`・`styleSrc` の `'sha256-…'` は、sha256 の base64（44 文字、末尾 `=`）だけを受ける。sha384・sha512 は受けない。
 - `cacheRules`（`[{ "path": "/_framework/*", "value": "public, max-age=31536000, immutable" }]`）は既定では付けない。pokemon の `_headers` にはキャッシュの規則が無いため。`immutable` は、ファイル名にハッシュが付いていないファイルには使わない（デプロイ後に古いファイルが残るため）。
 - `build-pages` の `site.json` の `csp` にこの引数を書けば、`_headers` も一緒に作られる。Worker の `/api/*` には付かない（Cloudflare の静的アセットだけ）。

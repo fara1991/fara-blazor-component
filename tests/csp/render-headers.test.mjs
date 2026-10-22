@@ -2,9 +2,10 @@
 //   node --test tests/csp/render-headers.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { renderHeaders } from "../../csp/render-headers.mjs";
 
-const SHA = "'sha256-abcDEF0123+/=='";
+const SHA = `'sha256-${createHash("sha256").update("x").digest("base64")}'`;
 
 test("何も渡さないと、既定の CSP（'self' と固定の値だけ）・末尾の改行つき", () => {
     const text = renderHeaders();

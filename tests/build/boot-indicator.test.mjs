@@ -26,6 +26,7 @@ const SITE = {
     robotsDisallow: ["/my-", "/data-share", "/api/my/"],
     developRobots: "allow",
     maxDescription: 150,
+    bodyRootClass: "entry-static",
 };
 
 // 本文は pokemon の本文の形（main と本文のテキスト）を簡単に模したもの。boot-indicator の検査には本文の中身は関係ない

@@ -1,5 +1,5 @@
-// \u9759\u7684\u306a\u516c\u958b\u30d5\u30a1\u30a4\u30eb\u4e00\u5f0f\u3092\u4f5c\u308b\uff08\u30b5\u30a4\u30c8\u306b\u4f9d\u5b58\u3057\u306a\u3044\uff09\u3002\u5165\u529b\u306f\u30da\u30fc\u30b8\u4e00\u89a7 JSON \u3068\u3001\u30b5\u30a4\u30c8\u8a2d\u5b9a JSON\u3002\u672c\u6587\u306e HTML \u306f\u547c\u3073\u51fa\u3057\u5074\u304c\u4f5c\u308b\u3002
-//   node build/build-pages.mjs --site site.json --pages pages.json --template index.html --out <dir> --env production|develop
+// 静的な公開ファイル一式を作る（サイトに依存しない）。入力はページ一覧 JSON と、サイト設定 JSON。本文の HTML は呼び出し側が作る。
+//   node build/build-pages.mjs --site site.json --pages pages.json --template <dir>/index.html --out <dir> --env production|develop
 //
 // 作るもの（--out の中。ファイル名は homeFile・urlStyle の設定による）:
 //   <path>.html（または <path>/index.html）  ページごと。head（title・description・canonical・OGP・Twitter カード）と本文（#app の中の SEO-BODY）を差し込む
@@ -10,8 +10,9 @@
 //   _headers                                 site.json の csp を指定したときだけ（csp/render-headers.mjs。develop は X-Robots-Tag: noindex）
 //   _redirects                               pages の redirects が 1 つ以上あるとき（旧 URL → 新 URL の 301 など）
 //
-// テンプレートは index.html（dotnet publish などの出力）。<!-- SEO-HEAD:START/END --> と <!-- SEO-BODY:START/END --> の区切りの間を書き換える。
+// テンプレートは dotnet publish などの出力（出力先とは別のフォルダに置く）。SEO-HEAD と SEO-BODY の区切りの間を書き換える。
 // 区切りの外（読み込み表示の #boot-indicator・Blazor の読み込み）は触らない。ツールは決定論的（同じ入力で同じバイト列）。
+// 出力先の古いファイルは消さない（urlStyle を変えたときなど）。出力先を空にしてから実行する運用にする。
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -23,6 +24,9 @@ export const BODY_START = "<!-- SEO-BODY:START -->";
 export const BODY_END = "<!-- SEO-BODY:END -->";
 
 export const ENVIRONMENTS = ["production", "develop"];
+/** Cloudflare の _redirects の上限（静的な規則。このツールは動的な規則を作らない）。 */
+export const MAX_STATIC_REDIRECTS = 2000;
+export const MAX_REDIRECT_LINE = 1000;
 const DEFAULT_MAX_DESCRIPTION = 160;
 const REDIRECT_STATUSES = [301, 302, 307, 308];
 const CHANGEFREQ = ["always", "hourly", "daily", "weekly", "monthly", "yearly", "never"];
@@ -31,12 +35,25 @@ const PATH_PATTERN = /^\/(?:[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*)?$/;
 const ORIGIN_PATTERN = /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*$/;
 const HTML_FILE_PATTERN = /^[a-z0-9][a-z0-9._-]*\.html$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+/** BCP 47 の言語タグ（ja・en-US など）と、og:locale（ja_JP など）の形。 */
+const LANG_PATTERN = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
+const LOCALE_PATTERN = /^[A-Za-z]{2,3}(_[A-Za-z0-9]{2,8})*$/;
+/** 空白と制御文字（_redirects の 1 行を壊す文字）。 */
+const WHITESPACE_OR_CONTROL = /[\s\u0000-\u001f\u007f]/;
+/** テンプレートの #app の開始タグ（class などの属性があっても受ける）。 */
+const APP_TAG = /<div\b[^>]*\sid="app"[^>]*>/;
+/** bodyRootClass に使える class 名（英字で始まり、英数字・ハイフン）。 */
+const CLASS_NAME = /^[A-Za-z][A-Za-z0-9-]*$/;
 
 const SITE_KEYS = new Set(["name", "origin", "devOrigin", "lang", "locale", "homeFile", "urlStyle", "spaFallback",
-    "notFoundPage", "robotsDisallow", "developRobots", "maxDescription", "csp"]);
+    "notFoundPage", "robotsDisallow", "developRobots", "maxDescription", "bodyRootClass", "csp"]);
+const SPA_FALLBACK_KEYS = new Set(["title"]);
+const NOT_FOUND_KEYS = new Set(["title", "bodyHtml"]);
 const PAGE_KEYS = new Set(["path", "title", "description", "bodyHtml", "canonical", "noindex", "ogImage", "ogType",
     "lang", "lastmod", "changefreq", "priority", "jsonLd"]);
 const REDIRECT_KEYS = new Set(["from", "to", "status"]);
+const PAGES_FILE_KEYS = new Set(["pages", "redirects"]);
+const SEO_MARKERS = [HEAD_START, HEAD_END, BODY_START, BODY_END];
 
 /** HTML の文字として安全にする（属性の値・本文のどちらにも使う）。 */
 export function escapeHtml(text) {
@@ -72,8 +89,17 @@ function unknownKeys(object, allowed, where, problems) {
     }
 }
 
+function isPlainObject(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function isNonEmptyString(value) {
     return typeof value === "string" && value.trim() !== "";
+}
+
+/** 本文（bodyHtml）に SEO の区切りが入っていないか。 */
+function hasSeoMarker(text) {
+    return SEO_MARKERS.some((marker) => text.includes(marker));
 }
 
 /** 絶対 URL（https://…）か、サイトの中のパス（/…）を、絶対 URL にする。それ以外は null。 */
@@ -86,7 +112,7 @@ function toAbsoluteUrl(value, origin) {
 
 /** サイト設定を検査し、既定値を入れた設定を返す（問題は problems に積む）。 */
 export function checkSite(site, problems) {
-    if (typeof site !== "object" || site === null || Array.isArray(site)) {
+    if (!isPlainObject(site)) {
         problems.push("サイト設定はオブジェクトにしてください");
         return null;
     }
@@ -94,6 +120,8 @@ export function checkSite(site, problems) {
     for (const key of ["name", "lang", "locale"]) {
         if (!isNonEmptyString(site[key])) problems.push(`サイト設定: ${key} がありません`);
     }
+    if (site.lang !== undefined && !LANG_PATTERN.test(site.lang)) problems.push(`サイト設定: lang（${site.lang}）は BCP 47 の言語タグ（ja・en-US など）にしてください`);
+    if (site.locale !== undefined && !LOCALE_PATTERN.test(site.locale)) problems.push(`サイト設定: locale（${site.locale}）は ja_JP のような形にしてください`);
     for (const key of ["origin", "devOrigin"]) {
         if (typeof site[key] !== "string" || !ORIGIN_PATTERN.test(site[key])) {
             problems.push(`サイト設定: ${key} は https://ホスト名 の形（末尾の / なし）にしてください`);
@@ -104,22 +132,35 @@ export function checkSite(site, problems) {
     const urlStyle = site.urlStyle ?? "html";
     if (!["html", "directory"].includes(urlStyle)) problems.push('サイト設定: urlStyle は "html"（<path>.html）か "directory"（<path>/index.html）');
     const robotsDisallow = site.robotsDisallow ?? [];
-    if (!Array.isArray(robotsDisallow) || robotsDisallow.some((p) => typeof p !== "string" || !p.startsWith("/") || /\s/.test(p))) {
+    if (!Array.isArray(robotsDisallow) || robotsDisallow.some((p) => typeof p !== "string" || !p.startsWith("/") || WHITESPACE_OR_CONTROL.test(p))) {
         problems.push("サイト設定: robotsDisallow は / で始まるパスの配列にしてください");
     }
     const developRobots = site.developRobots ?? "disallow";
     if (!["disallow", "allow"].includes(developRobots)) problems.push('サイト設定: developRobots は "disallow" か "allow"');
     const maxDescription = site.maxDescription ?? DEFAULT_MAX_DESCRIPTION;
     if (!Number.isInteger(maxDescription) || maxDescription <= 0) problems.push("サイト設定: maxDescription は正の整数");
-    if (site.spaFallback !== undefined && site.spaFallback !== false && (typeof site.spaFallback !== "object" || site.spaFallback === null)) {
-        problems.push("サイト設定: spaFallback は {}（index.html を作る）か false");
+    if (site.bodyRootClass !== undefined && (typeof site.bodyRootClass !== "string" || !CLASS_NAME.test(site.bodyRootClass))) {
+        problems.push("サイト設定: bodyRootClass は class 名（例: entry-static）にしてください");
     }
-    if (site.notFoundPage !== undefined && site.notFoundPage !== false && (typeof site.notFoundPage !== "object" || site.notFoundPage === null)) {
-        problems.push("サイト設定: notFoundPage は {}（404.html を作る）か false");
+    if (site.spaFallback !== undefined && site.spaFallback !== false) {
+        if (!isPlainObject(site.spaFallback)) problems.push("サイト設定: spaFallback は {}（index.html を作る）か false");
+        else {
+            unknownKeys(site.spaFallback, SPA_FALLBACK_KEYS, "サイト設定 spaFallback", problems);
+            if (site.spaFallback.title !== undefined && !isNonEmptyString(site.spaFallback.title)) problems.push("サイト設定 spaFallback: title は空でない文字列");
+        }
     }
-    if (site.csp !== undefined && (typeof site.csp !== "object" || site.csp === null || Array.isArray(site.csp))) {
-        problems.push("サイト設定: csp は、CSP の欄（scriptSrc など）を持つオブジェクト");
+    if (site.notFoundPage !== undefined && site.notFoundPage !== false) {
+        if (!isPlainObject(site.notFoundPage)) problems.push("サイト設定: notFoundPage は {}（404.html を作る）か false");
+        else {
+            unknownKeys(site.notFoundPage, NOT_FOUND_KEYS, "サイト設定 notFoundPage", problems);
+            if (site.notFoundPage.title !== undefined && !isNonEmptyString(site.notFoundPage.title)) problems.push("サイト設定 notFoundPage: title は空でない文字列");
+            const body = site.notFoundPage.bodyHtml;
+            if (body !== undefined && (!isNonEmptyString(body) || hasSeoMarker(body))) {
+                problems.push("サイト設定 notFoundPage: bodyHtml は空でない文字列で、SEO の区切りを含めない");
+            }
+        }
     }
+    if (site.csp !== undefined && !isPlainObject(site.csp)) problems.push("サイト設定: csp は、CSP の欄（scriptSrc など）を持つオブジェクト");
     return {
         ...site,
         homeFile,
@@ -133,7 +174,7 @@ export function checkSite(site, problems) {
 }
 
 /**
- * テンプレートを検査する。区切りは 1 つずつ、SEO-BODY は #app の直下（最初の </div> より前）にあること。
+ * テンプレートを検査する。区切りは 1 つずつ。SEO-BODY は <div id="app"> の直下（#app を閉じる </div> より前）にあること。
  * SEO-BODY の中は空（白だけ）であること。生成済みの index.html（本文が入ったもの）を渡すと、404 や SPA のフォールバックに本文が残るため。
  */
 export function checkTemplate(template, problems) {
@@ -142,20 +183,21 @@ export function checkTemplate(template, problems) {
         return;
     }
     let markersOk = true;
-    for (const marker of [HEAD_START, HEAD_END, BODY_START, BODY_END]) {
+    for (const marker of SEO_MARKERS) {
         const count = template.split(marker).length - 1;
         if (count !== 1) {
             problems.push(`テンプレートの区切り ${marker} が ${count} 個です（1 個にしてください）`);
             markersOk = false;
         }
     }
-    const app = template.indexOf('<div id="app">');
-    if (app < 0) problems.push('テンプレートに <div id="app"> がありません');
-    if (markersOk && app >= 0) {
+    const appMatch = APP_TAG.exec(template);
+    if (!appMatch) problems.push('テンプレートに <div id="app"> がありません');
+    if (markersOk && appMatch) {
+        const appEnd = appMatch.index + appMatch[0].length;
         const bodyStart = template.indexOf(BODY_START);
         const bodyEnd = template.indexOf(BODY_END);
-        const appClose = template.indexOf("</div>", app);
-        if (bodyStart < app || appClose < 0 || bodyEnd > appClose) {
+        const appClose = template.indexOf("</div>", appEnd);
+        if (bodyStart < appEnd || appClose < 0 || bodyEnd > appClose) {
             problems.push('SEO-BODY の区切りは <div id="app"> の直下（#app を閉じる </div> より前）に置いてください');
         }
         const body = template.slice(bodyStart + BODY_START.length, bodyEnd);
@@ -173,11 +215,11 @@ function replaceBetween(text, start, end, content) {
     return text.slice(0, s + start.length) + "\n    " + content + "\n    " + text.slice(e);
 }
 
-/** <html> の lang を書き換える（無ければ足す）。 */
+/** <html> の lang を書き換える（無ければ足す）。lang は検査済み（BCP 47）。置換は関数で行い、$ の解釈を避ける。 */
 function setHtmlLang(text, lang) {
     return text.replace(/<html\b([^>]*)>/i, (match, attrs) => {
-        if (/\slang="[^"]*"/.test(attrs)) return `<html${attrs.replace(/\slang="[^"]*"/, ` lang="${escapeHtml(lang)}"`)}>`;
-        return `<html lang="${escapeHtml(lang)}"${attrs}>`;
+        if (/\slang="[^"]*"/.test(attrs)) return `<html${attrs.replace(/\slang="[^"]*"/, () => ` lang="${lang}"`)}>`;
+        return `<html lang="${lang}"${attrs}>`;
     });
 }
 
@@ -257,7 +299,7 @@ export function outputFileFor(path, site) {
 
 function normalizePage(raw, index, origin, site, problems) {
     const label = `ページ ${index + 1}${typeof raw?.path === "string" ? `（${raw.path}）` : ""}`;
-    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    if (!isPlainObject(raw)) {
         problems.push(`${label}: オブジェクトにしてください`);
         return null;
     }
@@ -279,11 +321,16 @@ function normalizePage(raw, index, origin, site, problems) {
     if (typeof raw.bodyHtml !== "string" || raw.bodyHtml === "") {
         problems.push(`${label}: bodyHtml（本文の HTML）がありません`);
         ok = false;
-    } else if ([HEAD_START, HEAD_END, BODY_START, BODY_END].some((marker) => raw.bodyHtml.includes(marker))) {
-        problems.push(`${label}: bodyHtml に SEO の区切りを入れないでください（再生成が壊れます）`);
+    } else {
+        if (hasSeoMarker(raw.bodyHtml)) problems.push(`${label}: bodyHtml に SEO の区切りを入れないでください（再生成が壊れます）`);
+        if (site.bodyRootClass !== undefined && !rootHasClass(raw.bodyHtml, site.bodyRootClass)) {
+            problems.push(`${label}: bodyHtml の先頭の要素に class="${site.bodyRootClass}" が必要です（サイトの約束。docs/usage.md）`);
+        }
     }
     if (raw.noindex !== undefined && typeof raw.noindex !== "boolean") problems.push(`${label}: noindex は true か false`);
-    if (raw.lang !== undefined && !isNonEmptyString(raw.lang)) problems.push(`${label}: lang が不正です`);
+    if (raw.lang !== undefined && !(typeof raw.lang === "string" && LANG_PATTERN.test(raw.lang))) {
+        problems.push(`${label}: lang は BCP 47 の言語タグ（ja・en-US など）にしてください`);
+    }
     if (raw.lastmod !== undefined && !(typeof raw.lastmod === "string" && DATE_PATTERN.test(raw.lastmod)
         && new Date(`${raw.lastmod}T00:00:00Z`).toISOString().slice(0, 10) === raw.lastmod)) {
         problems.push(`${label}: lastmod は YYYY-MM-DD（実在する日付）にしてください`);
@@ -313,13 +360,55 @@ function normalizePage(raw, index, origin, site, problems) {
     return { ...raw, ogType: raw.ogType ?? "website", canonicalUrl, noindex: raw.noindex === true };
 }
 
-/** redirects を検査して _redirects の行にする。 */
+/**
+ * 本文の先頭の要素に、サイトの約束の class があるか（例: <main class="entry-static">）。
+ * 読み込み表示などの JavaScript は、この class に依存する（docs/usage.md）。
+ */
+function rootHasClass(bodyHtml, className) {
+    const root = /^\s*<[A-Za-z][^>]*>/.exec(bodyHtml);
+    if (!root) return false;
+    const classes = /\sclass="([^"]*)"/.exec(root[0]);
+    return classes !== null && classes[1].split(/\s+/).includes(className);
+}
+
+/** 1 つの redirect の to を検査し、_redirects に書く値（URL は正規化したもの）を返す。不正なら null。 */
+function checkRedirectTarget(to, origin, problems, label) {
+    if (typeof to !== "string" || to === "") {
+        problems.push(`${label}: to は / で始まるパスか https:// の URL`);
+        return null;
+    }
+    if (WHITESPACE_OR_CONTROL.test(to)) {
+        problems.push(`${label}: to に空白・改行・制御文字は使えません`);
+        return null;
+    }
+    if (to.startsWith("/")) {
+        if (!PATH_PATTERN.test(to)) {
+            problems.push(`${label}: to（${to}）は小文字・数字・ハイフンのパスにしてください`);
+            return null;
+        }
+        return to;
+    }
+    let url;
+    try {
+        url = new URL(to);
+    } catch {
+        problems.push(`${label}: to（${to}）は URL として読めません`);
+        return null;
+    }
+    if (url.protocol !== "https:") {
+        problems.push(`${label}: to は https:// の URL にしてください`);
+        return null;
+    }
+    return url.href;
+}
+
+/** redirects を検査して _redirects の行にする。from・to は空白・改行を含めない（1 行の形を壊さないため）。 */
 function normalizeRedirects(redirects, origin, pagePaths, problems) {
     const lines = [];
     const froms = new Set();
     redirects.forEach((r, index) => {
         const label = `redirects ${index + 1}`;
-        if (typeof r !== "object" || r === null || Array.isArray(r)) return problems.push(`${label}: オブジェクトにしてください`);
+        if (!isPlainObject(r)) return problems.push(`${label}: オブジェクトにしてください`);
         unknownKeys(r, REDIRECT_KEYS, label, problems);
         if (typeof r.from !== "string" || r.from === "/" || !PATH_PATTERN.test(r.from)) {
             return problems.push(`${label}: from は / 以外のパス（例: /old-page）`);
@@ -327,16 +416,20 @@ function normalizeRedirects(redirects, origin, pagePaths, problems) {
         if (pagePaths.has(r.from)) problems.push(`${label}: from（${r.from}）は既存のページと同じです`);
         if (froms.has(r.from)) problems.push(`${label}: from（${r.from}）が重複しています`);
         froms.add(r.from);
-        const isPath = typeof r.to === "string" && r.to.startsWith("/");
-        if (!(isPath ? PATH_PATTERN.test(r.to) : toAbsoluteUrl(r.to, origin) !== null)) {
-            return problems.push(`${label}: to は / で始まるパスか https://… の URL`);
-        }
-        const target = isPath ? `${origin}${r.to}` : r.to;
-        if (target === `${origin}${r.from}`) problems.push(`${label}: from と to が同じです`);
+        const target = checkRedirectTarget(r.to, origin, problems, label);
+        if (target === null) return;
+        if (target === r.from || target === `${origin}${r.from}`) problems.push(`${label}: from と to が同じです`);
         const status = r.status ?? 301;
         if (!REDIRECT_STATUSES.includes(status)) problems.push(`${label}: status は ${REDIRECT_STATUSES.join(" / ")}`);
-        lines.push({ from: r.from, to: r.to, status });
+        lines.push({ from: r.from, to: target, status });
     });
+    if (lines.length > MAX_STATIC_REDIRECTS) {
+        problems.push(`redirects は ${MAX_STATIC_REDIRECTS} 件までです（${lines.length} 件）`);
+    }
+    for (const line of lines) {
+        const text = `${line.from} ${line.to} ${line.status}`;
+        if (text.length > MAX_REDIRECT_LINE) problems.push(`redirects（${line.from}）: 1 行が ${MAX_REDIRECT_LINE} 文字を超えています`);
+    }
     return lines;
 }
 
@@ -405,12 +498,10 @@ export function buildPages({ site, pages, redirects, template, env }) {
     if (settings.notFoundPage !== false) {
         reserve("404.html", "notFoundPage");
         const title = settings.notFoundPage.title ?? `ページが見つかりません | ${settings.name}`;
-        const bodyHtml = settings.notFoundPage.bodyHtml ?? null;
-        if (bodyHtml !== null && !isNonEmptyString(bodyHtml)) problems.push("notFoundPage.bodyHtml は空でない文字列にしてください");
         files.set("404.html", renderPage({
             template,
             headLines: [`<title>${escapeHtml(title)}</title>`, '<meta name="robots" content="noindex" />'],
-            bodyHtml,
+            bodyHtml: settings.notFoundPage.bodyHtml ?? null,
             lang: settings.lang,
         }));
     }
@@ -433,6 +524,18 @@ export function buildPages({ site, pages, redirects, template, env }) {
 
     if (problems.length > 0) throw new BuildError(problems);
     return files;
+}
+
+/**
+ * テンプレートが出力先の書き出し先と同じファイルなら例外にする（テンプレートを出力で上書きすると、2 回目の実行が壊れるため）。
+ */
+export function assertTemplateNotOverwritten(templatePath, outDir, files) {
+    const template = resolve(templatePath).toLowerCase();
+    for (const name of files.keys()) {
+        if (resolve(outDir, name).toLowerCase() === template) {
+            throw new Error(`テンプレート（${templatePath}）が出力先の ${name} と同じです。テンプレートは出力先の外に置いてください（dotnet publish の出力を別フォルダへ）`);
+        }
+    }
 }
 
 /** Map の内容を --out のフォルダに書き出す（フォルダは必要に応じて作る）。書き出したファイル名を返す。 */
@@ -467,17 +570,28 @@ function readJson(path, what) {
     }
 }
 
+/** ページ一覧のファイルを、pages と redirects に分ける（配列、または { pages, redirects }）。 */
+export function readPagesInput(input) {
+    if (Array.isArray(input)) return { pages: input, redirects: undefined };
+    if (!isPlainObject(input)) throw new BuildError(["ページ一覧は配列か、{ pages, redirects } のオブジェクトにしてください"]);
+    const problems = [];
+    unknownKeys(input, PAGES_FILE_KEYS, "ページ一覧", problems);
+    if (problems.length > 0) throw new BuildError(problems);
+    return { pages: input.pages, redirects: input.redirects };
+}
+
 /** CLI の本体（テストからも呼べるよう、書き出したファイル名を返す）。 */
 export function main(argv) {
     const args = parseArgs(argv);
     const site = readJson(resolve(args.site), "サイト設定");
-    const pagesInput = readJson(resolve(args.pages), "ページ一覧");
-    const pages = Array.isArray(pagesInput) ? pagesInput : pagesInput.pages;
-    const redirects = Array.isArray(pagesInput) ? undefined : pagesInput.redirects;
-    // テンプレートは書き出す前に読み切る（--out がテンプレートのフォルダの中でも壊れない）
-    const template = readFileSync(resolve(args.template), "utf8");
+    const { pages, redirects } = readPagesInput(readJson(resolve(args.pages), "ページ一覧"));
+    // テンプレートは書き出す前に読み切り、出力先で上書きされないことを確かめてから書く
+    const templatePath = resolve(args.template);
+    const template = readFileSync(templatePath, "utf8");
+    const outDir = resolve(args.out);
     const files = buildPages({ site, pages, redirects, template, env: args.env });
-    return writeFiles(resolve(args.out), files);
+    assertTemplateNotOverwritten(templatePath, outDir, files);
+    return writeFiles(outDir, files);
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {

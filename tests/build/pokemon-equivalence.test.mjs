@@ -29,6 +29,7 @@ const POKEMON_SITE = {
     robotsDisallow: ["/my-", "/data-share", "/api/my/"],
     developRobots: "allow",
     maxDescription: 150,
+    bodyRootClass: "entry-static",
 };
 
 /** ページ一覧（kit の入力）。bodyHtml は pokemon の buildBody() の出力（C# が作る本文の代わり）。 */
