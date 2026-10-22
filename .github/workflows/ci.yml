@@ -43,3 +43,6 @@ jobs:
 
       - name: Test (C# の共通コード)
         run: dotnet test tests/FaraSiteKit.Core.Tests --configuration Release
+
+      - name: Test (Razor 部品)
+        run: dotnet test tests/FaraSiteKit.Razor.Tests --configuration Release
