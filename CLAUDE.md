@@ -40,7 +40,7 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 - `docs/`: 利用方法（`usage.md`）と変更履歴（`changelog.md`）
 - `src/FaraSiteKit.Core/`: C#（`SiteLinks`・`MaintenanceInfo`・`ReportForm`）。UI と通信に依存しない純粋なコードだけを置く（Razor・MudBlazor は K0-4 で別のプロジェクトに）
 - `tests/FaraSiteKit.Core.Tests/`: C# のテスト（xUnit）。`global.json` の SDK（8.0.x）で実行する
-- `.github/workflows/ci.yml`: `npm test`（Node 22）と `dotnet test`（ubuntu）を実行
+- `.github/workflows/ci.yml`: `npm test`（Node 22）と `dotnet test` を、ubuntu と windows の matrix で並列に実行
 
 ## 変更の流れ
 

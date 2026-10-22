@@ -1,6 +1,6 @@
 name: CI
 
-# 共有部品のテスト。push と PR で実行する。
+# 共有部品のテスト。push と PR で実行する。ubuntu と windows の 2 つで並列に動かす（matrix）。
 #   - test: worker/ の Node テスト（共有 JS）
 #   - dotnet: src/ の C# 共通コードの xUnit テスト
 on:
@@ -13,7 +13,11 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +29,11 @@ jobs:
         run: npm test
 
   dotnet:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
