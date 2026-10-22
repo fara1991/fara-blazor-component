@@ -22,13 +22,24 @@ import { getMaintenance, maintenanceResponse } from "../external/fara-site-kit/w
 - wrangler は、サブモジュールの中のファイルもバンドルする（`wrangler deploy --dry-run` で確認する）。
 - サイトの `package.json` のテストは、kit のテストファイルを指す（例: `node --test external/fara-site-kit/worker/report.test.mjs`）。
 
-## 3. 確認
+## 3. C# の共通コードを使う（`src/FaraSiteKit.Core`）
+
+```xml
+<ProjectReference Include="..\..\external\fara-site-kit\src\FaraSiteKit.Core\FaraSiteKit.Core.csproj" />
+```
+
+- 対象は net8.0。net9.0 のサイトからも参照できる。`IsPackable` は false（NuGet では配らない）。
+- 名前空間は移す前と同じ（`FaraPokemonBattleAssistant.Core` の `SiteLinks`、`FaraPokemonBattleAssistant.Web.Services` の `MaintenanceInfo`・`ReportForm`）。`using` は書き換えなくてよい。
+- 起動時に `SiteLinks.DevelopHost` へ、そのサイトの確認用ホスト名（例: `pokemon-dev.fara-labs.com`）を設定する。空のままなら、リンクは切り替えない。
+- サブモジュールの中の csproj を参照するため、CI のチェックアウトは `submodules: true`（ネストした submodule がある場合は `--recursive`）。
+
+## 4. 確認
 
 - サイトの `wrangler deploy --dry-run`（本番と確認用の両方）
 - サイトの Worker のテスト（`/api/report`・`/api/maintenance` の挙動）
 - 確認用サイトで表示を確かめてから、本番へ（サイトの運用どおり）
 
-## 4. サブモジュールを上げる（kit の変更を取り込む）
+## 5. サブモジュールを上げる（kit の変更を取り込む）
 
 1. kit で変更を PR → develop にマージ → タグ（`vX.Y.Z`）
 2. 各サイトで、サブモジュールをそのタグのコミットに上げる PR（develop 向け）

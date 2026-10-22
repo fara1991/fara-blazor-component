@@ -11,8 +11,10 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 | --- | --- | --- |
 | `worker/` | Worker の共有 JS（`maintenance.js`: メンテナンス表示、`report.js`: 作者への報告の受け口）と、そのテスト | K0 で取り込み（develop 時点で pokemon と同一内容） |
 | `docs/` | 利用方法・変更履歴 | K0 で作成 |
-| `.github/workflows/ci.yml` | `npm test`（Node 22、ubuntu） | K0 |
-| `src/`（Razor クラスライブラリ・C# の共通コード） | — | ステップ 2 以降で作る |
+| `src/FaraSiteKit.Core/` | C#（UI と通信に依存しない共通コード）: `SiteLinks`（確認用ホストへの切り替え）・`MaintenanceInfo`（メンテナンス状態の読み取り）・`ReportForm`（報告の入力の検査） | K0-2 |
+| `tests/FaraSiteKit.Core.Tests/` | 上の C# の xUnit テスト（`dotnet test`） | K0-2 |
+| `.github/workflows/ci.yml` | `npm test`（Node 22、ubuntu）と `dotnet test`（global.json の SDK） | K0 |
+| `src/`（Razor クラスライブラリ） | — | K0-4 で作る |
 
 ## 使い方
 
@@ -23,7 +25,7 @@ git submodule add https://github.com/fara1991/fara-site-kit.git external/fara-si
 ```
 
 - Worker: `worker/index.js` から `../external/fara-site-kit/worker/report.js` などを import する（wrangler がバンドルする）
-- C#（ステップ 2 以降）: `ProjectReference` で `external/fara-site-kit/src/...` を参照する
+- C#: `ProjectReference` で `external/fara-site-kit/src/FaraSiteKit.Core/FaraSiteKit.Core.csproj` を参照する（net8.0。名前空間は `FaraPokemonBattleAssistant.*` のまま。詳しくは `docs/usage.md`）
 
 ## テスト
 
@@ -31,6 +33,7 @@ git submodule add https://github.com/fara1991/fara-site-kit.git external/fara-si
 npm test                  # worker/ の Node テストすべて（Node 22 以上）
 npm run test:report
 npm run test:maintenance
+dotnet test tests/FaraSiteKit.Core.Tests   # C#（.NET 8 SDK）
 ```
 
 ## 関連
