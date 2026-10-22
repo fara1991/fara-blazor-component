@@ -46,3 +46,7 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 ```bash
 npm test
 ```
+
+## その他
+
+- ライセンスは MIT。コードを足すときは、MIT で公開できない第三者のコード・秘密情報を入れない
