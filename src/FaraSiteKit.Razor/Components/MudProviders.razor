@@ -1,0 +1,37 @@
+@* MudBlazor の土台（テーマ・ポップアップ・ダイアログ・スナックバー）。全ページで 1 回だけ置く（レイアウトの中）。
+   テーマは SiteTheme（紫系）か、CustomTheme で替える。ライト／ダークは SiteThemeState に従う。
+   テーマを切り替えたら、MudThemeProvider を作り直す（パラメーターの変更だけでは、色が切り替わらないため） *@
+@implements IDisposable
+@inject SiteThemeState ThemeState
+@inject IJSRuntime Js
+
+<MudThemeProvider @key="ThemeState.Current" Theme="Theme" IsDarkMode="ThemeState.IsDark" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@code {
+    /// <summary>サイト独自のテーマ。省略すると SiteTheme.Create()（紫系）。</summary>
+    [Parameter] public MudTheme? CustomTheme { get; set; }
+
+    private MudTheme? _theme;
+
+    private MudTheme Theme => _theme ??= CustomTheme ?? SiteTheme.Create();
+
+    // 保存されたテーマを読み終えてから描く（最初に light で描くと、ダークの人は部品の色が light のままになる）。
+    // WebAssembly は同期で読めるので、描画の前に読む
+    protected override void OnInitialized()
+    {
+        ThemeState.Changed += OnChanged;
+        if (Js is IJSInProcessRuntime sync) ThemeState.TryLoadSync(sync);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ThemeState.InitializeAsync();
+    }
+
+    private Task OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => ThemeState.Changed -= OnChanged;
+}
