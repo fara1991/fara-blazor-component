@@ -1,0 +1,23 @@
+name: CI
+
+# Worker の共有 JS（worker/）の Node テスト。push と PR で実行する。
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test (Worker の共有 JS)
+        run: npm test

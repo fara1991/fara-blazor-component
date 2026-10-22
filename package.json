@@ -1,0 +1,13 @@
+{
+  "name": "fara-site-kit",
+  "private": true,
+  "description": "Fara のサイトで共通に使う部品（Worker の共有 JS などの Node テスト）。利用するサイトは git submodule で取り込む（CLAUDE.md 参照）",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test:report": "node --test worker/report.test.mjs",
+    "test:maintenance": "node --test worker/maintenance.test.mjs",
+    "test": "node --test worker/report.test.mjs worker/maintenance.test.mjs"
+  }
+}
