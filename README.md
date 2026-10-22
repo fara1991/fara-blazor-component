@@ -40,3 +40,5 @@ dotnet test tests/FaraSiteKit.Core.Tests   # C#（.NET 8 SDK）
 
 - 変更の流れ・ブランチ運用: `CLAUDE.md`
 - バージョン（タグ）と変更履歴: `docs/changelog.md`
+
+ライセンス: MIT（LICENSE を参照）
