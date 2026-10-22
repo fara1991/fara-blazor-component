@@ -62,9 +62,11 @@
 
     <MudMainContent>
         <main id="fsk-main" tabindex="-1">
+            <MaintenanceBanner Info="Maintenance" />
             <article class="content px-4">
                 @Body
             </article>
+            <SiteFooter />
         </main>
     </MudMainContent>
 </MudLayout>
@@ -90,6 +92,9 @@
 
     /// <summary>サイト独自のテーマ（省略すると既定の紫系）。</summary>
     [Parameter] public MudTheme? CustomTheme { get; set; }
+
+    /// <summary>メンテナンスの状態（「更新予定」のお知らせを出すため）。省略可。</summary>
+    [Parameter] public MaintenanceInfo? Maintenance { get; set; }
 
     /// <summary>レイアウトの page クラスに足す追加のクラス（サイトの画面の状態に合わせる）。</summary>
     [Parameter] public string? PageClass { get; set; }

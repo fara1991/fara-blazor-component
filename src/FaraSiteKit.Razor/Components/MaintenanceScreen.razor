@@ -1,0 +1,32 @@
+@* メンテナンス中（MAINTENANCE=true）に、アプリの代わりに出す画面。Program.cs が、起動時に状態を読んで、この画面だけを動かす。
+   文言は引数で変えられる（省略時は、一般的な文）。連絡先の欄（Contact）は、サイトが渡す（SNS など） *@
+@inject SiteOptions Site
+
+<PageTitle>メンテナンス中 | @Site.Name</PageTitle>
+
+<main class="maintenance-screen">
+    <h1>@Heading</h1>
+    <p>@((MarkupString)Lead)</p>
+    @if (!string.IsNullOrWhiteSpace(Info?.Message))
+    {
+        <p class="maintenance-schedule">@Info.Message</p>
+    }
+    @if (Contact is not null)
+    {
+        @Contact
+    }
+</main>
+
+@code {
+    /// <summary>メンテナンスの状態（Message に予定の文）。null でも動く。</summary>
+    [Parameter] public MaintenanceInfo? Info { get; set; }
+
+    /// <summary>見出し。</summary>
+    [Parameter] public string Heading { get; set; } = "ただいまメンテナンス中です";
+
+    /// <summary>見出しの下の文（改行は &lt;br /&gt;。HTML はそのまま出す。サイトが決めた文だけを入れること）。</summary>
+    [Parameter] public string Lead { get; set; } = "サイトの調整を行っています。<br />しばらくしてから、もう一度お試しください。";
+
+    /// <summary>連絡先（お知らせの場所など）。省略可。</summary>
+    [Parameter] public RenderFragment? Contact { get; set; }
+}
