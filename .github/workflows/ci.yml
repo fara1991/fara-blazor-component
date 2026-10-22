@@ -1,7 +1,7 @@
 name: CI
 
 # 共有部品のテスト。push と PR で実行する。ubuntu と windows の 2 つで並列に動かす（matrix）。
-#   - test: worker/ の Node テスト（共有 JS）
+#   - test: worker/・build/・csp/ の Node テスト（共有 JS・静的ファイルの生成・CSP）
 #   - dotnet: src/ の C# 共通コードの xUnit テスト、Razor 部品の bUnit テスト、samples/MinimalSite のビルド
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Test (Worker の共有 JS)
+      - name: Test (Worker の共有 JS・build・csp)
         run: npm test
 
   dotnet:

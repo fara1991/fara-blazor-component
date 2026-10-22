@@ -1,0 +1,12 @@
+# Cloudflare の静的アセットに付けるヘッダー（Worker の /api/* には付かない）。
+# fara-site-kit の csp/render-headers.mjs が、サイトの設定（site.json の csp）から書き出す。直接は直さない。
+# 外部から読み込めるのは、サイトの設定に書いたものだけ。足さないとブロックされる。
+# script-src に 'unsafe-inline' と 'unsafe-eval' は使わない（importmap はハッシュで許可する）。
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'{{scriptSrc}}; style-src 'self' 'unsafe-inline'{{styleSrc}}; font-src 'self'{{fontSrc}}; img-src 'self' data:{{imgSrc}}; connect-src 'self'{{connectSrc}}{{frameSrc}}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+{{X_ROBOTS_TAG}}
+{{CACHE_RULES}}
