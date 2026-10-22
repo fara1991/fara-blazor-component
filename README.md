@@ -1,5 +1,39 @@
 # fara-site-kit
 
-Fara のサイト（pokemon・avatar ほか）で共通に使う部品（Razor クラスライブラリ、C# の共通コード、Worker の共有 JS、ビルドツール、CSP のテンプレート）をまとめるリポジトリ。
+Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）で共通に使う部品をまとめるリポジトリ。
 
-準備中。計画は fara-avatar-modding-guide の docs/wasm-migration-plan.md の §10 を参照。
+- 計画: fara-avatar-modding-guide の `docs/wasm-migration-plan.md` の §10（フェーズ K0 が今の段階）
+- 本番・確認用のサイトそのものは、このリポジトリには無い（各サイトのリポジトリにある）
+
+## 構成
+
+| 場所 | 中身 | 状態 |
+| --- | --- | --- |
+| `worker/` | Worker の共有 JS（`maintenance.js`: メンテナンス表示、`report.js`: 作者への報告の受け口）と、そのテスト | K0 で取り込み（pokemon の origin/develop と同じ内容） |
+| `docs/` | 利用方法・変更履歴 | K0 で作成 |
+| `.github/workflows/ci.yml` | `npm test`（Node 22、ubuntu） | K0 |
+| `src/`（Razor クラスライブラリ・C# の共通コード） | — | ステップ 2 以降で作る |
+
+## 使い方
+
+各サイトは git submodule で取り込み、必要なファイルを参照する（詳しい手順は `docs/usage.md`）。
+
+```bash
+git submodule add https://github.com/fara1991/fara-site-kit.git external/fara-site-kit
+```
+
+- Worker: `worker/index.js` から `../external/fara-site-kit/worker/report.js` などを import する（wrangler がバンドルする）
+- C#（ステップ 2 以降）: `ProjectReference` で `external/fara-site-kit/src/...` を参照する
+
+## テスト
+
+```bash
+npm test                  # worker/ の Node テストすべて（Node 22 以上）
+npm run test:report
+npm run test:maintenance
+```
+
+## 関連
+
+- 変更の流れ・ブランチ運用: `CLAUDE.md`
+- バージョン（タグ）と変更履歴: `docs/changelog.md`
