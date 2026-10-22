@@ -2,7 +2,7 @@ name: CI
 
 # 共有部品のテスト。push と PR で実行する。ubuntu と windows の 2 つで並列に動かす（matrix）。
 #   - test: worker/ の Node テスト（共有 JS）
-#   - dotnet: src/ の C# 共通コードの xUnit テスト
+#   - dotnet: src/ の C# 共通コードの xUnit テスト、Razor 部品の bUnit テスト、samples/MinimalSite のビルド
 on:
   push:
   pull_request:
@@ -46,3 +46,6 @@ jobs:
 
       - name: Test (Razor 部品)
         run: dotnet test tests/FaraSiteKit.Razor.Tests --configuration Release
+
+      - name: Build (Razor 部品を使う最小のサイト。公開はしない)
+        run: dotnet build samples/MinimalSite --configuration Release
