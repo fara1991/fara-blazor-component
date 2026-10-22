@@ -32,11 +32,14 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 
 - 許す: `script-src` に `'wasm-unsafe-eval'`、`style-src` に `'unsafe-inline'`（MudBlazor のため）
 - 許さない: `script-src` の `'unsafe-inline'` と `'unsafe-eval'`。インラインの script は外部ファイルにし、importmap はハッシュで許可する
-- kit が持つのは `_headers` のテンプレート（`csp/`、ステップ 4 以降）。ホストは各サイトが使うものだけを足す
+- kit が持つのは `_headers` のテンプレート（`csp/`）。ホストは各サイトが使うものだけを足す
 
 ## 構成メモ
 
 - `worker/`: Worker の共有 JS と Node テスト（`node --test`、Node 22）
+- `build/`: 静的ファイル（ページの HTML・robots.txt・sitemap.xml・_headers など）の生成。本文は呼び出し側が作る（使い方は `docs/usage.md` の 6）
+- `csp/`: `_headers` のテンプレートと生成関数（`render-headers.mjs`）
+- `tests/build/`・`tests/csp/`・`tests/fixtures/pokemon/`: 上の 2 つの Node テスト。pokemon の出力と同じになることを確かめる（fixtures は pokemon のファイルのコピー）
 - `docs/`: 利用方法（`usage.md`）と変更履歴（`changelog.md`）
 - `src/FaraSiteKit.Core/`: C#（`SiteLinks`・`MaintenanceInfo`・`ReportForm`）。UI と通信に依存しない純粋なコードだけを置く（Razor・MudBlazor は K0-4 で別のプロジェクトに）
 - `tests/FaraSiteKit.Core.Tests/`: C# のテスト（xUnit）。`global.json` の SDK（10.0.x）で実行する
