@@ -92,11 +92,11 @@ public class MaintenanceTests : SiteKitTestContext
         var cut = Render<MaintenanceScreen>(p =>
         {
             p.Add(c => c.Heading, "工事中");
-            p.Add(c => c.Contact, builder => builder.AddMarkupContent(0, "<a class=\"maintenance-twitter\" href=\"https://example.test/x\">@contact</a>"));
+            p.Add(c => c.Contact, builder => builder.AddMarkupContent(0, "<a class=\"maintenance-link\" href=\"https://example.test/x\">@contact</a>"));
         });
 
         Assert.Equal("工事中", cut.Find("h1").TextContent);
-        Assert.Equal("@contact", cut.Find("a.maintenance-twitter").TextContent);
+        Assert.Equal("@contact", cut.Find("a.maintenance-link").TextContent);
     }
 
     [Fact]
