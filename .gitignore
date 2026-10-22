@@ -5,6 +5,8 @@ node_modules/
 ## .NET（C# の共通コードを足すとき）
 bin/
 obj/
+bin.unix/
+obj.unix/
 
 ## Claude Code（個人の設定）
 .claude/settings.local.json

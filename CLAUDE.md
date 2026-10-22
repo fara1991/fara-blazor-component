@@ -13,8 +13,13 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 ## 目的と使われ方
 
 - 利用するサイトは、このリポジトリを git submodule（`external/fara-site-kit`）として取り込み、必要なファイルを参照する。NuGet では配らない（決定事項）
-- C# は ProjectReference で参照する（ステップ 2 以降）
+- C# は ProjectReference で参照する（`src/FaraSiteKit.Core`、net8.0）
 - 利用するサイトの例: pokemon（`external/fara-site-kit`）
+
+## C# 共通コードのルール
+
+- 公開の型・メンバーを変えるときは、利用中のサイト（pokemon など）のビルドが通るか確かめてから
+- サイト固有の値（ホスト名・サイト名・作者）は kit に入れない。`SiteLinks.DevelopHost` のように、各サイトが起動時に設定する
 
 ## 共有ファイルのルール
 
@@ -33,8 +38,9 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 
 - `worker/`: Worker の共有 JS と Node テスト（`node --test`、Node 22）
 - `docs/`: 利用方法（`usage.md`）と変更履歴（`changelog.md`）
-- `.github/workflows/ci.yml`: `npm test` を ubuntu で実行
-- C#（`src/`）と Razor 部品は、ステップ 2 以降で作る（K0 では作らない）
+- `src/FaraSiteKit.Core/`: C#（`SiteLinks`・`MaintenanceInfo`・`ReportForm`）。UI と通信に依存しない純粋なコードだけを置く（Razor・MudBlazor は K0-4 で別のプロジェクトに）
+- `tests/FaraSiteKit.Core.Tests/`: C# のテスト（xUnit）。`global.json` の SDK（8.0.x）で実行する
+- `.github/workflows/ci.yml`: `npm test`（Node 22）と `dotnet test`（ubuntu）を実行
 
 ## 変更の流れ
 
@@ -45,7 +51,11 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 
 ```bash
 npm test
+dotnet test tests/FaraSiteKit.Core.Tests
 ```
+
+- C# の名前空間は `FaraSiteKit.Core`（`SiteLinks`・`MaintenanceInfo`・`MaintenanceState`・`ReportForm` すべて）。利用するサイトは `using FaraSiteKit.Core;` を書く。名前空間を変えると、利用中のサイトが壊れる（破壊的変更）
+- `tests/FaraSiteKit.Core.Tests` のテストが正。pokemon の `tests/FaraPokemonBattleAssistant.Web.Tests`（MaintenanceInfoTests・ReportFormTests）は kit の複製で、サイトの組み込みの確認として残す。pokemon 側は組み込みの確認で、内容が同一である必要はない。kit のテストを変えたら、pokemon 側が壊れていないか（pokemon の Web.Tests が通るか）を確認する
 
 ## その他
 

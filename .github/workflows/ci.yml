@@ -1,6 +1,8 @@
 name: CI
 
-# Worker の共有 JS（worker/）の Node テスト。push と PR で実行する。
+# 共有部品のテスト。push と PR で実行する。
+#   - test: worker/ の Node テスト（共有 JS）
+#   - dotnet: src/ の C# 共通コードの xUnit テスト
 on:
   push:
   pull_request:
@@ -21,3 +23,15 @@ jobs:
 
       - name: Test (Worker の共有 JS)
         run: npm test
+
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Test (C# の共通コード)
+        run: dotnet test tests/FaraSiteKit.Core.Tests --configuration Release
