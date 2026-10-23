@@ -66,6 +66,17 @@ public class StaticAssetTests
     [InlineData("fsk-nav-section")]
     [InlineData("fsk-pane-scroll")]
     [InlineData("fsk-page-pane")]
+    [InlineData("fsk-card")]
+    [InlineData("fsk-card-body")]
+    [InlineData("fsk-form-group")]
+    [InlineData("fsk-form-label")]
+    [InlineData("fsk-mb-0")]
+    [InlineData("fsk-mb-1")]
+    [InlineData("fsk-mb-3")]
+    [InlineData("fsk-mt-3")]
+    [InlineData("fsk-small")]
+    [InlineData("fsk-muted")]
+    [InlineData("fsk-page-scroll")]
     [InlineData("fsk-page-column")]
     [InlineData("fsk-page-card")]
     [InlineData("fsk-report-card")]
@@ -85,6 +96,30 @@ public class StaticAssetTests
         var css = File.ReadAllText(Path.Combine(RepoRoot(), "src", "FaraSiteKit.Razor", "wwwroot", "css", "fara-site-kit.css"));
 
         Assert.Contains("." + className, css);
+    }
+
+    [Fact]
+    public void EveryFskClassUsedByTheComponentsHasARuleOrIsAKnownHook()
+    {
+        // 部品が使う fsk- の class は、CSS に規則があるか、サイトが自由に使う目印（規則なし）として許可した名前だけ
+        var hooks = new HashSet<string> { "fsk-main", "fsk-nav", "fsk-footer-name", "fsk-notice-text", "fsk-report-turnstile", "fsk-service-" };
+        var root = RepoRoot();
+        var css = File.ReadAllText(Path.Combine(root, "src", "FaraSiteKit.Razor", "wwwroot", "css", "fara-site-kit.css"));
+        var used = Directory.GetFiles(Path.Combine(root, "src", "FaraSiteKit.Razor", "Components"), "*.razor")
+            .SelectMany(f => System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(f), "fsk-[a-z0-9-]+").Select(m => m.Value))
+            .Distinct();
+
+        foreach (var name in used.Where(n => !hooks.Contains(n)))
+            Assert.True(css.Contains("." + name), $"{name} の規則が CSS に無い");
+    }
+
+    [Fact]
+    public void ThePhonePageScrollRulesAreOnlyForTheOptInClass()
+    {
+        var css = File.ReadAllText(Path.Combine(RepoRoot(), "src", "FaraSiteKit.Razor", "wwwroot", "css", "fara-site-kit.css"));
+
+        Assert.Contains(".fsk-page.fsk-page-scroll.mud-layout {", css);
+        Assert.Contains("html:has(.fsk-page-scroll)", css);
     }
 
     [Fact]

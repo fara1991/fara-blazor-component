@@ -43,11 +43,11 @@ export function maintenancePageHtml(siteName, message) {
 
 /**
  * お知らせのバナー。1 行目に見出し「【お知らせ】」、2 行目以降に本文（CSS で見出し・本文をそれぞれ次の行に置く）。
- * 見た目は各サイトの CSS の .maintenance-notice で付ける。CSP のため、インラインの style は使わない。
+ * 見た目は各サイトの CSS の .fsk-notice で付ける。CSP のため、インラインの style は使わない。
  */
 export function noticeHtml(message) {
   const text = message || "まもなくメンテナンスを行います。";
-  return `<div class="maintenance-notice" role="status"><strong class="maintenance-notice-title">【お知らせ】</strong><span class="maintenance-notice-text">${escapeHtml(text)}</span></div>`;
+  return `<div class="fsk-notice" role="status"><strong class="fsk-notice-title">【お知らせ】</strong><span class="fsk-notice-text">${escapeHtml(text)}</span></div>`;
 }
 
 /**

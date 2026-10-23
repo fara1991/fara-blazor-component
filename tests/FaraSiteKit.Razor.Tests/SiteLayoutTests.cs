@@ -30,6 +30,31 @@ public class SiteLayoutTests : SiteKitTestContext
     }
 
     [Fact]
+    public void ThePageDoesNotScrollOnPhonesByDefault()
+    {
+        var cut = RenderLayout(mobile: true);
+
+        Assert.DoesNotContain("fsk-page-scroll", cut.Find("div.mud-layout").ClassName);
+    }
+
+    [Fact]
+    public void MobilePageScrollAddsTheClassAndKeepsTheOthers()
+    {
+        JSInterop.Setup<bool>("faraSiteKit.watchMobile", _ => true).SetResult(true);
+        var cut = Render<SiteLayout>(p =>
+        {
+            p.Add(c => c.Body, builder => builder.AddMarkupContent(0, "<p>本文</p>"));
+            p.Add(c => c.MobilePageScroll, true);
+            p.Add(c => c.PageClass, "site-extra");
+        });
+
+        var classes = cut.Find("div.mud-layout").ClassName!.Split(' ');
+        Assert.Contains("fsk-page", classes);
+        Assert.Contains("fsk-page-scroll", classes);
+        Assert.Contains("site-extra", classes);
+    }
+
+    [Fact]
     public void OnAPhoneTheDrawerIsClosedOnTheFirstRender()
     {
         var cut = RenderLayout(mobile: true);
