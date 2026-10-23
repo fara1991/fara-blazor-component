@@ -2,6 +2,15 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 0.3.2
+
+kit の Actions「Set maintenance (all sites)」の入力を変更(0.3.1 の入力 `target_branch` / `sites` は廃止)。
+
+- 入力を、反映先ブランチのチェックボックス(boolean)に変更: `develop`(各サイトの dev。既定 ON)、`master`(各サイトの本番。既定 OFF)、`migration_wasm`(avatar の wasm-dev。既定 OFF)。サイトは常に 4 つすべて(`migration_wasm` は avatar のみ)。複数チェックできる。`maintenance_mode`・`maintenance_message` は変更なし(本番は mode 必須)。1 つも選ばなければ拒否。順序は dev 系(develop → migration_wasm)を先に全部、全成功後に本番(master)を 1 サイトずつ。
+- 実行元(Use workflow from)は **master のみ**に単純化(`validate` が `github.ref` を検査。develop 上からは実行できない)。Environment `develop-maintenance` と `production-maintenance` は、**どちらも Deployment branches を master のみ**にする(`develop-maintenance` を develop にしていた場合は master に変更する。手順は `docs/maintenance-cli.md` の 3)。
+- 事前確認(計画): 対象ブランチのワークフローが入力 `maintenance_mode` を受け取れる版かを、`GET /repos/{repo}/contents/{file}?ref={branch}` で見て、受け取れないサイト(入力が無い・ファイルが無い)は dispatch せず警告つきで飛ばす。飛ばしたサイトと理由は、本番の承認画面より前(dev job の計画)にジョブサマリーに出る。選んだ対象がすべて飛ばされたら失敗。PAT に Contents: Read が無く確かめられないときは、従来どおり dispatch して失敗時に案内する。
+- CLI: `set` に `--plan`(事前確認だけして計画を表示)と `--allow-empty`、事前確認を追加。`--site` / `--env` は CLI 用に残す。
+
 ## 0.3.1
 
 追加のみ(破壊的変更なし)。

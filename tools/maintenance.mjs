@@ -9,7 +9,9 @@
 // set   : Cloudflare API には書き込まない。各サイトのリポジトリの deploy ワークフローを gh workflow run で手動実行（workflow_dispatch）し、
 //         入力 maintenance_mode / maintenance_message を渡す。ワークフローが wrangler deploy --var MAINTENANCE_MODE:... で反映する（雛形は docs/maintenance-cli.md）。
 //         Cloudflare のトークンは使わない（gh のログインだけ）。
-//         既定はドライラン（実行する gh のコマンドを表示するだけ）。--apply で実行。
+//         既定はドライラン（実行する gh のコマンドを表示するだけ）。--apply で実行。--plan は、事前確認だけ(読み取り)をして計画を表示する。
+//         事前確認: ワークフローのファイルが ref の上で入力 maintenance_mode(と maintenance_message)を受け取れる版かを、GET contents で見て、受け取れないサイトは警告つきで飛ばす
+//         (PAT の Contents: read が無く確かめられないときは、従来どおり dispatch して、失敗したら案内する)。すべて飛ばされたら失敗(--allow-empty なら成功)。
 //         順序: dev をすべて起動 → それぞれの結果を待って表示 → 全部成功したら production（サイトごとに起動して結果を待つ）。1 つでも失敗したら、そこで中断する。
 //         production を含む --apply は、--mode が必須で、--confirm に「production サイト名（アルファベット順・カンマ区切り）」の再入力が必須（master の最新が wrangler deploy で公開される）。
 // 終了コード: 0 = 成功（ドライランを含む）、1 = 失敗・中断・確認の不一致、2 = 使い方の誤り。
@@ -38,14 +40,15 @@ export const ENVS = ["dev", "production", "wasm-dev"];
 
 // ---- 引数 ----
 
+const FLAGS_BOOL = new Set(["--apply", "--plan", "--allow-empty"]);
 const FLAGS_WITH_VALUE = new Set(["--env", "--site", "--mode", "--message", "--confirm", "--sites-file"]);
 
 export function parseArgs(argv) {
   const [command, ...rest] = argv;
-  const opts = { command, env: undefined, sites: [], mode: undefined, message: undefined, confirm: undefined, apply: false, sitesFile: undefined };
+  const opts = { command, env: undefined, sites: [], mode: undefined, message: undefined, confirm: undefined, apply: false, plan: false, allowEmpty: false, sitesFile: undefined };
   for (let i = 0; i < rest.length; i++) {
     const flag = rest[i];
-    if (flag === "--apply") { opts.apply = true; continue; }
+    if (FLAGS_BOOL.has(flag)) { if (flag === "--apply") opts.apply = true; else if (flag === "--plan") opts.plan = true; else opts.allowEmpty = true; continue; }
     if (!FLAGS_WITH_VALUE.has(flag)) throw new UsageError(`不明なオプションです: ${flag}`);
     const value = rest[++i];
     if (value === undefined) throw new UsageError(`${flag} に値がありません`);
@@ -272,26 +275,63 @@ async function watch(t, run, { gh }) {
   if (r.code !== 0) throw new Error(`実行が失敗しました: ${run.url}`);
 }
 
-async function runSet(targets, io, opts, { gh, sleep, now, prompt }) {
+/**
+ * 事前確認: 対象のワークフローのファイルが、ref の上で、これから渡す入力(maintenance_mode / maintenance_message)を受け取れる版かを、
+ * GET /repos/{repo}/contents/{file}?ref={ref} で見る(PAT の Contents: read が要る)。
+ * @returns {Promise<{ supported: boolean | null, reason: string }>} supported: true = 受け取れる、false = 受け取れない(飛ばす)、null = 確かめられなかった(権限なしなど。従来どおり dispatch して、失敗したら案内する)
+ */
+export async function preflight(t, opts, gh) {
+  const need = [opts.mode !== undefined && INPUT_MODE, opts.message !== undefined && INPUT_MESSAGE].filter(Boolean);
+  const r = await gh(["api", `repos/${t.repo}/contents/${t.workflow.file}?ref=${encodeURIComponent(t.workflow.ref)}`, "-H", "Accept: application/vnd.github.raw"]);
+  if (r.code === 0) {
+    const missing = need.filter((n) => !r.stdout.includes(n));
+    return missing.length === 0 ? { supported: true, reason: "" } : { supported: false, reason: `${t.repo} の ${t.workflow.ref} の ${t.workflow.file} に、入力 ${missing.join(" / ")} がまだ無い(新しい入力つきのワークフローが、その ref に入っていない)` };
+  }
+  if (/HTTP 404|Not Found/i.test(r.stderr)) return { supported: false, reason: `${t.repo} の ${t.workflow.ref} に ${t.workflow.file} が見つからない` };
+  return { supported: null, reason: "事前確認できなかった(Contents の Read 権限が無いなど)" };
+}
+
+async function runSet(targets, io, opts, { gh, sleep, now, prompt, report }) {
   const label = (t) => `[${t.site}/${t.env}] ${t.repo} ${t.workflow.file} (${t.workflow.ref})`;
-  const dev = targets.filter((t) => t.env !== "production"); // dev と wasm-dev(確認用)は本番より先
-  const prod = targets.filter((t) => t.env === "production");
   // 本番へ文面だけを渡す操作は許さない（ワークフローの公開が、意図しない表示の切り替えにならないよう、mode を明示させる）
-  if (prod.length > 0 && opts.mode === undefined) throw new UsageError("production を含むときは --mode が必要です（--message だけの変更は dev だけで使えます）");
+  if (targets.some((t) => t.env === "production") && opts.mode === undefined) throw new UsageError("production を含むときは --mode が必要です（--message だけの変更は dev だけで使えます）");
   const change = [opts.mode !== undefined && `${MODE_VAR}=${opts.mode}`, opts.message !== undefined && `${MESSAGE_VAR}=${printable(opts.message)}`].filter(Boolean).join(" ");
 
-  io.log(opts.apply ? `実行します（${change}）:` : `ドライラン（${change}）。次の順に実行します（まだ何も実行していません）:`);
+  // 事前確認(--apply と --plan のとき): 入力を受け取れない版のワークフローは、dispatch して失敗させず、警告つきで飛ばす
+  const skipped = [];
+  let todo = targets;
+  if (opts.apply || opts.plan) {
+    todo = [];
+    for (const t of targets) {
+      let pre;
+      try { pre = await preflight(t, opts, gh); } catch (e) { pre = { supported: null, reason: `事前確認できなかった(${e.message})` }; }
+      if (pre.supported === false) skipped.push({ t, reason: pre.reason });
+      else todo.push(t);
+    }
+  }
+  if (report) { report.skipped = skipped.map((x) => ({ site: x.t.site, env: x.t.env, reason: x.reason })); report.runnable = todo.length; report.ran = 0; }
+  const dev = todo.filter((t) => t.env !== "production"); // dev と wasm-dev(確認用)は本番より先
+  const prod = todo.filter((t) => t.env === "production");
+
+  io.log(opts.apply ? `実行します（${change}）:` : `${opts.plan ? "計画" : "ドライラン"}（${change}）。次の順に実行します（まだ何も実行していません）:`);
   let n = 1;
-  for (const t of [...dev, ...prod]) io.log(`  ${n++}. ${label(t)}\n     ${displayCommand(dispatchArgs(t, opts))}`);
+  for (const t of [...dev, ...prod]) io.log(`  ${n++}. ${label(t)}
+     ${displayCommand(dispatchArgs(t, opts))}`);
+  for (const x of skipped) io.log(`  [警告] 飛ばす: [${x.t.site}/${x.t.env}] ${x.reason}`);
   if (prod.length > 0) io.log("  （production は、master の最新のコードが wrangler deploy で公開されます）");
   if (dev.length > 0 && prod.length > 0) io.log("  （dev をすべて起動して結果を待ち、全部成功したら production。1 つでも失敗したら中断）");
+  if (todo.length === 0 && (opts.apply || opts.plan)) {
+    io.error("実行できる対象がありません（すべて飛ばされました。何も反映されません）");
+    return opts.allowEmpty ? 0 : 1;
+  }
   if (!opts.apply) {
-    io.log("実行するには --apply を付けてください");
+    io.log(opts.plan ? "（計画のみ。実行はしません）" : "実行するには --apply を付けてください");
     return 0;
   }
 
   if (prod.length > 0) {
-    const phrase = `production ${[...new Set(prod.map((t) => t.site))].sort().join(",")}`;
+    // 再入力する名前は、選んだ対象(飛ばす前)のサイト名
+    const phrase = `production ${[...new Set(targets.filter((t) => t.env === "production").map((t) => t.site))].sort().join(",")}`;
     const answer = opts.confirm !== undefined ? opts.confirm : await prompt(`本番のワークフロー ${prod.length} 件を実行します（master の最新が wrangler deploy で公開されます）。続けるには「${phrase}」と入力してください: `);
     if (answer === null) { io.error(`本番を変更するには、対話の入力か --confirm "${phrase}" が必要です`); return 1; }
     if (answer.trim() !== phrase) { io.error("確認の入力が一致しないため、何も実行せずに終了します"); return 1; }
@@ -308,12 +348,14 @@ async function runSet(targets, io, opts, { gh, sleep, now, prompt }) {
     for (const { t, run } of started) {
       await watch(t, run, deps);
       io.log(`  ${label(t)}: 成功しました ${run.url}`);
+      if (report) report.ran++;
     }
     for (const t of prod) {
       const run = await dispatch(t, opts, deps);
       io.log(`  ${label(t)}: 起動しました ${run.url}`);
       await watch(t, run, deps);
       io.log(`  ${label(t)}: 成功しました ${run.url}`);
+      if (report) report.ran++;
     }
   } catch (e) {
     io.error(`失敗: ${e.message}`);
@@ -325,7 +367,7 @@ async function runSet(targets, io, opts, { gh, sleep, now, prompt }) {
 }
 
 /** 本体。終了コードを返す（process.exit はしない）。 */
-export async function main(argv, { env = process.env, fetchImpl = fetch, log = console.log, error = console.error, prompt = defaultPrompt, gh = defaultGh, sleep = defaultSleep, now = Date.now, sitesPath } = {}) {
+export async function main(argv, { env = process.env, fetchImpl = fetch, log = console.log, error = console.error, prompt = defaultPrompt, gh = defaultGh, sleep = defaultSleep, now = Date.now, sitesPath, report } = {}) {
   const io = makeIo({ env, log, error });
   try {
     const opts = parseArgs(argv);
@@ -336,11 +378,14 @@ export async function main(argv, { env = process.env, fetchImpl = fetch, log = c
       if (opts.mode === undefined && opts.message === undefined) throw new UsageError("set には --mode か --message が必要です");
       if (opts.mode !== undefined && !MODES.includes(opts.mode)) throw new UsageError(`--mode は ${MODES.join("・")} のどれかです`);
       if (opts.message !== undefined) validateMessage(opts.message);
-    } else if (opts.mode !== undefined || opts.message !== undefined || opts.apply || opts.confirm !== undefined) {
-      throw new UsageError("--mode / --message / --apply / --confirm は set だけで使えます");
+    } else if (opts.mode !== undefined || opts.message !== undefined || opts.apply || opts.plan || opts.allowEmpty || opts.confirm !== undefined) {
+      throw new UsageError("--mode / --message / --apply / --plan / --confirm は set だけで使えます");
     }
     const sites = loadSites(opts.sitesFile ?? sitesPath ?? join(here, "maintenance-sites.json"));
-    if (opts.command === "set") return await runSet(selectTargets(sites, opts, { needWorkflow: true }), io, opts, { gh, sleep, now, prompt });
+    if (opts.command === "set") {
+      if (opts.apply && opts.plan) throw new UsageError("--apply と --plan は同時に使えません");
+      return await runSet(selectTargets(sites, opts, { needWorkflow: true }), io, opts, { gh, sleep, now, prompt, report: report });
+    }
     const targets = selectTargets(sites, opts);
     const token = env.CLOUDFLARE_API_TOKEN;
     const accountId = env.CLOUDFLARE_ACCOUNT_ID;
