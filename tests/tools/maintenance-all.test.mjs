@@ -156,19 +156,36 @@ test("ワークフロー: トリガは workflow_dispatch だけ(PR・issue・コ
   assert.match(yml, /permissions:\n {2}contents: read\n/);
 });
 
-test("ワークフロー: 本番の job だけに Environment(承認)、dev の job には付けない。同時実行は待たせる(cancel しない)", () => {
-  assert.match(jobBlock("production"), /environment: production-maintenance/);
-  assert.doesNotMatch(jobBlock("dev"), /environment:/);
+test("ワークフロー: Environment は dev = dev-maintenance、本番 = production-maintenance。validate には付けない。待機は dev と本番で別の枠(cancel しない)", () => {
+  assert.match(jobBlock("production"), /environment: production-maintenance\n/);
+  assert.match(jobBlock("dev"), /environment: dev-maintenance\n/);
   assert.doesNotMatch(jobBlock("validate"), /environment:/);
-  assert.match(yml, /concurrency:\n {2}group: set-maintenance-all\n {2}cancel-in-progress: false/);
+  // 全体の concurrency は置かず、dev と本番の job で別の group にする
+  assert.doesNotMatch(yml.slice(0, yml.indexOf("\njobs:")), /concurrency:/);
+  assert.match(jobBlock("dev"), /concurrency:\n {6}group: set-maintenance-dev\n {6}cancel-in-progress: false/);
+  assert.match(jobBlock("production"), /concurrency:\n {6}group: set-maintenance-production\n {6}cancel-in-progress: false/);
   assert.match(jobBlock("production"), /if: \$\{\{ inputs\.target_branch == 'master' \}\}/);
   assert.match(jobBlock("dev"), /if: \$\{\{ inputs\.target_branch != 'master' \}\}/);
 });
 
-test("ワークフロー: シークレットは gh を動かす step(dev・production)にだけ渡す。入力は env 経由で、run に埋め込まない", () => {
+test("ワークフロー: SITES_DISPATCH_TOKEN は dev・production の job の最後の step にだけ渡す(validate には渡さない)", () => {
   assert.equal((yml.match(/secrets\.SITES_DISPATCH_TOKEN/g) ?? []).length, 2);
   assert.doesNotMatch(jobBlock("validate"), /secrets\./);
+  for (const name of ["dev", "production"]) {
+    const steps = jobBlock(name).split("\n      - ").slice(1);
+    assert.ok(steps.length >= 2);
+    steps.forEach((st, i) => assert.equal(st.includes("secrets.SITES_DISPATCH_TOKEN"), i === steps.length - 1, `${name} の step ${i}`));
+    assert.match(steps.at(-1), /run: node tools\/maintenance-all\.mjs\n/);
+  }
   // run: の行に ${{ ... }} を直接書かない(env のブロックでだけ使う)
   for (const line of yml.split("\n")) if (/^\s+run:/.test(line)) assert.doesNotMatch(line, /\$\{\{/, line);
-  assert.match(yml, /refs\/heads\/master/);
+});
+
+test("ワークフロー: validate は master 以外で止まり、dev・production は validate を待つ", () => {
+  const v = jobBlock("validate");
+  assert.match(v, /- name: Require the default branch\n {8}if: \$\{\{ github\.ref != 'refs\/heads\/master' \}\}\n {8}run: \|\n[\s\S]*?exit 1/);
+  assert.match(v, /node tools\/maintenance-all\.mjs --validate-only/);
+  assert.ok(v.indexOf("Require the default branch") < v.indexOf("Validate inputs"), "ブランチの確認が先");
+  assert.match(jobBlock("dev"), /needs: validate\n/);
+  assert.match(jobBlock("production"), /needs: validate\n/);
 });

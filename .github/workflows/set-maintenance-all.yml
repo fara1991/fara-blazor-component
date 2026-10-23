@@ -6,9 +6,10 @@ name: Set maintenance (all sites)
 #
 # 安全のしくみ(docs/maintenance-cli.md の「kit の Actions から 4 サイトまとめて切り替える」):
 #   - トリガは workflow_dispatch だけ(PR・issue・コメントでは動かない。fork の PR にシークレットは渡らない)。実行できるのは書き込み権限のある人だけ
-#   - 本番(master)の job には Environment production-maintenance(必須レビュワー)を付ける。dev の job には付けない
+#   - PAT(SITES_DISPATCH_TOKEN)は Environment のシークレットに置く。dev の job は dev-maintenance(レビュワーなし)、本番の job は production-maintenance(必須レビュワー)。
+#     どちらも Deployment branches は master のみ。repository secret にしないのは、workflow_dispatch が「実行時に選んだ ref」のワークフローを使うため(書き込み権限者が別ブランチで抜けられる)
 #   - 入力は環境変数で受け、tools/maintenance-all.mjs が検査する(シェルには埋め込まない)
-#   - SITES_DISPATCH_TOKEN(4 リポジトリに限定した fine-grained PAT)は、gh を動かす step にだけ渡す
+#   - SITES_DISPATCH_TOKEN(4 リポジトリに限定した fine-grained PAT)は、各 job の最後の step(gh を動かす step)にだけ渡す
 on:
   workflow_dispatch:
     inputs:
@@ -34,11 +35,6 @@ on:
 permissions:
   contents: read
 
-# 同時に 2 回動かさない(後から来たものは待つ。実行中のものを cancel しない)
-concurrency:
-  group: set-maintenance-all
-  cancel-in-progress: false
-
 jobs:
   # 入力の検査(シークレットは渡さない)。ここで通らなければ、後の job は動かない
   validate:
@@ -49,6 +45,7 @@ jobs:
         run: |
           echo "::error::このワークフローは master から実行してください(Use workflow from: master)"
           exit 1
+      # actions/checkout・setup-node は GitHub 公式。このリポジトリでは他のワークフローでも同じ版を使っており、タグ指定のままにしている
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -61,11 +58,16 @@ jobs:
           MAINTENANCE_MESSAGE_INPUT: ${{ inputs.maintenance_message }}
           SITES_INPUT: ${{ inputs.sites }}
 
-  # develop(各サイトの dev)と migration/wasm(avatar の確認用)。承認は要らない
+  # develop(各サイトの dev)と migration/wasm(avatar の確認用)。Environment dev-maintenance(レビュワーなし。Deployment branches は master のみ)
   dev:
     needs: validate
     if: ${{ inputs.target_branch != 'master' }}
     runs-on: ubuntu-latest
+    environment: dev-maintenance
+    # 同時に動かすのは 1 つ(実行中のものは cancel しない)。待てるのは 1 件だけで、さらに追加すると古い待機は取り消される。dev と本番は別の枠
+    concurrency:
+      group: set-maintenance-dev
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -86,6 +88,9 @@ jobs:
     if: ${{ inputs.target_branch == 'master' }}
     runs-on: ubuntu-latest
     environment: production-maintenance
+    concurrency:
+      group: set-maintenance-production
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
