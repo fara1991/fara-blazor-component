@@ -5,11 +5,11 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { planFromEnv, runAll, ENV_FOR_BRANCH } from "../../tools/maintenance-all.mjs";
+import { planFromEnv, runAll, ENV_FOR_BRANCH, ALLOWED_TARGETS } from "../../tools/maintenance-all.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TIP = "a".repeat(40);
-const base = { TARGET_BRANCH: "develop", MAINTENANCE_MODE_INPUT: "notice", MAINTENANCE_MESSAGE_INPUT: "", SITES_INPUT: "all" };
+const base = { RUN_REF: "refs/heads/master", TARGET_BRANCH: "develop", MAINTENANCE_MODE_INPUT: "notice", MAINTENANCE_MESSAGE_INPUT: "", SITES_INPUT: "all" };
 
 /** gh の模擬(repo ごとに run を管理)。failDispatch: その repo の workflow run が失敗。noTip: コミットの取得が 403。 */
 function fakeGh({ failDispatch = {}, noTip = false } = {}) {
@@ -156,9 +156,9 @@ test("ワークフロー: トリガは workflow_dispatch だけ(PR・issue・コ
   assert.match(yml, /permissions:\n {2}contents: read\n/);
 });
 
-test("ワークフロー: Environment は dev = dev-maintenance、本番 = production-maintenance。validate には付けない。待機は dev と本番で別の枠(cancel しない)", () => {
+test("ワークフロー: Environment は dev = develop-maintenance、本番 = production-maintenance。validate には付けない。待機は dev と本番で別の枠(cancel しない)", () => {
   assert.match(jobBlock("production"), /environment: production-maintenance\n/);
-  assert.match(jobBlock("dev"), /environment: dev-maintenance\n/);
+  assert.match(jobBlock("dev"), /environment: develop-maintenance\n/);
   assert.doesNotMatch(jobBlock("validate"), /environment:/);
   // 全体の concurrency は置かず、dev と本番の job で別の group にする
   assert.doesNotMatch(yml.slice(0, yml.indexOf("\njobs:")), /concurrency:/);
@@ -181,11 +181,38 @@ test("ワークフロー: SITES_DISPATCH_TOKEN は dev・production の job の�
   for (const line of yml.split("\n")) if (/^\s+run:/.test(line)) assert.doesNotMatch(line, /\$\{\{/, line);
 });
 
-test("ワークフロー: validate は master 以外で止まり、dev・production は validate を待つ", () => {
+test("ワークフロー: validate は master・develop 以外の ref で止まり、RUN_REF を渡して組み合わせを検査する。dev・production は validate を待つ", () => {
   const v = jobBlock("validate");
-  assert.match(v, /- name: Require the default branch\n {8}if: \$\{\{ github\.ref != 'refs\/heads\/master' \}\}\n {8}run: \|\n[\s\S]*?exit 1/);
-  assert.match(v, /node tools\/maintenance-all\.mjs --validate-only/);
-  assert.ok(v.indexOf("Require the default branch") < v.indexOf("Validate inputs"), "ブランチの確認が先");
+  assert.match(v, /- name: Require master or develop\n {8}if: \$\{\{ github\.ref != 'refs\/heads\/master' && github\.ref != 'refs\/heads\/develop' \}\}\n {8}run: \|\n[\s\S]*?exit 1/);
+  assert.match(v, /node tools\/maintenance-all\.mjs --validate-only\n {8}env:\n {10}RUN_REF: \$\{\{ github\.ref \}\}/);
+  assert.ok(v.indexOf("name: Require master or develop") < v.indexOf("name: Validate inputs"), "ref の確認が先");
+  // 実行する step にも RUN_REF を渡す(validate をすり抜けても、実行側でも検査する)
+  for (const name of ["dev", "production"]) assert.match(jobBlock(name), /RUN_REF: \$\{\{ github\.ref \}\}/);
   assert.match(jobBlock("dev"), /needs: validate\n/);
   assert.match(jobBlock("production"), /needs: validate\n/);
+});
+
+test("実行 ref と target_branch の組み合わせ: master の ref はすべて可、develop の ref は develop / migration/wasm だけ(master は拒否)", () => {
+  assert.deepEqual(ALLOWED_TARGETS, { "refs/heads/master": ["develop", "master", "migration/wasm"], "refs/heads/develop": ["develop", "migration/wasm"] });
+  for (const target of ["develop", "master", "migration/wasm"]) {
+    const extra = target === "master" ? { MAINTENANCE_MODE_INPUT: "true" } : {};
+    assert.doesNotThrow(() => planFromEnv({ ...base, RUN_REF: "refs/heads/master", TARGET_BRANCH: target, ...extra }), `master から ${target}`);
+  }
+  for (const target of ["develop", "migration/wasm"]) assert.doesNotThrow(() => planFromEnv({ ...base, RUN_REF: "refs/heads/develop", TARGET_BRANCH: target }), `develop から ${target}`);
+  assert.throws(() => planFromEnv({ ...base, RUN_REF: "refs/heads/develop", TARGET_BRANCH: "master", MAINTENANCE_MODE_INPUT: "true" }), /develop から実行したワークフローでは、target_branch=master は使えません/);
+  for (const ref of ["refs/heads/feature/x", "refs/heads/migration/wasm", "refs/tags/v1", "refs/pull/1/merge", "master", "", undefined]) {
+    assert.throws(() => planFromEnv({ ...base, RUN_REF: ref }), /master か develop から実行してください/, String(ref));
+  }
+});
+
+test("develop の ref から実行すると、dev の job は動き、master への反映は何も起動されない", async () => {
+  const dev = await go({ RUN_REF: "refs/heads/develop" });
+  assert.equal(dev.code, 0, dev.out);
+  assert.equal(dev.g.dispatches().length, 4);
+  const prod = await go({ RUN_REF: "refs/heads/develop", TARGET_BRANCH: "master", MAINTENANCE_MODE_INPUT: "true" });
+  assert.equal(prod.code, 2);
+  assert.equal(prod.g.calls.length, 0, "gh を呼ばない");
+  const feat = await go({ RUN_REF: "refs/heads/feature/x" });
+  assert.equal(feat.code, 2);
+  assert.equal(feat.g.calls.length, 0);
 });
