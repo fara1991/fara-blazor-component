@@ -2,19 +2,18 @@
 // kit のリポジトリの Actions「Set maintenance (all sites)」(.github/workflows/set-maintenance-all.yml) から呼ぶ。
 // 4 サイトの deploy ワークフローを、tools/maintenance.mjs の set で一括して起動する(dev 系を先に全部・全成功後に本番、失敗で中断、起動 run の特定、本番の確認は set のもの)。
 //
-// 反映先は、対象ブランチのチェックボックス(boolean 入力)で選ぶ。サイトは常に 4 つすべて(migration_wasm は avatar のみ)。
+// 反映先は、対象ブランチのチェックボックス(boolean 入力)で選ぶ。サイトは常に 4 つすべて。
 //   develop        → 各サイトの dev(develop ブランチ)
-//   migration_wasm → avatar の wasm-dev(migration/wasm ブランチ)
 //   master         → 各サイトの本番(master ブランチ)
 //
 // 入力は環境変数だけで受ける(ワークフローの inputs をシェルに埋め込まない):
 //   RUN_REF                   このワークフローを実行した kit の ref(github.ref)。refs/heads/master だけ許可
-//   TARGET_DEVELOP / TARGET_MASTER / TARGET_MIGRATION_WASM   "true" か "false"(チェックボックス)。1 つ以上 true
+//   TARGET_DEVELOP / TARGET_MASTER   "true" か "false"(チェックボックス)。1 つ以上 true
 //   MAINTENANCE_MODE_INPUT    空 / true / notice / false(master を選ぶときは必須)
 //   MAINTENANCE_MESSAGE_INPUT 文面(200 文字まで・制御文字なし。空 = 変更しない)
 //   GH_TOKEN                  gh の認証(SITES_DISPATCH_TOKEN。ここでは読まない。gh が使う)
 //   GITHUB_STEP_SUMMARY       あれば、結果(各サイトの run の URL と結果、飛ばしたサイトと理由)を追記する
-// 段階(--phase): validate = 入力の検査だけ / dev = 計画(事前確認)を全対象について表示してから、dev 系(develop → migration_wasm)を実行 /
+// 段階(--phase): validate = 入力の検査だけ / dev = 計画(事前確認)を全対象について表示してから、dev(develop)を実行 /
 //                production = 本番(master)を実行 / all(既定)= dev → production。
 // 事前確認で入力を受け取れない版と分かったサイトは、dispatch せず警告つきで飛ばす。計画の時点で、実行できる対象が 1 つも無ければ失敗。
 // 終了コード: 0 = 成功、1 = 失敗・中断、2 = 入力の誤り。
@@ -28,7 +27,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 /** チェックボックスの入力と set の --env の対応(この順 = dev 系を先に、本番は最後)。 */
 export const STAGES = [
   { input: "TARGET_DEVELOP", branch: "develop", envName: "dev" },
-  { input: "TARGET_MIGRATION_WASM", branch: "migration/wasm", envName: "wasm-dev" },
   { input: "TARGET_MASTER", branch: "master", envName: "production" },
 ];
 /** 実行してよい kit の ref。master だけ(develop などの上のワークフローは、PAT を使う Environment の Deployment branches でも使えない想定)。 */
@@ -49,7 +47,7 @@ export function planFromEnv(env, sitesPath = join(here, "maintenance-sites.json"
     if (v !== "true" && v !== "false") throw new UsageError(`${st.branch} のチェックボックスの値が不正です(${JSON.stringify(v.slice(0, 20))})`);
     if (v === "true") picked.push(st);
   }
-  if (picked.length === 0) throw new UsageError("反映先のブランチ(develop / master / migration_wasm)を 1 つ以上選んでください");
+  if (picked.length === 0) throw new UsageError("反映先のブランチ(develop / master)を 1 つ以上選んでください");
 
   const mode = String(env.MAINTENANCE_MODE_INPUT ?? "");
   if (mode !== "" && !MODES.includes(mode)) throw new UsageError(`maintenance_mode は 空 / ${MODES.join(" / ")} のどれかです`);

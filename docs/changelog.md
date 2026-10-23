@@ -2,6 +2,15 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 0.3.4
+
+avatar の WASM 移行(Phase 5)が develop に統合され、確認用 Worker `fara-avatar-wasm-dev` と avatar の `deploy-wasm-dev.yml`・wrangler の `env.wasm-dev` が廃止されたことに合わせた整理。
+
+- kit の Actions「Set maintenance (all sites)」の入力 `migration_wasm`(boolean)を廃止。入力は `develop` / `master` / `maintenance_mode` / `maintenance_message` になる。
+- `tools/maintenance.mjs` / `tools/maintenance-all.mjs` / `tools/maintenance-sites.json` から `wasm-dev` 環境(avatar の `deploy.yml` / `migration/wasm` / `fara-avatar-wasm-dev`)を削除。`--env` は dev・production・all。
+- avatar の dev(develop の `deploy.yml`)には入力つきの版が入ったので、事前確認で飛ばされず反映される。docs の「avatar の dev は未対応で飛ばされる」旨の記述を直した。
+- テスト・docs(maintenance-cli.md・README・CLAUDE.md)を更新。
+
 ## 0.3.3
 
 v0.3.2 の初回実行で見つかった不具合の修正。

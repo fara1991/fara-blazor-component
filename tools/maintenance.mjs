@@ -37,8 +37,8 @@ export class UsageError extends Error {}
 /** そのサイトのその ref のワークフローが、渡す入力を受け取れない版だった(dispatch が HTTP 422 Unexpected inputs)。失敗にせず、警告つきで飛ばす。 */
 export class SkipSite extends Error {}
 
-/** 環境。dev = develop 用、production = 本番(master)、wasm-dev = avatar の WASM 移行用の確認用(migration/wasm)。--env all は dev と production だけ(wasm-dev は明示したときだけ)。 */
-export const ENVS = ["dev", "production", "wasm-dev"];
+/** 環境。dev = develop 用、production = 本番(master)。 */
+export const ENVS = ["dev", "production"];
 
 // ---- 引数 ----
 
@@ -93,9 +93,9 @@ export function loadSites(path) {
   return data.sites;
 }
 
-/** @returns {{site: string, env: "production"|"dev"|"wasm-dev", worker: string, repo?: string, workflow?: {file: string, ref: string}}[]} */
+/** @returns {{site: string, env: "production"|"dev", worker: string, repo?: string, workflow?: {file: string, ref: string}}[]} */
 export function selectTargets(sites, { env, sites: names }, { needWorkflow = false } = {}) {
-  if (![...ENVS, "all"].includes(env)) throw new UsageError("--env は dev・production・wasm-dev・all のどれかです");
+  if (![...ENVS, "all"].includes(env)) throw new UsageError("--env は dev・production・all のどれかです");
   const known = new Set(sites.map((s) => s.name));
   for (const n of names) if (!known.has(n)) throw new UsageError(`不明なサイトです: ${n}（${[...known].join("・")}）`);
   const envs = env === "all" ? ["dev", "production"] : [env];
@@ -105,7 +105,7 @@ export function selectTargets(sites, { env, sites: names }, { needWorkflow = fal
     for (const e of envs) {
       if (needWorkflow) {
         if (!s.workflows?.[e]) {
-          // サイトを名指ししたのに無いときは誤り。名指ししていない(全サイト)ときは、そのサイトを飛ばす(例: wasm-dev は avatar だけ)
+          // サイトを名指ししたのに無いときは誤り。名指ししていない(全サイト)ときは、そのサイトを飛ばす
           if (env !== "all" && names.includes(s.name)) throw new UsageError(`${s.name} の ${e} のワークフローが maintenance-sites.json にありません`);
           continue;
         }
@@ -316,7 +316,7 @@ async function runSet(targets, io, opts, { gh, sleep, now, prompt, report }) {
     }
   }
   if (report) { report.skipped = skipped.map((x) => ({ site: x.t.site, env: x.t.env, reason: x.reason })); report.runnable = todo.length; report.ran = 0; }
-  const dev = todo.filter((t) => t.env !== "production"); // dev と wasm-dev(確認用)は本番より先
+  const dev = todo.filter((t) => t.env !== "production"); // dev は本番より先
   const prod = todo.filter((t) => t.env === "production");
 
   io.log(opts.apply ? `実行します（${change}）:` : `${opts.plan ? "計画" : "ドライラン"}（${change}）。次の順に実行します（まだ何も実行していません）:`);

@@ -20,7 +20,7 @@ writeFileSync(sitesPath, JSON.stringify({
   sites: [
     { name: "pokemon", repo: "o/pk", workflows: { dev: wf("deploy-develop.yml", "develop"), production: wf("deploy.yml", "master") }, workers: { production: "w-pk", dev: "w-pk-dev" } },
     { name: "portfolio", repo: "o/pf", workflows: { dev: wf("deploy-develop.yml", "develop"), production: wf("deploy.yml", "master") }, workers: { production: "w-pf", dev: "w-pf-dev" } },
-    { name: "devonly", repo: "o/do", workflows: { dev: wf("wasm.yml", "migration/wasm") }, workers: { dev: "w-do-dev" } },
+    { name: "devonly", repo: "o/do", workflows: { dev: wf("extra.yml", "feature/x") }, workers: { dev: "w-do-dev" } },
   ],
 }));
 
@@ -239,7 +239,7 @@ test("dev だけのサイト（production のワークフローが無い）は�
   const g = fakeGh();
   const all = await run(["set", "--env", "all", "--site", "devonly", "--mode", "true", "--apply"], { gh: g.gh });
   assert.equal(all.code, 0, all.all);
-  assert.deepEqual(g.dispatches().map((a) => a[a.indexOf("--ref") + 1]), ["migration/wasm"]);
+  assert.deepEqual(g.dispatches().map((a) => a[a.indexOf("--ref") + 1]), ["feature/x"]);
   const prod = await run(["set", "--env", "production", "--site", "devonly", "--mode", "true"]);
   assert.equal(prod.code, 2);
 });
@@ -463,17 +463,13 @@ test("雛形: 実行後のサマリーに、設定した値と反映後の現在
   assert.match(readFileSync(summary, "utf8"), /設定した値: MAINTENANCE_MODE=`\(変更なし\)` \/ MAINTENANCE_MESSAGE=`\(変更なし\)`/);
 });
 
-test("wasm-dev(avatar の確認用): --env all には含めず、--env wasm-dev と明示したときだけ。ほかのサイトは飛ばす", async () => {
-  const g = fakeGh();
+test("同梱の sites.json: avatar の dev(develop の deploy.yml)にも dispatch できる。--env に wasm-dev は無い", async () => {
   const real = join(root, "tools", "maintenance-sites.json");
-  const all = await run(["set", "--env", "all", "--site", "avatar", "--mode", "true", "--sites-file", real, "--apply", "--confirm", "production avatar"], { gh: g.gh });
-  assert.equal(all.code, 0, all.all);
-  assert.ok(!g.dispatches().some((a) => a.includes("migration/wasm")));
-  const g2 = fakeGh();
-  const w = await run(["set", "--env", "wasm-dev", "--mode", "true", "--sites-file", real, "--apply"], { gh: g2.gh });
-  assert.equal(w.code, 0, w.all);
-  assert.deepEqual(g2.dispatches().map((a) => [a[a.indexOf("--repo") + 1], a[a.indexOf("--ref") + 1]]), [["fara1991/fara-avatar-modding-guide", "migration/wasm"]]);
-  assert.equal((await run(["set", "--env", "wasm-dev", "--site", "pokemon", "--mode", "true", "--sites-file", real])).code, 2, "名指ししたのにワークフローが無い");
+  const g = fakeGh();
+  const r = await run(["set", "--env", "dev", "--site", "avatar", "--mode", "true", "--sites-file", real, "--apply"], { gh: g.gh });
+  assert.equal(r.code, 0, r.all);
+  assert.deepEqual(g.dispatches().map((a) => [a[2], a[a.indexOf("--repo") + 1], a[a.indexOf("--ref") + 1]]), [["deploy.yml", "fara1991/fara-avatar-modding-guide", "develop"]]);
+  assert.equal((await run(["set", "--env", "wasm-dev", "--mode", "true", "--sites-file", real])).code, 2);
 });
 
 test("入力が無いワークフローへの dispatch の失敗は、サイト名と原因・対処(--site で除く)を出す", async () => {
