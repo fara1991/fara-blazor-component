@@ -38,6 +38,7 @@ function fakeGh({ failWatch = [], failDispatch = [], noRun = [], extraRun = [], 
     const repo = repoOf(args);
     if (args[0] === "api" && args[1] === "user") return { code: 0, stdout: "fara1991\n", stderr: "" };
     if (args[0] === "api" && args[1].includes("/contents/")) {
+      assert.match(args[1], /^repos\/[^/]+\/[^/]+\/contents\/\.github\/workflows\/[^/?]+\?ref=/, `ワークフローのパスは .github/workflows/ 以下: ${args[1]}`);
       const repoName = args[1].split("/").slice(1, 3).join("/");
       const c = contents[repoName] ?? "inputs: maintenance_mode maintenance_message";
       if (c === 404) return { code: 1, stdout: "", stderr: "gh: Not Found (HTTP 404)" };
@@ -51,7 +52,8 @@ function fakeGh({ failWatch = [], failDispatch = [], noRun = [], extraRun = [], 
       return { code: 0, stdout: JSON.stringify(runs.get(repo) ?? []), stderr: "" };
     }
     if (args[0] === "workflow" && args[1] === "run") {
-      if (failDispatch.includes(repo)) return { code: 1, stdout: "", stderr: "HTTP 422: Workflow does not have 'workflow_dispatch' trigger" };
+      const fd = Array.isArray(failDispatch) ? (failDispatch.includes(repo) ? "HTTP 422: Workflow does not have 'workflow_dispatch' trigger" : null) : (failDispatch[repo] ?? null);
+      if (fd) return { code: 1, stdout: "", stderr: fd };
       if (!noRun.includes(repo)) {
         const mk = () => {
           const id = next++;
@@ -537,4 +539,34 @@ test("事前確認: 本番の再入力は、飛ばす前に選んだサイト名
   assert.equal(r.code, 0, r.all);
   assert.deepEqual(g.dispatches().map((a) => a[a.indexOf("--repo") + 1]), ["o/pf"]);
   assert.deepEqual([report.ran, report.runnable, report.skipped.map((x) => x.site)], [1, 1, ["pokemon"]]);
+});
+
+test("dispatch が 422 Unexpected inputs で返ったら飛ばして続行、すべてそうなら失敗(--allow-empty なら成功)。ほかのエラーは中断", async () => {
+  const unexpected = "HTTP 422: Unexpected inputs provided: [\"maintenance_mode\"]";
+  const f403 = { "o/pk": 403, "o/pf": 403 };
+  const g = fakeGh({ contents: f403, failDispatch: { "o/pk": unexpected } });
+  const r = await run(["set", "--env", "dev", "--site", "pokemon,portfolio", "--mode", "true", "--apply"], { gh: g.gh });
+  assert.equal(r.code, 0, r.all);
+  assert.match(r.out, /\[警告\] 飛ばす: \[pokemon\/dev\] .*HTTP 422 Unexpected inputs/);
+  assert.equal(g.watches().length, 1, "portfolio は続行");
+  assert.match(r.out, /飛ばしたサイトが 1 件/);
+
+  const gAll = fakeGh({ contents: f403, failDispatch: { "o/pk": unexpected, "o/pf": unexpected } });
+  const all = await run(["set", "--env", "dev", "--site", "pokemon,portfolio", "--mode", "true", "--apply"], { gh: gAll.gh });
+  assert.equal(all.code, 1);
+  assert.match(all.err, /実行できた対象がありません/);
+  const ok = await run(["set", "--env", "dev", "--site", "pokemon,portfolio", "--mode", "true", "--apply", "--allow-empty"], { gh: fakeGh({ contents: f403, failDispatch: { "o/pk": unexpected, "o/pf": unexpected } }).gh });
+  assert.equal(ok.code, 0);
+
+  const other = fakeGh({ contents: f403, failDispatch: { "o/pk": "HTTP 401: Bad credentials" } });
+  const bad = await run(["set", "--env", "dev", "--site", "pokemon,portfolio", "--mode", "true", "--apply"], { gh: other.gh });
+  assert.equal(bad.code, 1);
+  assert.equal(other.dispatches().length, 1, "422 以外は中断して、後続を起動しない");
+});
+
+test("事前確認の GET は .github/workflows/ 以下のパスを見る", async () => {
+  const g = fakeGh();
+  await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--plan"], { gh: g.gh });
+  const url = g.calls.find((a) => a[0] === "api" && a[1].includes("/contents/"))[1];
+  assert.equal(url, "repos/o/pk/contents/.github/workflows/deploy-develop.yml?ref=develop");
 });

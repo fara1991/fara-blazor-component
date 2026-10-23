@@ -26,6 +26,7 @@ function fakeGh({ contents = {}, failDispatch = {}, noTip = false } = {}) {
     const repo = args[args.indexOf("--repo") + 1];
     if (args[0] === "api" && args[1] === "user") return { code: 0, stdout: "fara1991\n", stderr: "" };
     if (args[0] === "api" && args[1].includes("/contents/")) {
+      assert.match(args[1], /^repos\/[^/]+\/[^/]+\/contents\/\.github\/workflows\/[^/?]+\?ref=/, `ワークフローのパスは .github/workflows/ 以下: ${args[1]}`);
       const [path, query] = args[1].split("?ref=");
       const key = `${path.split("/").slice(1, 3).join("/")}@${decodeURIComponent(query)}`;
       const c = contents[key] ?? OK;
@@ -188,12 +189,57 @@ test("段階 production: 本番だけを起動する。飛ばすサイトは本�
 
 // ---- 失敗・その他 ----
 
-test("入力が未対応で事前確認できないサイト(403)の dispatch が失敗したら、サイト名と案内を出して中断し、本番は起動しない", async () => {
-  const contents = Object.fromEntries(Object.values(REPOS).map((repo) => [`${repo}@develop`, 403]));
-  const r = await go({ ...master }, { contents, failDispatch: { [REPOS.avatar]: "HTTP 422: Unexpected inputs provided: [\"maintenance_mode\"]" } });
+test("事前確認の URL は .github/workflows/ 以下(ファイル名だけだと 404 になる)", async () => {
+  const r = await go({});
+  assert.equal(r.code, 0, r.out);
+  const urls = r.g.calls.filter((a) => a[0] === "api" && a[1].includes("/contents/")).map((a) => a[1]);
+  assert.equal(urls.length, 8, "plan と実行で 4 サイトずつ");
+  assert.ok(urls.every((u) => u.includes("/contents/.github/workflows/")), urls.join("\n"));
+  assert.ok(urls.includes("repos/fara1991/fara-pokemon-battle-assistant/contents/.github/workflows/deploy-develop.yml?ref=develop"));
+  assert.ok(urls.includes("repos/fara1991/fara-bot-moderator/contents/.github/workflows/site.yml?ref=develop"));
+});
+
+const noPreflight = (ref) => Object.fromEntries(Object.values(REPOS).map((repo) => [`${repo}@${ref}`, 403]));
+const unexpected = "could not create workflow dispatch event: HTTP 422: Unexpected inputs provided: [\"maintenance_message\",\"maintenance_mode\"]";
+
+test("事前確認できず(403)dispatch が 422 Unexpected inputs で返ったサイトは、失敗にせず飛ばして続行する。サマリーに明記", async () => {
+  const r = await go({}, { contents: noPreflight("develop"), failDispatch: { [REPOS.avatar]: unexpected } });
+  assert.equal(r.code, 0, r.out);
+  assert.deepEqual(r.g.dispatches().map((x) => x.repo).sort(), Object.values(REPOS).sort(), "avatar も dispatch は試みる");
+  assert.match(r.out, /\[警告\] 飛ばす: \[avatar\/dev\] .*HTTP 422 Unexpected inputs/);
+  assert.match(r.summary, /飛ばしたサイト\(警告\)/);
+  assert.match(r.summary, /- avatar \/ dev: .*Unexpected inputs/);
+  assert.equal(r.g.calls.filter((a) => a[1] === "watch").length, 3, "ほかの 3 サイトは続行して結果を待つ");
+});
+
+test("422 以外のエラー(認証・ワークフロー不在・その他)は従来どおり失敗で中断し、本番は起動しない", async () => {
+  for (const stderr of ["HTTP 401: Bad credentials", "HTTP 404: Not Found", "could not find any workflows named deploy.yml", "HTTP 500: Server Error", "HTTP 422: Workflow does not have 'workflow_dispatch' trigger"]) {
+    const r = await go({ ...master }, { contents: noPreflight("develop"), failDispatch: { [REPOS.avatar]: stderr } });
+    assert.equal(r.code, 1, stderr);
+    assert.match(r.out, /\[avatar\/dev\] gh workflow run が失敗しました/, stderr);
+    assert.ok(r.g.dispatches().every((x) => x.ref === "develop"), "本番は起動しない");
+  }
+});
+
+test("422 で飛ばすのは本番でも同じ。飛ばした事実はサマリーに出て、残りの本番は続行する", async () => {
+  const r = await go({ TARGET_DEVELOP: "false", ...master }, { contents: noPreflight("master"), failDispatch: { [REPOS.pokemon]: unexpected } }, { phase: "production" });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.summary, /- pokemon \/ production: /);
+  assert.equal(r.g.calls.filter((a) => a[1] === "watch").length, 3);
+});
+
+test("422 ですべて飛ばされたら失敗(何も反映されない)。dev の段階では、あとで本番が実行できるなら失敗にしない", async () => {
+  const all422 = Object.fromEntries(Object.values(REPOS).map((repo) => [repo, unexpected]));
+  const r = await go({}, { contents: noPreflight("develop"), failDispatch: all422 });
   assert.equal(r.code, 1);
-  assert.match(r.out, /\[avatar\/dev\] gh workflow run が失敗しました.*Unexpected inputs/);
-  assert.ok(r.g.dispatches().every((x) => x.ref === "develop"), "本番は起動しない");
+  assert.match(r.out, /実行できた対象が 1 つもありません|実行できる対象が/);
+  assert.match(r.summary, /失敗・中断/);
+  // dev の段階: dev はすべて 422 で飛ばされるが、本番(master)は実行できる → 失敗にしない
+  const devPhase = await go({ ...master }, { contents: { ...noPreflight("develop") }, failDispatch: Object.fromEntries(Object.values(REPOS).map((repo) => [repo, unexpected])) }, { phase: "dev" });
+  assert.equal(devPhase.code, 0, devPhase.out);
+  // 本番の段階: すべて飛ばされたら失敗
+  const prod = await go({ TARGET_DEVELOP: "false", ...master }, { contents: noPreflight("master"), failDispatch: all422 }, { phase: "production" });
+  assert.equal(prod.code, 1);
 });
 
 test("トークン(GH_TOKEN)が無いと、gh を呼ぶ前に失敗する。入力が不正なら終了コード 2", async () => {
