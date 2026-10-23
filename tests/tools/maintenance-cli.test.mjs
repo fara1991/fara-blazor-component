@@ -28,7 +28,7 @@ writeFileSync(sitesPath, JSON.stringify({
  * gh の模擬。run list（起動済みの run）・workflow run（run を増やす）・run watch（成功/失敗）を再現し、呼び出しを記録する。
  * failWatch: その repo の run watch を失敗させる。failDispatch: その repo の workflow run を失敗させる。noRun: 起動しても run が一覧に出ない。
  */
-function fakeGh({ failWatch = [], failDispatch = [], noRun = [], extraRun = [], wrongSha = [] } = {}) {
+function fakeGh({ failWatch = [], failDispatch = [], noRun = [], extraRun = [], wrongSha = [], contents = {} } = {}) {
   const calls = [];
   const runs = new Map(); // repo -> [{databaseId, url}]
   let next = 100;
@@ -37,6 +37,13 @@ function fakeGh({ failWatch = [], failDispatch = [], noRun = [], extraRun = [], 
     calls.push(args);
     const repo = repoOf(args);
     if (args[0] === "api" && args[1] === "user") return { code: 0, stdout: "fara1991\n", stderr: "" };
+    if (args[0] === "api" && args[1].includes("/contents/")) {
+      const repoName = args[1].split("/").slice(1, 3).join("/");
+      const c = contents[repoName] ?? "inputs: maintenance_mode maintenance_message";
+      if (c === 404) return { code: 1, stdout: "", stderr: "gh: Not Found (HTTP 404)" };
+      if (c === 403) return { code: 1, stdout: "", stderr: "gh: Resource not accessible by personal access token (HTTP 403)" };
+      return { code: 0, stdout: c, stderr: "" };
+    }
     if (args[0] === "api" && args[1].startsWith("repos/")) return { code: 0, stdout: `${TIP}\n`, stderr: "" };
     if (args[0] === "run" && args[1] === "list") {
       assert.equal(args[args.indexOf("--user") + 1], "fara1991", "自分が起動した run だけに絞る");
@@ -197,7 +204,7 @@ test("本番: --confirm が無い（対話もできない）と、何も実行�
   const r = await run(["set", "--env", "production", "--site", "pokemon", "--mode", "true", "--apply"], { gh: g.gh });
   assert.equal(r.code, 1);
   assert.match(r.err, /--confirm "production pokemon"/);
-  assert.equal(g.calls.length, 0);
+  assert.equal(g.dispatches().length, 0);
 });
 
 test("本番: --confirm が違うと、何も実行しない（dev も実行しない）", async () => {
@@ -205,7 +212,7 @@ test("本番: --confirm が違うと、何も実行しない（dev も実行し�
     const g = fakeGh();
     const r = await run(["set", "--env", "all", "--site", "pokemon,portfolio", "--mode", "true", "--apply", "--confirm", wrong], { gh: g.gh });
     assert.equal(r.code, 1, wrong);
-    assert.equal(g.calls.length, 0, wrong);
+    assert.equal(g.dispatches().length, 0, wrong);
   }
 });
 
@@ -473,4 +480,61 @@ test("入力が無いワークフローへの dispatch の失敗は、サイト�
   assert.equal(r.code, 1);
   assert.match(r.err, /\[pokemon\/dev\] gh workflow run が失敗しました/);
   assert.match(r.err, /まだ入っていない可能性.*--site で除く/);
+});
+
+// ---- 事前確認(入力を受け取れない版のワークフローは、dispatch せずに警告つきで飛ばす) ----
+
+test("事前確認: 入力が無い版のサイトは飛ばして警告を出し、ほかは実行する。すべて飛ばされたら失敗", async () => {
+  const old = { "o/pk": "name: Deploy\non: push\n" };
+  const g = fakeGh({ contents: old });
+  const r = await run(["set", "--env", "dev", "--site", "pokemon,portfolio", "--mode", "true", "--apply"], { gh: g.gh });
+  assert.equal(r.code, 0, r.all);
+  assert.deepEqual(g.dispatches().map((a) => a[a.indexOf("--repo") + 1]), ["o/pf"], "pokemon は dispatch しない");
+  assert.match(r.out, /\[警告\] 飛ばす: \[pokemon\/dev\] o\/pk の develop の deploy-develop\.yml に、入力 maintenance_mode がまだ無い/);
+  const all = fakeGh({ contents: { "o/pk": "x", "o/pf": "y" } });
+  const none = await run(["set", "--env", "dev", "--site", "pokemon,portfolio", "--mode", "true", "--apply"], { gh: all.gh });
+  assert.equal(none.code, 1);
+  assert.match(none.err, /すべて飛ばされました。何も反映されません/);
+  assert.equal(all.dispatches().length, 0);
+});
+
+test("事前確認: ワークフローのファイルが無い(404)は飛ばす。権限が無い(403)は確かめられないので、従来どおり dispatch する", async () => {
+  const g = fakeGh({ contents: { "o/pk": 404, "o/pf": 403 } });
+  const r = await run(["set", "--env", "dev", "--site", "pokemon,portfolio", "--mode", "true", "--apply"], { gh: g.gh });
+  assert.equal(r.code, 0, r.all);
+  assert.match(r.out, /\[pokemon\/dev\] o\/pk の develop に deploy-develop\.yml が見つからない/);
+  assert.deepEqual(g.dispatches().map((a) => a[a.indexOf("--repo") + 1]), ["o/pf"]);
+});
+
+test("事前確認: --message を渡すときは maintenance_message も要る。--mode だけなら mode だけ見る", async () => {
+  const g = fakeGh({ contents: { "o/pk": "maintenance_mode only" } });
+  const r1 = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--message", "x", "--apply", "--allow-empty"], { gh: g.gh });
+  assert.equal(r1.code, 0);
+  assert.match(r1.out, /入力 maintenance_message がまだ無い/);
+  assert.equal(g.dispatches().length, 0);
+  const g2 = fakeGh({ contents: { "o/pk": "maintenance_mode only" } });
+  assert.equal((await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--apply"], { gh: g2.gh })).code, 0);
+  assert.equal(g2.dispatches().length, 1);
+});
+
+test("--plan: 事前確認だけ(読み取り)して計画を表示し、dispatch も本番の確認もしない。ドライランは gh を呼ばない", async () => {
+  const g = fakeGh({ contents: { "o/pk": "old" } });
+  const r = await run(["set", "--env", "all", "--site", "pokemon,portfolio", "--mode", "true", "--plan"], { gh: g.gh, prompt: async () => { throw new Error("求めない"); } });
+  assert.equal(r.code, 0, r.all);
+  assert.equal(g.dispatches().length, 0);
+  assert.match(r.out, /\[警告\] 飛ばす: \[pokemon\/dev\]/);
+  assert.match(r.out, /\[警告\] 飛ばす: \[pokemon\/production\]/);
+  assert.match(r.out, /\[portfolio\/production\]/);
+  assert.equal((await run(["set", "--env", "dev", "--mode", "true", "--apply", "--plan"])).code, 2);
+  const dry = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true"]); // gh は呼べない(noGh)
+  assert.equal(dry.code, 0);
+});
+
+test("事前確認: 本番の再入力は、飛ばす前に選んだサイト名。飛ばした本番は実行しない。結果は report に残る", async () => {
+  const g = fakeGh({ contents: { "o/pk": "old" } });
+  const report = {};
+  const r = await run(["set", "--env", "production", "--site", "pokemon,portfolio", "--mode", "true", "--apply", "--confirm", "production pokemon,portfolio"], { gh: g.gh, report });
+  assert.equal(r.code, 0, r.all);
+  assert.deepEqual(g.dispatches().map((a) => a[a.indexOf("--repo") + 1]), ["o/pf"]);
+  assert.deepEqual([report.ran, report.runnable, report.skipped.map((x) => x.site)], [1, 1, ["pokemon"]]);
 });
