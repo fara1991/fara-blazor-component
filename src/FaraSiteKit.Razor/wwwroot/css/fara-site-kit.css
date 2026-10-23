@@ -621,7 +621,7 @@ a.fsk-footer-social:focus-visible {
     display: block;
 }
 
-/* メンテナンス画面（MAINTENANCE=true）。アプリの代わりに、この画面だけを出す */
+/* メンテナンス画面（MAINTENANCE_MODE=true）。アプリの代わりに、この画面だけを出す */
 .fsk-maintenance {
     min-height: 100vh;
     min-height: 100dvh;

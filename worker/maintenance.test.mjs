@@ -7,27 +7,37 @@ import { getMaintenance, maintenanceResponse, maintenancePageHtml, noticeHtml, w
 const req = (path, accept = "text/html", method = "GET") => new Request(`https://site.example${path}`, { method, headers: { Accept: accept } });
 
 test("getMaintenance: true / on / 1 はメンテナンス、notice はお知らせ、それ以外は通常", () => {
-  for (const v of ["true", "TRUE", " True ", "on", "1"]) assert.equal(getMaintenance({ MAINTENANCE: v }).state, "on", v);
-  for (const v of ["notice", "NOTICE", " Notice "]) assert.equal(getMaintenance({ MAINTENANCE: v }).state, "notice", v);
-  for (const v of [undefined, null, "", "false", "False", "0", "off", "yes", "maintenance"]) assert.equal(getMaintenance({ MAINTENANCE: v }).state, "off", String(v));
+  for (const v of ["true", "TRUE", " True ", "on", "1"]) assert.equal(getMaintenance({ MAINTENANCE_MODE: v }).state, "on", v);
+  for (const v of ["notice", "NOTICE", " Notice "]) assert.equal(getMaintenance({ MAINTENANCE_MODE: v }).state, "notice", v);
+  for (const v of [undefined, null, "", "false", "False", "0", "off", "yes", "maintenance"]) assert.equal(getMaintenance({ MAINTENANCE_MODE: v }).state, "off", String(v));
   assert.equal(getMaintenance(undefined).state, "off");
   assert.equal(getMaintenance({}).state, "off");
 });
 
+test("getMaintenance: 旧名 MAINTENANCE は読まない（0.3.0 で MAINTENANCE_MODE に変更。設定が残っていても通常のまま）", () => {
+  for (const v of ["true", "notice", "on", "1"]) {
+    const info = getMaintenance({ MAINTENANCE: v, MAINTENANCE_MESSAGE: "旧名だけの設定" });
+    assert.deepEqual(info, { state: "off", message: "" }, v);
+  }
+  // 新名が優先される（旧名が false/true のどちらでも、新名の値だけで決まる）
+  assert.equal(getMaintenance({ MAINTENANCE: "true", MAINTENANCE_MODE: "false" }).state, "off");
+  assert.equal(getMaintenance({ MAINTENANCE: "false", MAINTENANCE_MODE: "notice" }).state, "notice");
+});
+
 test("getMaintenance: 文は notice と true のときだけ。通常に戻せば、お知らせも消える", () => {
   const message = "10月25日（土）20:00ごろ、サイトを更新します";
-  assert.equal(getMaintenance({ MAINTENANCE: "notice", MAINTENANCE_MESSAGE: message }).message, message);
-  assert.equal(getMaintenance({ MAINTENANCE: "true", MAINTENANCE_MESSAGE: message }).message, message);
-  assert.equal(getMaintenance({ MAINTENANCE: "false", MAINTENANCE_MESSAGE: message }).message, "");
+  assert.equal(getMaintenance({ MAINTENANCE_MODE: "notice", MAINTENANCE_MESSAGE: message }).message, message);
+  assert.equal(getMaintenance({ MAINTENANCE_MODE: "true", MAINTENANCE_MESSAGE: message }).message, message);
+  assert.equal(getMaintenance({ MAINTENANCE_MODE: "false", MAINTENANCE_MESSAGE: message }).message, "");
   assert.equal(getMaintenance({ MAINTENANCE_MESSAGE: message }).message, "");
 });
 
 test("getMaintenance: 文は 200 文字まで・制御文字なし・文字列以外は空", () => {
-  assert.equal(Array.from(getMaintenance({ MAINTENANCE: "notice", MAINTENANCE_MESSAGE: "あ".repeat(500) }).message).length, 200);
-  assert.equal(getMaintenance({ MAINTENANCE: "notice", MAINTENANCE_MESSAGE: "😀".repeat(300) }).message, "😀".repeat(200));
-  assert.equal(getMaintenance({ MAINTENANCE: "notice", MAINTENANCE_MESSAGE: "a\u0000b\u0007c" }).message, "abc");
-  assert.equal(getMaintenance({ MAINTENANCE: "notice", MAINTENANCE_MESSAGE: 5 }).message, "");
-  assert.equal(getMaintenance({ MAINTENANCE: "notice" }).message, "");
+  assert.equal(Array.from(getMaintenance({ MAINTENANCE_MODE: "notice", MAINTENANCE_MESSAGE: "あ".repeat(500) }).message).length, 200);
+  assert.equal(getMaintenance({ MAINTENANCE_MODE: "notice", MAINTENANCE_MESSAGE: "😀".repeat(300) }).message, "😀".repeat(200));
+  assert.equal(getMaintenance({ MAINTENANCE_MODE: "notice", MAINTENANCE_MESSAGE: "a\u0000b\u0007c" }).message, "abc");
+  assert.equal(getMaintenance({ MAINTENANCE_MODE: "notice", MAINTENANCE_MESSAGE: 5 }).message, "");
+  assert.equal(getMaintenance({ MAINTENANCE_MODE: "notice" }).message, "");
 });
 
 test("escapeHtml は HTML の特殊文字を変える", () => {

@@ -1,5 +1,5 @@
 @* 「更新予定」のお知らせ（MaintenanceInfo の状態が Notice のときだけ）。1 行目に見出し「【お知らせ】」、2 行目以降に本文（MaintenanceInfo.NoticeText）。
-   Worker の変数 MAINTENANCE を false に戻すと消える。通常・メンテナンス中（On）のときは何も出さない *@
+   Worker の変数 MAINTENANCE_MODE を false に戻すと消える。通常・メンテナンス中（On）のときは何も出さない *@
 @if (Info is { State: MaintenanceState.Notice })
 {
     <div class="fsk-notice" role="status"><strong class="fsk-notice-title">【お知らせ】</strong><span class="fsk-notice-text">@Info.NoticeText</span></div>
