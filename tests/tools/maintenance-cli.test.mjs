@@ -453,3 +453,24 @@ test("雛形: 実行後のサマリーに、設定した値と反映後の現在
   exec({});
   assert.match(readFileSync(summary, "utf8"), /設定した値: MAINTENANCE_MODE=`\(変更なし\)` \/ MAINTENANCE_MESSAGE=`\(変更なし\)`/);
 });
+
+test("wasm-dev(avatar の確認用): --env all には含めず、--env wasm-dev と明示したときだけ。ほかのサイトは飛ばす", async () => {
+  const g = fakeGh();
+  const real = join(root, "tools", "maintenance-sites.json");
+  const all = await run(["set", "--env", "all", "--site", "avatar", "--mode", "true", "--sites-file", real, "--apply", "--confirm", "production avatar"], { gh: g.gh });
+  assert.equal(all.code, 0, all.all);
+  assert.ok(!g.dispatches().some((a) => a.includes("migration/wasm")));
+  const g2 = fakeGh();
+  const w = await run(["set", "--env", "wasm-dev", "--mode", "true", "--sites-file", real, "--apply"], { gh: g2.gh });
+  assert.equal(w.code, 0, w.all);
+  assert.deepEqual(g2.dispatches().map((a) => [a[a.indexOf("--repo") + 1], a[a.indexOf("--ref") + 1]]), [["fara1991/fara-avatar-modding-guide", "migration/wasm"]]);
+  assert.equal((await run(["set", "--env", "wasm-dev", "--site", "pokemon", "--mode", "true", "--sites-file", real])).code, 2, "名指ししたのにワークフローが無い");
+});
+
+test("入力が無いワークフローへの dispatch の失敗は、サイト名と原因・対処(--site で除く)を出す", async () => {
+  const g = fakeGh({ failDispatch: ["o/pk"] });
+  const r = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--apply"], { gh: g.gh });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /\[pokemon\/dev\] gh workflow run が失敗しました/);
+  assert.match(r.err, /まだ入っていない可能性.*--site で除く/);
+});

@@ -1,14 +1,15 @@
 # メンテナンス表示の切り替え（Actions の画面 / 一括変更 CLI）
 
-Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTENANCE_MESSAGE`（文面）を切り替える方法は 2 つ。**第一の手段は、GitHub Actions の「Run workflow」画面で入力して実行する方法**（スマホの GitHub アプリからも可）。Cloudflare のトークンも、手元の環境変数も要らない。4 サイトをまとめて切り替えたいときだけ、手元の CLI（`tools/maintenance.mjs`）を使う（補助）。
+Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTENANCE_MESSAGE`（文面）を切り替える方法は 3 つ。**第一の手段は、GitHub Actions の「Run workflow」画面で入力して実行する方法**（スマホの GitHub アプリからも可）。Cloudflare のトークンも、手元の環境変数も要らない。4 サイトをまとめて切り替えたいときは、kit の Actions（3）か、手元の CLI（2。補助）を使う。
 
 | 方法 | 使う場面 | 必要なもの |
 | --- | --- | --- |
 | 1. Actions の画面で実行する | 1 サイトずつ。いつでも・どこからでも | GitHub のアカウントだけ(ブラウザかスマホアプリ) |
-| 2. CLI の `set` | 4 サイトをまとめて(dev を先に流し、成功したら本番) | `gh auth login` 済みの `gh`。環境変数は不要 |
-| 2. CLI の `status` | 4 サイトの現在値を 1 つの表で見る(任意) | Cloudflare の読み取りトークン(Workers Scripts の Read)。無くてもよい(結果は Actions のジョブサマリーにも出る) |
+| 2. CLI の `set`(補助) | 4 サイトをまとめて(dev を先に流し、成功したら本番) | `gh auth login` 済みの `gh`。環境変数は不要 |
+| 3. kit の Actions「Set maintenance (all sites)」 | 4 サイトをまとめて、スマホからでも。手元の環境変数も CLI も不要 | 一度だけ: PAT(`SITES_DISPATCH_TOKEN`)と Environment の登録(下の 3) |
+| 2. CLI の `status`(補助) | 4 サイトの現在値を 1 つの表で見る(任意) | Cloudflare の読み取りトークン(Workers Scripts の Read)。無くてもよい(結果は Actions のジョブサマリーにも出る) |
 
-どちらの方法でも、実際の反映は各サイトの deploy ワークフロー(`wrangler deploy --var ...`)が行う。両方とも同じ入力 `maintenance_mode` / `maintenance_message` を使う。**公開されるのは、実行するブランチ(dev = `develop`、本番 = `master`)の最新のコード**である点に注意する。
+1・2・3 のどの方法でも、実際の反映は各サイトの deploy ワークフロー(`wrangler deploy --var ...`)が行う。いずれも同じ入力 `maintenance_mode` / `maintenance_message` を使う。**公開されるのは、実行するブランチ(dev = `develop`、本番 = `master`)の最新のコード**である点に注意する。
 
 ## 1. Actions の画面で実行する(第一の手段)
 
@@ -119,6 +120,74 @@ node tools/maintenance.mjs set --env all --mode false --apply --confirm "product
 反映の確認は `status`。公開の直後は、反映に数十秒かかることがある。
 
 `set` は、サイトのコードを公開し直す（`wrangler deploy`）。つまり、そのブランチ（dev は `develop`、production は `master`）の最新の内容が公開される。公開してはいけない変更が `master` に入っていないか、実行の前に確かめる。
+
+## 3. kit の Actions から 4 サイトまとめて切り替える
+
+kit のリポジトリ(`fara1991/fara-site-kit`)の Actions →「**Set maintenance (all sites)**」→ Run workflow で、4 サイトに一度に反映する。手元の環境変数も CLI も要らない(スマホの GitHub アプリからも可)。中身は 2 の `set` を、Actions の上で動かしているだけ(`.github/workflows/set-maintenance-all.yml` → `tools/maintenance-all.mjs` → `tools/maintenance.mjs set --apply`)。
+
+入力:
+
+| 入力 | 値 |
+| --- | --- |
+| `target_branch` | `develop` = 各サイトの dev(確認用)、`master` = 各サイトの本番、`migration/wasm` = avatar の WASM 移行用の確認用(下の「avatar の WASM 移行用」) |
+| `maintenance_mode` | 空 / `true` = 全体メンテナンス(503) / `notice` = お知らせ帯 / `false` = 通常。空 = 変更しない。**`master` では必須**(message だけの変更は `develop` だけ) |
+| `maintenance_message` | 文面(200 文字まで・改行なし)。空 = 変更しない |
+| `sites` | 既定 `all`。`pokemon,avatar,bot,portfolio` のカンマ区切りで絞れる |
+
+動き:
+
+1. `validate` job: 入力を検査する(シークレットは渡さない)。`master` ブランチから実行していないとき、`target_branch` / `maintenance_mode` / `sites` が決まった値でないとき、文面が 200 文字を超える・制御文字を含むときは、ここで止まる
+2. `target_branch=develop`(または `migration/wasm`)なら `dev` job: Environment `dev-maintenance`(レビュワーなし。承認は要らない。PAT をここに置くための Environment)。各サイトの dev 用ワークフローを、そのリポジトリの `develop` で起動する
+3. `target_branch=master` なら `production` job: GitHub の **Environment `production-maintenance`**(必須レビュワー = 自分)の**承認が済むまで動かない**。承認の画面(Review deployments)では、**入力値(`maintenance_mode` / `maintenance_message` / `sites`)と、対象の各サイトの master の最新のコード(公開される内容)を確認してから**承認する。承認後、各サイトの本番ワークフローを `master` で 1 サイトずつ起動し、結果を待つ。**そのサイトの master の最新のコードが `wrangler deploy` で公開される**ので、承認の前に確かめる
+4. 起動した run の特定・失敗で中断・サマリーは `set` のとおり。ジョブサマリーに、各サイトの run の URL と結果が出る
+5. `concurrency`(dev と本番で別の枠)で、同じ枠の job を同時に 2 つ動かさない。実行中のものは止めない。待てるのは 1 件だけで、さらに追加すると、古い待機は取り消される(最後に押したものだけが残る)
+
+### 注意点
+
+1. **各サイトの対象ブランチに、入力 `maintenance_mode` / `maintenance_message` を受け取るワークフローが入っている必要がある**。入っていないサイトへの dispatch は失敗する(`Unexpected inputs provided`)。失敗時は、サイト名と「そのサイトの `<ref>` に新しい入力つきワークフローがまだ入っていない可能性。`--site` で除く」を出して**そこで中断**する(それ以降のサイトは起動しない)。特に `master` 側は、各サイトの develop → master のマージが済むまで、未対応のサイトが出る。`sites` で対応済みのサイトだけに絞って実行する
+2. **pokemon の本番は未作成の間**、master のワークフローが旧版(入力なし)なので、この Actions からは作れない。初回は pokemon の develop → master のマージ(master への push)で作る。push の公開は `--var MAINTENANCE_MODE:true` を付けるので、メンテナンス画面のまま(非公開のまま)作られる。作ったあとの切り替えから、この Actions を使う
+3. 各サイトの `develop` 側は、新しい入力つきのワークフローが先に入るので、dev から使える
+
+### avatar の WASM 移行用の確認用(`fara-avatar-wasm-dev`、`migration/wasm`)
+
+**方式: `target_branch` に `migration/wasm` を足し、`tools/maintenance-sites.json` の avatar に `wasm-dev` の環境として持たせた**(`workflows.wasm-dev` = `deploy.yml` / `migration/wasm`、`workers.wasm-dev` = `fara-avatar-wasm-dev`)。理由:
+
+- ほかの対象と同じく「ブランチで反映先が決まる」ので、入力の形(`target_branch`)が変わらず、使い方が一貫する。別の job や別の入力を足すより、仕組みが増えない
+- avatar だけの環境なので、`sites=all` のままでも、`migration/wasm` のときは avatar だけが対象になる(ほかのサイトは自動で飛ばす)。`sites` に avatar 以外を名指しすると、入力の誤りで止まる
+- `--env all`(dev と production)には含めない。`--env wasm-dev` と明示したときだけ使うので、既存の dev / 本番の一括変更に影響しない
+- 注意: Cloudflare 側の Worker `fara-avatar-wasm-dev` と、`migration/wasm` に入力つきの `deploy.yml` ができるまでは、`migration/wasm` を選ぶと失敗する(上の注意点 1 と同じ表示)
+
+### 登録するもの(ユーザー向けの手順)
+
+**トークンはチャットや issue に貼らない**。次の画面に直接入力する。
+
+PAT は repository secret ではなく、**Environment のシークレット**に置く。理由: `workflow_dispatch` は「実行時に選んだ ref(ブランチ)」のワークフローを使う。repository secret にすると、書き込み権限のある人が別ブランチで書き換えたワークフローから、PAT を読めてしまう。Environment のシークレットは、Deployment branches を `master` だけにしておけば、`master` のワークフローでしか使えない。
+
+1. fine-grained PAT を作る: GitHub → 右上のアイコン → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
+   - Resource owner: 自分(`fara1991`)
+   - Repository access: **Only select repositories** → `fara-pokemon-battle-assistant`、`fara-avatar-modding-guide`、`fara-bot-moderator`、`fara-portfolio-site` の **4 つだけ**
+   - Repository permissions: **Actions: Read and write**(Metadata: Read-only は自動で付く)。あわせて **Contents: Read-only を付けることを推奨**する。起動した run が各ブランチの先頭のコミットのものかまで照合でき、別の実行との取り違えを防げる(付けなくても動くが、その照合だけ飛ばす)
+   - 有効期限(Expiration): 必ず付ける(短めにして、切れたら作り直す)
+2. Environment を **2 つ**作る: **fara-site-kit → Settings → Environments → New environment**
+   - `dev-maintenance`: レビュワーなし
+   - `production-maintenance`: **Required reviewers** に自分を追加(必須)。自分だけがレビュワーで、自分が実行する運用なら、**Prevent self-review は OFF** にする(ON のままだと、自分では承認できず動かない)
+   - どちらも **Deployment branches and tags** を **Selected branches and tags → `master`** だけにする
+3. それぞれの Environment のシークレットとして登録する: 各 Environment のページ → **Environment secrets → Add environment secret** → 名前 `SITES_DISPATCH_TOKEN`、値に PAT を貼る(2 つの Environment に同じ値)。**repository secret(Settings → Secrets and variables → Actions)には置かない**
+4. **kit の master を保護する(ruleset)**: 現状、kit の `master` にはブランチ保護が無い。保護が無いと、書き込み権限のある人が、`master` のワークフローを直接 push で書き換えて、Environment のシークレットを読める。**Settings → Rules → Rulesets → New ruleset → New branch ruleset** → Target branches に `master`(Default) → **Require a pull request before merging** を有効にして保存する。個人のリポジトリで書き込み権限者が自分だけなら、保護が無くても許容範囲だが、その場合は**アカウントの 2FA と、短い PAT の期限が前提**になる(個人リポジトリの無料プランでは、ruleset に自分を例外にできない・レビュー必須にできないなど限界がある)
+5. **最初の試行(実機で確認する項目)**: まず `target_branch=develop` で、`sites` を 1 サイトに絞って試す。サマリーの run の URL と、そのサイトの dev の表示を確かめる。同時に次を確認する
+   - `gh api user`(起動した人の特定)が、fine-grained PAT で通ること
+   - `gh run list` / `gh run watch` が、PAT の権限(Actions)で通ること
+   - Environment の承認画面(本番)が出て、承認後に動くこと
+   - 問題がなければ `master` を使う
+
+### 安全性(kit は公開リポジトリ)
+
+- トリガは `workflow_dispatch` だけ(issue・PR・コメント・push では動かない)。テストが、`on:` が `workflow_dispatch` だけであることを検査している
+- fork からの PR では、リポジトリのシークレットは渡されない(そもそもこのワークフローは PR で動かない)。実行できるのは、kit のリポジトリに**書き込み権限のある人だけ**
+- `SITES_DISPATCH_TOKEN` は Environment のシークレットで、`dev` / `production` job の最後の step(gh を動かす step)の `GH_TOKEN` にだけ渡す。`validate` job には渡さない。Deployment branches が `master` だけなので、別ブランチのワークフローからは読めない。PAT は 4 リポジトリの Actions にしか効かないので、漏れても被害は限られる。画面・サマリーには出さない
+- `production` job の Environment(`production-maintenance`)には必須レビュワーを付ける。承認しなければ、本番には何も起動されない。`dev` job の Environment(`dev-maintenance`)は、PAT を置くためのもので、レビュワーは付けない
+- `actions/checkout` と `actions/setup-node` は GitHub 公式の action で、タグ指定(`@v4`)のまま使っている(ほかのワークフローと同じ。PAT は最後の step にしか渡さないので、これらの step からは見えない)
+- 入力はシェルに埋め込まず、環境変数で渡して、`tools/maintenance-all.mjs` が検査する(`sites` は 4 サイトの名前だけ、`maintenance_mode` は 3 値、文面は 200 文字・制御文字なし)。`gh` には引数配列として渡す(シェルを通さない)。テストで、記号入りの文面・不正な `sites` を確かめている
 
 ## ワークフローの雛形（各サイトに入れる）
 
