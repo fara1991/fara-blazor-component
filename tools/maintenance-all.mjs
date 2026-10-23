@@ -3,6 +3,7 @@
 // 4 サイトの deploy ワークフローを、tools/maintenance.mjs の set で一括して起動する(dev 先行・失敗で中断・起動 run の特定・本番の確認は set のもの)。
 //
 // 入力は環境変数だけで受ける(ワークフローの inputs をシェルに埋め込まない):
+//   RUN_REF                  このワークフローを実行した kit の ref(github.ref。refs/heads/master または refs/heads/develop。無ければ拒否)
 //   TARGET_BRANCH            develop(各サイトの dev) / master(各サイトの本番) / migration/wasm(avatar の WASM 移行用の確認用)
 //   MAINTENANCE_MODE_INPUT   空 / true / notice / false
 //   MAINTENANCE_MESSAGE_INPUT 文面(200 文字まで・制御文字なし。空 = 変更しない)
@@ -19,6 +20,14 @@ import { main, loadSites, selectTargets, validateMessage, UsageError } from "./m
 const here = dirname(fileURLToPath(import.meta.url));
 /** target_branch と set の --env の対応。 */
 export const ENV_FOR_BRANCH = { develop: "dev", master: "production", "migration/wasm": "wasm-dev" };
+/**
+ * 実行 ref(kit のどのブランチのワークフローを使うか)ごとに、反映してよい target_branch(サイト側のブランチ)。
+ * master の ref だけが本番(master)に反映できる。develop の ref は dev 系(develop / migration/wasm)だけ。それ以外の ref は拒否する。
+ */
+export const ALLOWED_TARGETS = {
+  "refs/heads/master": ["develop", "master", "migration/wasm"],
+  "refs/heads/develop": ["develop", "migration/wasm"],
+};
 const MODES = ["true", "notice", "false"];
 
 /**
@@ -29,6 +38,9 @@ export function planFromEnv(env, sitesPath = join(here, "maintenance-sites.json"
   const branch = String(env.TARGET_BRANCH ?? "");
   if (!Object.hasOwn(ENV_FOR_BRANCH, branch)) throw new UsageError(`target_branch は ${Object.keys(ENV_FOR_BRANCH).join(" / ")} のどれかです`);
   const envName = ENV_FOR_BRANCH[branch];
+  const runRef = String(env.RUN_REF ?? "");
+  if (!Object.hasOwn(ALLOWED_TARGETS, runRef)) throw new UsageError(`このワークフローは ${Object.keys(ALLOWED_TARGETS).map((r) => r.replace("refs/heads/", "")).join(" か ")} から実行してください(実行した ref: ${JSON.stringify(runRef.slice(0, 80))})`);
+  if (!ALLOWED_TARGETS[runRef].includes(branch)) throw new UsageError(`${runRef.replace("refs/heads/", "")} から実行したワークフローでは、target_branch=${branch} は使えません(使えるのは ${ALLOWED_TARGETS[runRef].join(" / ")}。本番の master は、master から実行する)`);
 
   const mode = String(env.MAINTENANCE_MODE_INPUT ?? "");
   if (mode !== "" && !MODES.includes(mode)) throw new UsageError(`maintenance_mode は 空 / ${MODES.join(" / ")} のどれかです`);

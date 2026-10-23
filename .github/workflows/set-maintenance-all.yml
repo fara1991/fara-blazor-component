@@ -6,8 +6,12 @@ name: Set maintenance (all sites)
 #
 # 安全のしくみ(docs/maintenance-cli.md の「kit の Actions から 4 サイトまとめて切り替える」):
 #   - トリガは workflow_dispatch だけ(PR・issue・コメントでは動かない。fork の PR にシークレットは渡らない)。実行できるのは書き込み権限のある人だけ
-#   - PAT(SITES_DISPATCH_TOKEN)は Environment のシークレットに置く。dev の job は dev-maintenance(レビュワーなし)、本番の job は production-maintenance(必須レビュワー)。
-#     どちらも Deployment branches は master のみ。repository secret にしないのは、workflow_dispatch が「実行時に選んだ ref」のワークフローを使うため(書き込み権限者が別ブランチで抜けられる)
+#   - PAT(SITES_DISPATCH_TOKEN)は Environment のシークレットに置く。dev の job は develop-maintenance(Deployment branches = develop。レビュワーは任意)、本番の job は production-maintenance(Deployment branches = master。必須レビュワー)。
+#     repository secret にしないのは、workflow_dispatch が「実行時に選んだ ref」のワークフローを使うため(書き込み権限者が別ブランチで抜けられる)
+#   - 実行 ref(kit のどのブランチのワークフローを使うか)と target_branch(サイト側のどのブランチに反映するか)の組み合わせを検査する:
+#       実行 ref = master  → target_branch は develop / master / migration/wasm のどれでもよい
+#       実行 ref = develop → target_branch は develop / migration/wasm だけ(master は拒否)
+#       それ以外の ref     → 拒否。本番(master)の job は、Environment の Deployment branches(master のみ)でも、master 以外の ref からは起動できない
 #   - 入力は環境変数で受け、tools/maintenance-all.mjs が検査する(シェルには埋め込まない)
 #   - SITES_DISPATCH_TOKEN(4 リポジトリに限定した fine-grained PAT)は、各 job の最後の step(gh を動かす step)にだけ渡す
 on:
@@ -40,10 +44,11 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Require the default branch
-        if: ${{ github.ref != 'refs/heads/master' }}
+      # 実行 ref が master でも develop でもなければ止める(組み合わせの検査は、次の Validate inputs が行う)
+      - name: Require master or develop
+        if: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/develop' }}
         run: |
-          echo "::error::このワークフローは master から実行してください(Use workflow from: master)"
+          echo "::error::このワークフローは master か develop から実行してください(Use workflow from)"
           exit 1
       # actions/checkout・setup-node は GitHub 公式。このリポジトリでは他のワークフローでも同じ版を使っており、タグ指定のままにしている
       - uses: actions/checkout@v4
@@ -53,17 +58,18 @@ jobs:
       - name: Validate inputs
         run: node tools/maintenance-all.mjs --validate-only
         env:
+          RUN_REF: ${{ github.ref }}
           TARGET_BRANCH: ${{ inputs.target_branch }}
           MAINTENANCE_MODE_INPUT: ${{ inputs.maintenance_mode }}
           MAINTENANCE_MESSAGE_INPUT: ${{ inputs.maintenance_message }}
           SITES_INPUT: ${{ inputs.sites }}
 
-  # develop(各サイトの dev)と migration/wasm(avatar の確認用)。Environment dev-maintenance(レビュワーなし。Deployment branches は master のみ)
+  # develop(各サイトの dev)と migration/wasm(avatar の確認用)。Environment develop-maintenance(Deployment branches = develop。実行 ref が develop でも動く)
   dev:
     needs: validate
     if: ${{ inputs.target_branch != 'master' }}
     runs-on: ubuntu-latest
-    environment: dev-maintenance
+    environment: develop-maintenance
     # 同時に動かすのは 1 つ(実行中のものは cancel しない)。待てるのは 1 件だけで、さらに追加すると古い待機は取り消される。dev と本番は別の枠
     concurrency:
       group: set-maintenance-dev
@@ -76,6 +82,7 @@ jobs:
       - name: Set maintenance (dev)
         run: node tools/maintenance-all.mjs
         env:
+          RUN_REF: ${{ github.ref }}
           TARGET_BRANCH: ${{ inputs.target_branch }}
           MAINTENANCE_MODE_INPUT: ${{ inputs.maintenance_mode }}
           MAINTENANCE_MESSAGE_INPUT: ${{ inputs.maintenance_message }}
@@ -99,6 +106,7 @@ jobs:
       - name: Set maintenance (production)
         run: node tools/maintenance-all.mjs
         env:
+          RUN_REF: ${{ github.ref }}
           TARGET_BRANCH: ${{ inputs.target_branch }}
           MAINTENANCE_MODE_INPUT: ${{ inputs.maintenance_mode }}
           MAINTENANCE_MESSAGE_INPUT: ${{ inputs.maintenance_message }}
