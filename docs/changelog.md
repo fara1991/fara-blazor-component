@@ -2,6 +2,14 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 0.3.3
+
+v0.3.2 の初回実行で見つかった不具合の修正。
+
+- 事前確認のパスのバグ: ワークフローのファイルを `repos/{repo}/contents/{file}` と**ファイル名だけ**で GET していたため、実在するファイルが 404(見つからない)になり、pokemon と bot が誤って飛ばされた。`.github/workflows/{file}` に修正。テストの gh のモックが、呼ばれる URL に `.github/workflows/` が含まれることを検査するようにした(以前はモックが通ってしまい検出できなかった)。
+- 事前確認できない場合(PAT に Contents: Read が無い 403)に dispatch して返る **HTTP 422 `Unexpected inputs provided`**(そのサイトのその ref のワークフローが入力を受け取れない版)は、失敗で中断せず、**警告つきで飛ばして続行**する(サマリーに明記。dev でも本番でも同じ)。422 以外のエラー(認証・ワークフロー不在・その他)は従来どおり失敗で中断。すべて飛ばされたら失敗(`maintenance-all` の dev の段階では、あとで本番が実行できるなら失敗にしない)。
+- docs: Contents: Read-only が必要なリポジトリ(非公開の avatar と portfolio)、403 のときは 422 で判定して飛ばす動作、最初の試行に今回の失敗例と対処を追記。
+
 ## 0.3.2
 
 kit の Actions「Set maintenance (all sites)」の入力を変更(0.3.1 の入力 `target_branch` / `sites` は廃止)。
