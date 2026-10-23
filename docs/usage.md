@@ -22,6 +22,19 @@ import { getMaintenance, maintenanceResponse } from "../external/fara-site-kit/w
 - wrangler は、サブモジュールの中のファイルもバンドルする（`wrangler deploy --dry-run` で確認する）。
 - サイトの `package.json` のテストは、kit のテストファイルを指す（例: `node --test external/fara-site-kit/worker/report.test.mjs`）。
 
+### 2.1 メンテナンスの変数（0.3.0 で名前を変更）
+
+Worker の変数（ダッシュボードの「変数とシークレット」、または `wrangler deploy --var`）で切り替える。
+
+| 変数 | 値 |
+| --- | --- |
+| `MAINTENANCE_MODE` | `false`（または未設定）= 通常 / `notice` = 通常のページの上に「更新予定」のお知らせ / `true` = メンテナンス画面（503） |
+| `MAINTENANCE_MESSAGE` | お知らせ・メンテナンス画面に出す文（200 文字まで） |
+
+- **旧名 `MAINTENANCE` は 0.3.0 から読まない**（残っていても何も起きない＝通常動作）。0.2.x 以前から上げるサイトは、`docs/changelog.md` の 0.3.0 の移行手順に従う。
+- 本番の公開前にお知らせを出す運用（`require-maintenance.mjs` 相当）や、公開と同時に `--var MAINTENANCE_MODE:true` を付けるワークフローも、新しい名前に合わせる。
+- 複数サイトの変数をまとめて見る・変えるには `tools/maintenance.mjs`（`docs/maintenance-cli.md`）。
+
 ## 3. C# の共通コードを使う（`src/FaraSiteKit.Core`）
 
 ```xml

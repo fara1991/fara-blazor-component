@@ -1,0 +1,9 @@
+{
+  "_comment": "一括変更 CLI（tools/maintenance.mjs）の対象。workers の名前は、各サイトの wrangler.jsonc / wrangler.toml の name（ダッシュボードの Worker 名）と同じにする。確認用の Worker を足すときは、サイトを増やすか、dev だけのサイトにする（例: avatar の WASM 移行用の確認用 Worker）。",
+  "sites": [
+    { "name": "pokemon", "workers": { "production": "fara-pokemon", "dev": "fara-pokemon-dev" } },
+    { "name": "avatar", "workers": { "production": "fara-avatar", "dev": "fara-avatar-dev" } },
+    { "name": "bot", "workers": { "production": "fara-twitch-bot", "dev": "fara-twitch-bot-dev" } },
+    { "name": "portfolio", "workers": { "production": "fara-portfolio", "dev": "fara-portfolio-dev" } }
+  ]
+}

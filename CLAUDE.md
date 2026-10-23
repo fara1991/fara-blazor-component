@@ -40,7 +40,8 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 - `build/`: 静的ファイル（ページの HTML・robots.txt・sitemap.xml・_headers など）の生成。本文は呼び出し側が作る（使い方は `docs/usage.md` の 6）
 - `csp/`: `_headers` のテンプレートと生成関数（`render-headers.mjs`）。Cloudflare の上限を検査する（`_headers` はルール 100 個まで・1 行 2000 文字まで、`_redirects` は静的 2000 件まで・1 行 1000 文字まで）
 - `tests/build/`・`tests/csp/`・`tests/fixtures/pokemon/`: 上の 2 つの Node テスト。pokemon の出力と同じになることを確かめる（fixtures は pokemon のファイルのコピー）
-- `docs/`: 利用方法（`usage.md`）と変更履歴（`changelog.md`）
+- `docs/`: 利用方法（`usage.md`）と変更履歴（`changelog.md`）、一括変更 CLI の使い方（`maintenance-cli.md`）
+- `tools/maintenance.mjs`: サイトの Worker の `MAINTENANCE_MODE` / `MAINTENANCE_MESSAGE` を Cloudflare の API でまとめて変える CLI。対象は `tools/maintenance-sites.json`（wrangler の name と同じにする）。実 API のテストはしない（`tests/tools/`、fetch を差し替え）。Worker の変数名は `MAINTENANCE_MODE`（0.3.0 で変更。旧名は読まない）
 - `src/FaraSiteKit.Core/`: C#（`SiteLinks`・`MaintenanceInfo`・`ReportForm`）。UI と通信に依存しない純粋なコードだけを置く（Razor・MudBlazor は K0-4 で別のプロジェクトに）
 - `tests/FaraSiteKit.Core.Tests/`: C# のテスト（xUnit）。`global.json` の SDK（10.0.x）で実行する
 - `.github/workflows/ci.yml`: `npm test`（Node 22）と `dotnet test` を、ubuntu と windows の matrix で並列に実行

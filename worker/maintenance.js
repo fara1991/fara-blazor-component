@@ -1,9 +1,10 @@
 // メンテナンス表示（4 つのリポジトリ＝pokemon・avatar・bot・portfolio で同じファイルを使う。各リポジトリの worker/ に同じ内容を置いている。直すときは 4 つともそろえること）。
 //
 // Cloudflare のダッシュボード（Worker の「変数とシークレット」）の変数で切り替える。デプロイ（変数の保存）の数秒〜1 分後に反映される。
-//   MAINTENANCE          "false"（または未設定）= 通常 / "notice" = 通常のページの上に「更新予定」のお知らせを出す / "true" = メンテナンス画面（503）
+//   MAINTENANCE_MODE     "false"（または未設定）= 通常 / "notice" = 通常のページの上に「更新予定」のお知らせを出す / "true" = メンテナンス画面（503）
 //   MAINTENANCE_MESSAGE  お知らせ・メンテナンス画面に出す文（例: 10月25日（土）20:00〜21:00 ごろ、サイトを更新します）。200 文字まで
-// お知らせは "notice" と "true" のときだけ出るので、MAINTENANCE を "false" に戻せば、お知らせも一緒に消える。
+// お知らせは "notice" と "true" のときだけ出るので、MAINTENANCE_MODE を "false" に戻せば、お知らせも一緒に消える。
+// 0.3.0 で変数名を MAINTENANCE から MAINTENANCE_MODE に変えた。旧名 MAINTENANCE は読まない（残っていても何も起きない）。
 // GitHub の自動デプロイで変数が消えないよう、wrangler の設定に keep_vars = true を入れている。
 
 const MAX_MESSAGE = 200;
@@ -26,7 +27,7 @@ function cleanMessage(value) {
  * @returns {{ state: "off" | "notice" | "on", message: string }}
  */
 export function getMaintenance(env) {
-  const raw = String(env?.MAINTENANCE ?? "").trim().toLowerCase();
+  const raw = String(env?.MAINTENANCE_MODE ?? "").trim().toLowerCase();
   const state = raw === "true" || raw === "on" || raw === "1" ? "on" : raw === "notice" ? "notice" : "off";
   return { state, message: state === "off" ? "" : cleanMessage(env?.MAINTENANCE_MESSAGE) };
 }

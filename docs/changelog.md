@@ -2,6 +2,26 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 0.3.0
+
+**破壊的変更**: Worker の変数名 `MAINTENANCE` を **`MAINTENANCE_MODE`** に変更した。値（`true` / `notice` / `false`）と挙動（true = 全体 503 のメンテナンス画面、notice = お知らせ帯、false = 通常）は同じ。`MAINTENANCE_MESSAGE` は変えない。**旧名 `MAINTENANCE` は読まない**（フォールバックなし）。旧名だけが設定されている Worker は、通常動作になる（メンテナンス画面もお知らせも出ない）。
+
+- `worker/maintenance.js`: `getMaintenance(env)` が `env.MAINTENANCE_MODE` を読む。旧名だけの設定は通常（テストで固定）。
+- コメント・説明文（`MaintenanceInfo`・`MaintenanceBanner`・`MaintenanceScreen`・CSS）の変数名を更新。C# の公開 API・Worker の `/api/maintenance` の JSON の形は変わらない。
+- 追加: 一括変更 CLI `tools/maintenance.mjs`（Node・依存なし）と対象の一覧 `tools/maintenance-sites.json`。`status`（現在値の一覧）・`set`（`--env` `--site` `--mode` `--message`）・`rename`（旧 `MAINTENANCE` → `MAINTENANCE_MODE`。移行用）。既定はドライラン、`--apply` で実行、本番はサイト名の入力が必須。使い方は `docs/maintenance-cli.md`。テスト `tests/tools/maintenance-cli.test.mjs`（API は fetch を差し替え）。
+- `docs/usage.md` に 2.1「メンテナンスの変数」を追加。
+
+### 各サイトの移行手順（kit を 0.3.0 に上げるとき）
+
+kit を上げた Worker が公開された時点から旧名は効かなくなる。**公開（本番）の前に、新しい変数を用意しておく**（順序を守らないと、メンテナンス中・お知らせ中の Worker が通常に戻る）。
+
+1. Cloudflare の各 Worker に `MAINTENANCE_MODE` を作り、いまの `MAINTENANCE` と同じ値にする。まとめてやるなら `node tools/maintenance.mjs rename --env dev`（ドライランで確認 → `--apply`）、続けて `--env production`。`MAINTENANCE` を消すのは手順 4。（`rename` は新変数の作成と旧変数の削除を一度に行う。kit を上げる前に旧変数を消してよいのは、まだ旧い kit の Worker が動いていない＝公開前のサイトだけ。公開済みのサイトは、kit を上げて公開してから `rename` する。その間の短い時間、状態は通常に戻る）
+2. サイトの `wrangler` / ワークフローの `--var MAINTENANCE:...` を `--var MAINTENANCE_MODE:...` に変える（`deploy.yml` / `site.yml` など）。
+3. `require-maintenance.mjs` 相当のスクリプトが読む変数名（`readMaintenanceValue` の `b.name === "MAINTENANCE"`）を `MAINTENANCE_MODE` にし、メッセージ・テストも合わせる。`SKIP_MAINTENANCE_CHECK` は変えない。
+4. 旧変数 `MAINTENANCE` を各 Worker から削除する（`rename` を使った場合は削除済み）。
+5. サイトの README・docs・テストの `MAINTENANCE`（変数名としての参照）を `MAINTENANCE_MODE` に直す。`MAINTENANCE_MESSAGE` は直さない。
+6. submodule を `v0.3.0` に上げる PR（develop 向け）→ 確認用で、`notice` / `true` / `false` の表示を確認。
+
 ## 0.2.1
 
 pokemon の PR-2（kit 採用）で見つかった課題の修正。既存のパラメータ・クラス名は変えない（追加のみ。1 件だけ、下の Worker のお知らせの class 名に注意）。
