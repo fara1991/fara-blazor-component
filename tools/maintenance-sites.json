@@ -1,5 +1,5 @@
 {
-  "_comment": "一括変更 CLI（tools/maintenance.mjs）の対象。repo は GitHub のリポジトリ、workflows は env（dev / production）ごとの deploy ワークフローのファイル名と ref（dev = develop ブランチ、production = master）。workers は status で読む Worker 名（各サイトの wrangler.jsonc / wrangler.toml の name と同じ）。wasm-dev は avatar の WASM 移行用の確認用(migration/wasm、fara-avatar-wasm-dev)。--env all には含めず、--env wasm-dev と明示したときだけ使う(Cloudflare 側の Worker と migration/wasm のワークフローができるまでは失敗する)。",
+  "_comment": "一括変更 CLI（tools/maintenance.mjs）の対象。repo は GitHub のリポジトリ、workflows は env（dev / production）ごとの deploy ワークフローのファイル名と ref（dev = develop ブランチ、production = master）。workers は status で読む Worker 名（各サイトの wrangler.jsonc / wrangler.toml の name と同じ）。",
   "sites": [
     {
       "name": "pokemon",
@@ -15,10 +15,9 @@
       "repo": "fara1991/fara-avatar-modding-guide",
       "workflows": {
         "dev": { "file": "deploy.yml", "ref": "develop" },
-        "production": { "file": "deploy.yml", "ref": "master" },
-        "wasm-dev": { "file": "deploy.yml", "ref": "migration/wasm" }
+        "production": { "file": "deploy.yml", "ref": "master" }
       },
-      "workers": { "production": "fara-avatar", "dev": "fara-avatar-dev", "wasm-dev": "fara-avatar-wasm-dev" }
+      "workers": { "production": "fara-avatar", "dev": "fara-avatar-dev" }
     },
     {
       "name": "bot",

@@ -11,7 +11,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TIP = "a".repeat(40);
 const OK = "inputs: maintenance_mode maintenance_message";
 const REPOS = { pokemon: "fara1991/fara-pokemon-battle-assistant", avatar: "fara1991/fara-avatar-modding-guide", bot: "fara1991/fara-bot-moderator", portfolio: "fara1991/fara-portfolio-site" };
-const base = { RUN_REF: "refs/heads/master", TARGET_DEVELOP: "true", TARGET_MASTER: "false", TARGET_MIGRATION_WASM: "false", MAINTENANCE_MODE_INPUT: "notice", MAINTENANCE_MESSAGE_INPUT: "" };
+const base = { RUN_REF: "refs/heads/master", TARGET_DEVELOP: "true", TARGET_MASTER: "false", MAINTENANCE_MODE_INPUT: "notice", MAINTENANCE_MESSAGE_INPUT: "" };
 
 /**
  * gh の模擬。contents: "repo@ref" → ワークフローの中身(文字列)または 404 / 403(ref ごとに指定。無ければ入力つきの版)。
@@ -63,14 +63,13 @@ const master = { TARGET_MASTER: "true", MAINTENANCE_MODE_INPUT: "true" };
 
 // ---- 入力の検査と段階の組み立て ----
 
-test("チェックボックスと環境の対応: develop = dev、migration_wasm = wasm-dev、master = production(dev 系が先、本番は最後)", () => {
-  assert.deepEqual(STAGES.map((s) => [s.input, s.branch, s.envName]), [["TARGET_DEVELOP", "develop", "dev"], ["TARGET_MIGRATION_WASM", "migration/wasm", "wasm-dev"], ["TARGET_MASTER", "master", "production"]]);
-  const p = planFromEnv({ ...base, TARGET_MASTER: "true", TARGET_MIGRATION_WASM: "true", MAINTENANCE_MODE_INPUT: "true", MAINTENANCE_MESSAGE_INPUT: "文面" });
-  assert.deepEqual(p.stages.map((s) => s.envName), ["dev", "wasm-dev", "production"]);
+test("チェックボックスと環境の対応: develop = dev、master = production(dev が先、本番は最後)", () => {
+  assert.deepEqual(STAGES.map((s) => [s.input, s.branch, s.envName]), [["TARGET_DEVELOP", "develop", "dev"], ["TARGET_MASTER", "master", "production"]]);
+  const p = planFromEnv({ ...base, TARGET_MASTER: "true", MAINTENANCE_MODE_INPUT: "true", MAINTENANCE_MESSAGE_INPUT: "文面" });
+  assert.deepEqual(p.stages.map((s) => s.envName), ["dev", "production"]);
   assert.deepEqual(p.stages[0].base, ["set", "--env", "dev", "--mode", "true", "--message", "文面", "--allow-empty"]);
   assert.deepEqual(p.stages[0].sites, ["pokemon", "avatar", "bot", "portfolio"], "サイトは常に 4 つすべて");
-  assert.deepEqual(p.stages[1].sites, ["avatar"], "migration_wasm は avatar のみ");
-  assert.equal(p.stages[2].confirm, "production avatar,bot,pokemon,portfolio");
+  assert.equal(p.stages[1].confirm, "production avatar,bot,pokemon,portfolio");
   assert.equal(p.stages[0].confirm, undefined);
   assert.deepEqual(planFromEnv(base).stages.map((s) => s.envName), ["dev"], "既定は develop だけ");
 });
@@ -80,7 +79,7 @@ test("入力の検査(注入防止): 不正な値は拒否する。master の実
   const bad = [
     { RUN_REF: "refs/heads/develop" }, { RUN_REF: "refs/heads/feature/x" }, { RUN_REF: "refs/tags/v1" }, { RUN_REF: "master" }, { RUN_REF: "" }, { RUN_REF: undefined },
     { TARGET_DEVELOP: "false" }, // どれも選ばない
-    { TARGET_DEVELOP: "yes" }, { TARGET_DEVELOP: "" }, { TARGET_MASTER: "TRUE" }, { TARGET_MIGRATION_WASM: "1" },
+    { TARGET_DEVELOP: "yes" }, { TARGET_DEVELOP: "" }, { TARGET_MASTER: "TRUE" },
     { MAINTENANCE_MODE_INPUT: "maintenance" }, { MAINTENANCE_MODE_INPUT: "true;" }, { MAINTENANCE_MODE_INPUT: "TRUE" },
     { MAINTENANCE_MESSAGE_INPUT: "a\nb" }, { MAINTENANCE_MESSAGE_INPUT: "a\u0007" }, { MAINTENANCE_MESSAGE_INPUT: "あ".repeat(201) },
     { MAINTENANCE_MODE_INPUT: "", MAINTENANCE_MESSAGE_INPUT: "" },
@@ -124,12 +123,6 @@ test("master だけ: 各サイトの本番のワークフローを master で起
   assert.ok(r.g.dispatches().every((x) => !x.args.some((a) => a.startsWith("maintenance_message"))));
 });
 
-test("migration_wasm: avatar の wasm-dev(migration/wasm)だけを起動する", async () => {
-  const r = await go({ TARGET_DEVELOP: "false", TARGET_MIGRATION_WASM: "true" });
-  assert.equal(r.code, 0, r.out);
-  assert.deepEqual(r.g.dispatches().map((x) => [x.repo, x.ref]), [[REPOS.avatar, "migration/wasm"]]);
-});
-
 // ---- 事前確認(飛ばす) ----
 
 test("対象ブランチのワークフローが入力を受け取れない版のサイトは、dispatch せずに飛ばし、サマリーに理由を出す", async () => {
@@ -150,8 +143,9 @@ test("すべて飛ばされたら失敗(何も反映されない)。dispatch は
 });
 
 test("ワークフローのファイルが無い(404)は飛ばす。権限が無く確かめられない(403)ときは、従来どおり dispatch する", async () => {
-  const r = await go({ TARGET_DEVELOP: "false", TARGET_MIGRATION_WASM: "true" }, { contents: { [`${REPOS.avatar}@migration/wasm`]: 404 } });
-  assert.equal(r.code, 1, "wasm-dev だけを選んで飛ばされたので、実行できる対象が無い");
+  const r = await go({}, { contents: { [`${REPOS.avatar}@develop`]: 404 } });
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.g.dispatches().length, 3, "avatar だけ飛ばす");
   const g = await go({}, { contents: Object.fromEntries(Object.values(REPOS).map((repo) => [`${repo}@develop`, 403])) });
   assert.equal(g.code, 0, g.out);
   assert.equal(g.g.dispatches().length, 4);
@@ -275,15 +269,15 @@ const jobBlock = (name) => {
   return m[1];
 };
 
-test("ワークフロー: トリガは workflow_dispatch だけ。入力は 3 つのチェックボックス(develop 既定 true)・mode・message。target_branch と sites は無い", () => {
+test("ワークフロー: トリガは workflow_dispatch だけ。入力は 2 つのチェックボックス(develop 既定 true)・mode・message。target_branch と sites は無い", () => {
   const on = /\non:\n([\s\S]*?)\npermissions:/.exec(yml)[1];
   assert.deepEqual([...on.matchAll(/^ {2}([a-z_]+):/gm)].map((m) => m[1]), ["workflow_dispatch"]);
   assert.doesNotMatch(yml, /pull_request|issue_comment|issues:|push:|workflow_run|schedule/);
   assert.match(yml, /permissions:\n {2}contents: read\n/);
   const inputs = [...on.matchAll(/^ {6}([a-z_]+):\n((?: {8}.*\n)+)/gm)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(inputs.map(([k]) => k), ["develop", "master", "migration_wasm", "maintenance_mode", "maintenance_message"]);
+  assert.deepEqual(inputs.map(([k]) => k), ["develop", "master", "maintenance_mode", "maintenance_message"]);
   const get = (k) => inputs.find(([n]) => n === k)[1];
-  for (const [k, def] of [["develop", "true"], ["master", "false"], ["migration_wasm", "false"]]) {
+  for (const [k, def] of [["develop", "true"], ["master", "false"]]) {
     assert.match(get(k), /type: boolean\n/);
     assert.match(get(k), new RegExp(`default: ${def}\\n`));
   }
@@ -331,6 +325,5 @@ test("ワークフロー: validate は master 以外の ref で止まり、RUN_R
     assert.match(b, /RUN_REF: \$\{\{ github\.ref \}\}/, name);
     assert.match(b, /TARGET_DEVELOP: \$\{\{ inputs\.develop \}\}/, name);
     assert.match(b, /TARGET_MASTER: \$\{\{ inputs\.master \}\}/, name);
-    assert.match(b, /TARGET_MIGRATION_WASM: \$\{\{ inputs\.migration_wasm \}\}/, name);
   }
 });

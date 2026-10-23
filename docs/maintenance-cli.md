@@ -69,7 +69,7 @@ export CLOUDFLARE_ACCOUNT_ID=...   # ダッシュボードの Workers & Pages �
 | bot | `site.yml` / `develop` / `fara-twitch-bot-dev` | `site.yml` / `master` / `fara-twitch-bot` |
 | portfolio | `deploy-develop.yml` / `develop` / `fara-portfolio-dev` | `deploy.yml` / `master` / `fara-portfolio` |
 
-別の一覧を使うときは `--sites-file <パス>`。Worker を足すときは JSON にサイトを足す（dev だけのサイトも可。例: avatar の WASM 移行用の確認用 Worker は、Cloudflare 側の作成後に足す）。
+別の一覧を使うときは `--sites-file <パス>`。Worker を足すときは JSON にサイトを足す（dev だけのサイトも可）。
 
 ### `status` — 現在値の一覧
 
@@ -135,7 +135,6 @@ kit のリポジトリ(`fara1991/fara-site-kit`)の Actions →「**Set maintena
 | --- | --- |
 | `develop`(チェック。既定 ON) | 各サイトの dev(`develop` ブランチ)に反映する |
 | `master`(チェック。既定 OFF) | 各サイトの本番(`master` ブランチ)に反映する。`maintenance_mode` が必須。承認が要る。**そのサイトの master の最新のコードが公開される** |
-| `migration_wasm`(チェック。既定 OFF) | avatar の wasm-dev(`migration/wasm` ブランチ)だけに反映する(下の「avatar の WASM 移行用」) |
 | `maintenance_mode` | 空 / `true` = 全体メンテナンス(503) / `notice` = お知らせ帯 / `false` = 通常。空 = 変更しない(`master` では必須。message だけの変更は `develop` だけ) |
 | `maintenance_message` | 文面(200 文字まで・改行なし)。空 = 変更しない |
 
@@ -144,8 +143,8 @@ kit のリポジトリ(`fara1991/fara-site-kit`)の Actions →「**Set maintena
 動き:
 
 1. `validate` job: 入力を検査する(シークレットは渡さない)。実行元が `master` か、チェックボックスが 1 つ以上か、`maintenance_mode` / 文面(200 文字以内・制御文字なし)が正しいか、`master` を選んだとき mode があるか、を確かめる。通らなければ、後の job は動かない
-2. `dev` job(Environment `develop-maintenance`): まず**計画**(事前確認)を、選んだ**すべての対象(本番を含む)**について行い、飛ばすサイトと理由をジョブサマリーに出す(本番の承認画面より前に見える)。実行できる対象が 1 つも無ければ、ここで失敗する。そのあと、`develop` → `migration_wasm` の順に、dev 系を実行する(各サイトの dev 用ワークフローを起動し、結果を待つ)。**`master` だけを選んだときも、計画のためにこの job は動く**(`develop-maintenance` にレビュワーを付けていると、その承認が要る)
-3. `production` job(`master` をチェックしたときだけ。Environment `production-maintenance`): dev 系が**全部成功してから**、**承認(必須レビュワー)が済むまで動かない**。承認の画面(Review deployments)では、**入力値(チェックしたブランチ・`maintenance_mode` / `maintenance_message`)と、`dev` job のサマリーの計画(飛ばすサイト)、対象各サイトの master の最新のコード(公開される内容)を確認してから**承認する。承認後、各サイトの本番ワークフローを `master` で 1 サイトずつ起動し、結果を待つ
+2. `dev` job(Environment `develop-maintenance`): まず**計画**(事前確認)を、選んだ**すべての対象(本番を含む)**について行い、飛ばすサイトと理由をジョブサマリーに出す(本番の承認画面より前に見える)。実行できる対象が 1 つも無ければ、ここで失敗する。そのあと、`develop` をチェックしていれば、dev を実行する(各サイトの dev 用ワークフローを起動し、結果を待つ)。**`master` だけを選んだときも、計画のためにこの job は動く**(`develop-maintenance` にレビュワーを付けていると、その承認が要る)
+3. `production` job(`master` をチェックしたときだけ。Environment `production-maintenance`): dev(develop をチェックしたとき)が**全部成功してから**、**承認(必須レビュワー)が済むまで動かない**。承認の画面(Review deployments)では、**入力値(チェックしたブランチ・`maintenance_mode` / `maintenance_message`)と、`dev` job のサマリーの計画(飛ばすサイト)、対象各サイトの master の最新のコード(公開される内容)を確認してから**承認する。承認後、各サイトの本番ワークフローを `master` で 1 サイトずつ起動し、結果を待つ
 4. 起動した run の特定・失敗で中断・サマリーは `set` のとおり。ジョブサマリーに、各サイトの run の URL と結果が出る
 5. `concurrency`(dev と本番で別の枠)で、同じ枠の job を同時に 2 つ動かさない。実行中のものは止めない。待てるのは 1 件だけで、さらに追加すると、古い待機は取り消される(最後に押したものだけが残る)
 
@@ -159,22 +158,13 @@ kit のリポジトリ(`fara1991/fara-site-kit`)の Actions →「**Set maintena
 - PAT に **Contents: Read** が無いと、事前確認の GET が 403 になり、確かめられない。このときは飛ばさずに dispatch する。dispatch が **HTTP 422 `Unexpected inputs provided`**(そのサイトのその ref のワークフローが、入力を受け取れない版)で返ったら、**失敗にせず、そのサイトを「飛ばす(警告)」にして続行する**(サマリーにも出る。dev でも本番でも同じ)。422 以外のエラー(認証・ワークフロー不在・その他の 4xx / 5xx)は、従来どおり失敗で中断する。すべて飛ばされたら失敗、の規則は同じ
 - **Contents: Read-only が必要なリポジトリ**: 非公開のリポジトリ(**avatar と portfolio**)は、PAT に Contents: Read-only が無いと、事前確認の GET が 403 になる(公開のリポジトリは、トークンが無くても読めるが、PAT の権限が絞られていても通る場合がある)。付けておくと、事前確認で飛ばす判断ができ、起動した run のコミット照合もできる
 - 事前確認のパスは `.github/workflows/{ファイル名}`(ワークフローのファイルは、リポジトリの `.github/workflows/` の下にある)
-- 現状: 各サイトの master 側は、すべて未対応(各サイトの develop → master のマージまで)。avatar の develop も未対応。この間は、飛ばされる旨の警告が出る
+- 現状: 各サイトの master 側は、すべて未対応(各サイトの develop → master のマージまで)。この間、master をチェックすると、本番は飛ばされる旨の警告が出る。avatar の dev(develop の `deploy.yml`)は入力つきの版が入っているので、飛ばされずに反映される
 
 ### 注意点
 
 1. **各サイトの対象ブランチに、入力つきのワークフローが入っている必要がある**(上のとおり、無いサイトは飛ばされる)。サイト側の develop → master のマージが済むまで、本番側はそのサイトに反映されない。サマリーの警告で確かめる
 2. **pokemon の本番は未作成の間**、master のワークフローが旧版(入力なし)なので、この Actions からは作れない(飛ばされる)。初回は pokemon の develop → master のマージ(master への push)で作る。push は `--var MAINTENANCE_MODE:true` を付けるので、メンテナンス画面のまま(非公開のまま)作られる。作ったあとの切り替えから、この Actions を使う
 3. 各サイトの `develop` 側は、新しい入力つきのワークフローが先に入るので、dev から使える
-
-### avatar の WASM 移行用の確認用(`fara-avatar-wasm-dev`、`migration/wasm`)
-
-**方式: チェックボックス `migration_wasm` を足し、`tools/maintenance-sites.json` の avatar に `wasm-dev` の環境として持たせた**(`workflows.wasm-dev` = `deploy.yml` / `migration/wasm`、`workers.wasm-dev` = `fara-avatar-wasm-dev`)。理由:
-
-- ほかの対象と同じく「ブランチで反映先が決まる」ので、入力の形(ブランチのチェックボックス)が一貫する。別の job や別の入力を足すより、仕組みが増えない
-- avatar だけの環境なので、サイトを選ぶ入力は要らない(`migration_wasm` をチェックすると、avatar だけが対象になる)
-- `--env all`(dev と production)には含めない。`--env wasm-dev` と明示したときだけ使うので、既存の dev / 本番の一括変更に影響しない
-- 注意: Cloudflare 側の Worker `fara-avatar-wasm-dev` と、`migration/wasm` に入力つきの `deploy.yml` ができるまでは、`migration_wasm` をチェックしても、事前確認で飛ばされる(ファイルや入力が無いため)
 
 ### 登録するもの(ユーザー向けの手順)
 
@@ -204,7 +194,7 @@ PAT は repository secret ではなく、**Environment のシークレット**�
    - Environment の承認画面(本番。`develop-maintenance` にレビュワーを付けたなら dev も)が出て、承認後に動くこと
    - `develop` ブランチ上から実行しようとすると、`validate` で止まること
    - 問題がなければ `master` もチェックして使う
-   - 失敗例と対処(v0.3.2 の初回実行): 事前確認が `pokemon` と `bot` の「ワークフローが見つからない」(404)で飛ばされた → 原因は事前確認のパスが `.github/workflows/` を欠いていたバグ(v0.3.3 で修正。実在するファイルは見つかる)。`avatar` と `portfolio`(非公開)は事前確認が 403 になり dispatch に進み、avatar の develop が旧ワークフロー(入力なし)で `HTTP 422: Unexpected inputs provided` となって中断された → v0.3.3 からは、422 は「飛ばす(警告)」になり、残りを続行する。403 が出るときは PAT に Contents: Read-only を付ける
+   - 失敗例と対処(v0.3.2 の初回実行): 事前確認が `pokemon` と `bot` の「ワークフローが見つからない」(404)で飛ばされた → 原因は事前確認のパスが `.github/workflows/` を欠いていたバグ(v0.3.3 で修正。実在するファイルは見つかる)。`avatar` と `portfolio`(非公開)は事前確認が 403 になり dispatch に進み、avatar の develop が当時は旧ワークフロー(入力なし)で `HTTP 422: Unexpected inputs provided` となって中断された → v0.3.3 からは、422 は「飛ばす(警告)」になり、残りを続行する。403 が出るときは PAT に Contents: Read-only を付ける
 
 ### 安全性(kit は公開リポジトリ)
 
