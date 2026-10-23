@@ -131,8 +131,14 @@
     /// <summary>レイアウトの page クラスに足す追加のクラス（サイトの画面の状態に合わせる）。</summary>
     [Parameter] public string? PageClass { get; set; }
 
+    /// <summary>
+    /// スマホ（767.98px 以下）で、ページ全体をスクロールさせるか。既定の false は、スマホでもページ全体を画面の高さに収め、本文の中だけをスクロールさせる（これまでと同じ）。
+    /// true にすると、ヘッダーは固定のまま、ページ全体（window）がスクロールし、フッターはページの最後に出る。PC には影響しない。
+    /// </summary>
+    [Parameter] public bool MobilePageScroll { get; set; }
+
     private string PageClassName =>
-        "fsk-page" + (ShowDrawer ? "" : " fsk-no-drawer") + (string.IsNullOrWhiteSpace(PageClass) ? "" : " " + PageClass);
+        "fsk-page" + (ShowDrawer ? "" : " fsk-no-drawer") + (MobilePageScroll ? " fsk-page-scroll" : "") + (string.IsNullOrWhiteSpace(PageClass) ? "" : " " + PageClass);
 
     /// <summary>メニュー（ハンバーガーとドロワー）を出すか。サイドバーがあるか、スマホで上部ナビを畳むとき。</summary>
     private bool HasMenu => ShowDrawer || (CollapseTopNavOnMobile && TopNav is not null && Mobile);

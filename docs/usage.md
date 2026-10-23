@@ -232,6 +232,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
 - `SiteNavItem(Href, Label, Icon, Disabled, Title)`: Href は相対パス（`""` がホーム）。`Disabled` の項目は選べない（`aria-disabled="true"`）。現在のページは自動で active。
 - 項目は `<a href>` のまま。スマホでメニューを閉じるのは、画面の移動で行う（OnClick は付けない）。
 - ヘッダーの名前は `SiteOptions.Name`（`HomeHref` へのリンク）。別の表示にしたいときは `Brand` に渡す。
+- `MobilePageScroll`（既定 false）: true にすると、スマホ（767.98px 以下）でページ全体（window）がスクロールする。既定は、スマホでもページ全体を画面の高さに収め、本文の中だけをスクロールさせる。PC には影響しない。
 - `MudProviders` は SiteLayout の中に置かれる（テーマは `CustomTheme` で替えられる。省略は紫系の既定）。
 
 **App.razor**: `Router` の `DefaultLayout` を上の MainLayout にし、`<NotFound>` で `NotFoundView` を出す。ページが移ったときは、SiteLayout が本文（`#fsk-main`）へフォーカスを移す（最初の読み込みでは動かさない）。`FocusOnNavigate` は使わない。
@@ -407,3 +408,22 @@ pokemon の既存の型・ファイルと、kit の部品の名前が重なる�
 - `dotnet test tests/FaraSiteKit.Razor.Tests`（bUnit）・`dotnet test tests/FaraSiteKit.Core.Tests`
 - `npm test`（worker・build・csp と、JS の `tests/js/kit-js.test.mjs`。JS だけは `npm run test:js`）
 - `samples/MinimalSite` は、同じ構成の最小の例（上部ナビの構成のページ `/top` を含む）。`dotnet build samples/MinimalSite` が CI で通ること。公開はしない。
+
+### 8.12 導入手順（小規模サイト向け: portfolio・bot など）
+
+静的 SSR のサイトを WASM に移すときの最短の流れ。詳しい説明は 8.1〜8.9。
+
+1. **submodule を追加**: `git submodule add https://github.com/fara1991/fara-site-kit.git external/fara-site-kit` のあと、使うタグに固定する（`cd external/fara-site-kit && git checkout vX.Y.Z`）。CI のチェックアウトは `submodules: true`。
+2. **参照を足す**: Web プロジェクトの csproj に `FaraSiteKit.Razor` の `ProjectReference`（8 の冒頭）。`_Imports.razor` に `FaraSiteKit.Core`・`FaraSiteKit.Razor`・`FaraSiteKit.Razor.Components`・`MudBlazor` の using。
+3. **`SiteOptions`**: `Program.cs` で `AddFaraSiteKit(options => ...)`。最低限 `Name`・`Author`・`PublishedYear`・`AuthorHomeUrl`・`DevelopHost`（確認用ホスト。空なら切り替えない）。`Social` は URL が空のものは出ない。`StorageKey`・`SidebarKey` は、既存の保存を引き継ぐ場合だけ旧い値に合わせる（8.6）。`HeadOutlet` と `MaintenanceInfo` の登録も 8.1 のとおり。
+4. **レイアウト**: `MainLayout.razor` は `SiteLayout` に `Body`・`Maintenance` を渡す。ナビは `ShowDrawer="false"` と `TopNav`（8.3）か、`DrawerContent` に `SiteNavMenu`。スマホでページ全体をスクロールさせたいサイトは `MobilePageScroll="true"`（既定の false は、本文の中だけがスクロールする）。
+5. **`index.html`**: `docs/index-template.html` の断片に合わせる。必須の data 属性は `theme-init.js` の `data-storage-key`・`data-sidebar-key`（`SiteOptions.StorageKey`・`SidebarKey` と同じ値。違うと起動時にコンソールへ警告）。`#boot-indicator`・`<div id="app">`・静的な本文の `class="entry-static"` と、body 末尾のスクリプトの順番（boot-indicator.js → fara-site-kit.js → scroll-progress.js → report.js → blazor.webassembly.js）も断片のとおり。
+6. **静的ファイル（`build-pages`）**: ページごとの title・description・本文を `pages.json` に、サイト名・ホストを `site.json` に書き、`dotnet publish` の出力の `index.html`（本文が空のもの）を `--template` にして実行する（6 の「使い方」）。
+
+   ```bash
+   node external/fara-site-kit/build/build-pages.mjs      --site site.json --pages pages.json --template artifacts/template/index.html      --out publish/wwwroot --env production   # 確認用は --env develop
+   ```
+
+   `site.json` の `bodyRootClass` は `entry-static`（読み込み表示の JS が使う）。`--out` はテンプレートと別のフォルダにする。
+7. **Worker**: `worker/index.js` から kit の `report.js`・`maintenance.js` を import する（2）。お知らせの帯は `fsk-notice`（Razor の `MaintenanceBanner` と同じ class）。
+8. **確認**: `wrangler deploy --dry-run`（本番・確認用）、`dotnet test`、`npm test`。確認用で、起動の表示・ダーク・メンテナンス・404 を見る。

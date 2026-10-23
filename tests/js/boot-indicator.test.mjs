@@ -47,7 +47,7 @@ function makeLabel() {
 }
 
 /** 画面を組み立てる。mudLayout: #app の中に MudBlazor の画面（.mud-layout）があるか */
-function makeEnv({ staticMain = true, rendered = false, withObserver = true } = {}) {
+function makeEnv({ staticMain = true, rendered = false, maintenance = false, withObserver = true } = {}) {
     const observers = [];
     class MutationObserver {
         constructor(callback) { this.callback = callback; this.active = true; observers.push(this); }
@@ -66,9 +66,14 @@ function makeEnv({ staticMain = true, rendered = false, withObserver = true } = 
     const staticEl = element(["entry-static"]);
     const app = {
         children: [],
-        querySelector: (sel) => (sel === ".mud-layout" && app.children.some((c) => c.classList.contains("mud-layout")) ? {} : null),
+        // セレクターは「.a, .b」（カンマ区切り）に対応する。子の class のどれかに合えば見つかる
+        querySelector: (sel) => {
+            const wanted = sel.split(",").map((x) => x.trim().replace(/^\./, ""));
+            return app.children.some((c) => wanted.some((w) => c.classList.contains(w))) ? {} : null;
+        },
     };
     if (rendered) app.children.push(element(["mud-layout"]));
+    else if (maintenance) app.children.push(element(["fsk-maintenance"]));
     else if (staticMain) app.children.push(staticEl);
     const errorUi = { display: "none" };
     const ids = { "boot-indicator": indicator, app, "blazor-error-ui": errorUi };
@@ -112,6 +117,7 @@ function makeEnv({ staticMain = true, rendered = false, withObserver = true } = 
 }
 
 const layout = () => element(["mud-layout"]);
+const maintenanceScreen = () => element(["fsk-maintenance"]);
 
 test("入口ページの本文（.entry-static）だけのあいだは、オーバーレイを残す", () => {
     const { indicator, app, trigger } = makeEnv();
@@ -126,6 +132,23 @@ test("MudBlazor の style だけが増えた時点では外さず、.mud-layout�
     assert.equal(indicator.removed, false, "骨組みが無いあいだは外さない（空白の一瞬を出さない）");
     app.children.push(layout());
     trigger(app);
+    assert.equal(indicator.removed, true);
+});
+
+test("メンテナンス画面（.fsk-maintenance。.mud-layout が無い）が出たら外す（60 秒を待たない）", () => {
+    const { indicator, app, staticEl, trigger, observers, timers } = makeEnv();
+    app.children.push(element(["mud-theme-provider"]));
+    trigger(app);
+    assert.equal(indicator.removed, false, "MudBlazor の部品だけでは外さない");
+    app.children.push(maintenanceScreen());
+    trigger(app);
+    assert.equal(indicator.removed, true);
+    assert.ok(observers.every((o) => !o.active) && timers.every((t) => !t.active), "監視・タイマーも止める");
+    assert.equal(staticEl.getAttribute("inert"), null);
+});
+
+test("起動の時点で、すでにメンテナンス画面が描かれていたら、すぐ外す", () => {
+    const { indicator } = makeEnv({ maintenance: true });
     assert.equal(indicator.removed, true);
 });
 

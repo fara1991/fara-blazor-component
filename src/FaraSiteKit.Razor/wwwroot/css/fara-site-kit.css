@@ -364,6 +364,52 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
     }
 }
 
+/* スマホはページ全体をスクロールさせる（SiteLayout の MobilePageScroll="true"）。
+   既定は、スマホでもページ全体を画面の高さに収めて、本文の中だけをスクロールさせる。入れ子のスクロールが操作しにくいサイト向けの選択肢。ヘッダーは固定のまま、フッターはページの最後に出る */
+@media (max-width: 767.98px) {
+    html:has(.fsk-page-scroll),
+    html:has(.fsk-page-scroll) body {
+        height: auto;
+    }
+
+    .fsk-page.fsk-page-scroll.mud-layout {
+        height: auto;
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow: visible;
+    }
+
+    .fsk-page.fsk-page-scroll .mud-main-content {
+        display: block;
+        height: auto;
+    }
+
+    .fsk-page.fsk-page-scroll .mud-main-content > main {
+        display: block;
+    }
+
+    .fsk-page.fsk-page-scroll .fsk-content {
+        display: block;
+        overflow-y: visible;
+        padding-bottom: 0;
+    }
+
+    .fsk-page.fsk-page-scroll .fsk-pane-scroll {
+        flex: none;
+        overflow: visible;
+        scrollbar-gutter: auto;
+    }
+
+    .fsk-page.fsk-page-scroll .fsk-page-pane {
+        scrollbar-gutter: auto;
+    }
+
+    /* 細い列に隠す設定（PC）は、スマホでは使わない（スマホは一時的なメニュー） */
+    html.fsk-sidebar-hidden .fsk-page.fsk-page-scroll .mud-main-content {
+        margin-left: 0 !important;
+    }
+}
+
 /* ---- 内容の列・報告フォーム ---- */
 
 /* 画面の題名（見出しの下に区切り線）。カードは薄い枠で囲む */
@@ -379,8 +425,46 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
 }
 
 .fsk-card {
+    --fsk-card-spacer: 1rem;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    word-wrap: break-word;
+    background-clip: border-box;
     border: 1px solid var(--fsk-border);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.fsk-card-body {
+    flex: 1 1 auto;
+    padding: var(--fsk-card-spacer);
+}
+
+/* 入力欄のまとまり（ラベル + 欄）と、小さな補助のクラス（ReportFormView が使う） */
+.fsk-form-label {
+    display: inline-block;
+    margin-bottom: 0.2rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.fsk-form-group,
+.fsk-form-group.fsk-mb-3 {
+    margin-bottom: 0.75rem !important;
+}
+
+.fsk-mb-0 { margin-bottom: 0 !important; }
+.fsk-mb-1 { margin-bottom: 0.25rem !important; }
+.fsk-mb-3 { margin-bottom: 1rem !important; }
+.fsk-mt-3 { margin-top: 1rem !important; }
+
+.fsk-small {
+    font-size: 0.875em;
+}
+
+.fsk-muted {
+    color: var(--fsk-muted) !important;
 }
 
 /* ライト／ダークのスイッチ: ダークのとき、つまみ（紫）の上のアイコンを白にする */

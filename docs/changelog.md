@@ -2,9 +2,19 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
-## 未リリース
+## 0.2.1
 
-- JS のテストを追加: `tests/js/boot-indicator.test.mjs`（45 秒・60 秒のタイマー、inert の戻し、blazor.webassembly.js の読み込み失敗、MutationObserver が無いとき）・`tests/js/scroll-progress.test.mjs`（スクロール対象の選択: 入れ子・最も背の高い要素・画面替えの選び直し・resize・同値なら書かない）。pokemon の tests/js（e68d150）から移植。
+pokemon の PR-2（kit 採用）で見つかった課題の修正。既存のパラメータ・クラス名は変えない（追加のみ。1 件だけ、下の Worker のお知らせの class 名に注意）。
+
+- `fara-site-kit.css`: `ReportFormView` が使うのに定義が無かった `fsk-mb-0`・`fsk-mb-1`・`fsk-mb-3`・`fsk-mt-3`・`fsk-small`・`fsk-muted`・`fsk-form-group`・`fsk-form-label` と、`fsk-card`・`fsk-card-body` の構造（flex の縦並び・内側の余白）を追加。色は kit のトークン（`--fsk-muted`・`--fsk-border`）。`--fsk-card-spacer`（既定 1rem）で余白を替えられる。サイトが app.css で補う必要はなくなる。
+- `SiteLayout`: `MobilePageScroll` パラメータを追加（既定 false = 従来どおり、スマホでもページ全体を画面の高さに固定）。true にすると、スマホ（767.98px 以下）でページ全体がスクロールする（クラス `fsk-page-scroll`）。
+- `worker/maintenance.js`: `noticeHtml` の class を `maintenance-notice*` から `fsk-notice`・`fsk-notice-title`・`fsk-notice-text` に変更（Razor の `MaintenanceBanner` と同じ）。**名前の変更**: 旧い class の CSS を自分で書いているサイトは、`fsk-notice*` に読み替える（kit の CSS を読めば、そのまま見た目が付く）。
+- `boot-indicator.js`: メンテナンス画面（`.fsk-maintenance`。`.mud-layout` が無い）が描かれたら、読み込み表示を外す（以前は 60 秒のタイムアウトまで残った）。
+- `docs/usage.md`: 8.12「導入手順（小規模サイト向け）」を追加。`MobilePageScroll` の説明。
+- JS のテストを追加（PR #8）: `tests/js/boot-indicator.test.mjs`（45 秒・60 秒のタイマー、inert の戻し、blazor.webassembly.js の読み込み失敗、MutationObserver が無いとき、メンテナンス画面での解除）・`tests/js/scroll-progress.test.mjs`。pokemon の tests/js（e68d150）から移植。
+- テスト: `MobilePageScroll` のクラス、追加した CSS の定義、worker の class 名、読み込み表示の解除。
+
+## 0.2.0 まで
 
 - K0: 骨格（`worker/`: `maintenance.js`・`report.js` とテスト、CI、利用方法）。pokemon の develop 時点と同一内容を取り込み。
 - K0-2: C#（`src/FaraSiteKit.Core`、net8.0）: `SiteLinks`（`DevelopHost` を追加し、サイト固有のホスト名を持たせない）・`MaintenanceInfo`・`ReportForm`。pokemon の同名クラスから移動（名前空間は `FaraSiteKit.Core` に統一。移す前は `FaraPokemonBattleAssistant.*`）。テスト `tests/FaraSiteKit.Core.Tests`（69 件）。CI に `dotnet test` を追加。
