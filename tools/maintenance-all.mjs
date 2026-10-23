@@ -84,6 +84,8 @@ export async function runAll(env, deps = {}, { phase = "all" } = {}) {
   const log = (t = "") => { out.push(String(t)); (deps.log ?? console.log)(String(t)); };
   const error = (t = "") => { out.push(String(t)); (deps.error ?? console.error)(String(t)); };
   const skippedAll = [];
+  const addSkipped = (list) => { for (const x of list ?? []) if (!skippedAll.some((y) => y.site === x.site && y.env === x.env && y.reason === x.reason)) skippedAll.push(x); };
+  const plannedProd = { runnable: 0 };
   let code = 0;
   let plan;
   const call = async (stage, kind) => {
@@ -113,7 +115,8 @@ export async function runAll(env, deps = {}, { phase = "all" } = {}) {
         const { c, report } = await call(stage, "plan");
         if (c !== 0) { code = c; break; }
         runnable += report.runnable ?? 0;
-        skippedAll.push(...(report.skipped ?? []));
+        addSkipped(report.skipped);
+        if (stage.envName === "production") plannedProd.runnable += report.runnable ?? 0;
       }
       if (code === 0 && runnable === 0) {
         error("実行できる対象が 1 つもありません(すべて飛ばされました)。何も反映されません。各サイトの対象ブランチに、入力 maintenance_mode つきのワークフローが入っているか確かめてください");
@@ -122,10 +125,18 @@ export async function runAll(env, deps = {}, { phase = "all" } = {}) {
     }
     if (code === 0) {
       log("== 実行 ==");
+      let ran = 0;
       for (const stage of toApply) {
         const { c, report } = await call(stage, "apply");
-        if (!doPlan) skippedAll.push(...(report.skipped ?? []));
+        addSkipped(report.skipped); // 計画で出たものに加えて、dispatch が 422(入力を受け取れない版)で返って飛ばしたものも
+        ran += report.ran ?? 0;
         if (c !== 0) { code = c; break; }
+      }
+      // すべて飛ばされて 1 つも反映されなかったら失敗。dev の段階では、あとで本番が実行できるなら失敗にしない
+      const nothingLeft = phase !== "dev" || plannedProd.runnable === 0;
+      if (code === 0 && toApply.length > 0 && ran === 0 && nothingLeft) {
+        error("実行できた対象が 1 つもありません(すべて飛ばされました)。何も反映されません。各サイトの対象ブランチに、入力 maintenance_mode つきのワークフローが入っているか確かめてください");
+        code = 1;
       }
     }
   } catch (e) {

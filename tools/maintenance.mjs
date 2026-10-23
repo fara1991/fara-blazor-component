@@ -34,6 +34,8 @@ const API = "https://api.cloudflare.com/client/v4";
 const here = dirname(fileURLToPath(import.meta.url));
 
 export class UsageError extends Error {}
+/** そのサイトのその ref のワークフローが、渡す入力を受け取れない版だった(dispatch が HTTP 422 Unexpected inputs)。失敗にせず、警告つきで飛ばす。 */
+export class SkipSite extends Error {}
 
 /** 環境。dev = develop 用、production = 本番(master)、wasm-dev = avatar の WASM 移行用の確認用(migration/wasm)。--env all は dev と production だけ(wasm-dev は明示したときだけ)。 */
 export const ENVS = ["dev", "production", "wasm-dev"];
@@ -250,8 +252,12 @@ async function dispatch(t, opts, { gh, sleep, now }) {
   const before = new Set((await listRuns(gh, t, user)).map((r) => r.databaseId));
   const startedAt = now();
   const r = await gh(dispatchArgs(t, opts));
+  // 事前確認できなかった(403 など)とき、入力を受け取れない版は dispatch が 422 Unexpected inputs で返す。これは失敗ではなく「未対応」なので、飛ばす
+  if (r.code !== 0 && /unexpected inputs/i.test(r.stderr)) {
+    throw new SkipSite(`${t.repo} の ${t.workflow.ref} の ${t.workflow.file} は、入力 ${INPUT_MODE} / ${INPUT_MESSAGE} を受け取れない版(dispatch が HTTP 422 Unexpected inputs。新しい入力つきのワークフローが、その ref に入っていない)`);
+  }
   if (r.code !== 0) {
-    const noInput = /unexpected inputs|workflow_dispatch|could not find any workflow|not found/i.test(r.stderr);
+    const noInput = /workflow_dispatch|could not find any workflow|not found/i.test(r.stderr);
     const hint = noInput
       ? `${t.repo} の ${t.workflow.ref} のワークフロー(${t.workflow.file})に、入力 ${INPUT_MODE} / ${INPUT_MESSAGE} を受け取る版がまだ入っていない可能性があります(新しい入力つきのワークフローが、その ref にマージされているか確かめる。未対応のサイトは --site で除く)`
       : `ワークフローに入力 ${INPUT_MODE} / ${INPUT_MESSAGE} が定義され、ref にそのワークフローがあるか確かめる`;
@@ -277,12 +283,12 @@ async function watch(t, run, { gh }) {
 
 /**
  * 事前確認: 対象のワークフローのファイルが、ref の上で、これから渡す入力(maintenance_mode / maintenance_message)を受け取れる版かを、
- * GET /repos/{repo}/contents/{file}?ref={ref} で見る(PAT の Contents: read が要る)。
+ * GET /repos/{repo}/contents/.github/workflows/{file}?ref={ref} で見る(PAT の Contents: read が要る)。
  * @returns {Promise<{ supported: boolean | null, reason: string }>} supported: true = 受け取れる、false = 受け取れない(飛ばす)、null = 確かめられなかった(権限なしなど。従来どおり dispatch して、失敗したら案内する)
  */
 export async function preflight(t, opts, gh) {
   const need = [opts.mode !== undefined && INPUT_MODE, opts.message !== undefined && INPUT_MESSAGE].filter(Boolean);
-  const r = await gh(["api", `repos/${t.repo}/contents/${t.workflow.file}?ref=${encodeURIComponent(t.workflow.ref)}`, "-H", "Accept: application/vnd.github.raw"]);
+  const r = await gh(["api", `repos/${t.repo}/contents/.github/workflows/${t.workflow.file}?ref=${encodeURIComponent(t.workflow.ref)}`, "-H", "Accept: application/vnd.github.raw"]);
   if (r.code === 0) {
     const missing = need.filter((n) => !r.stdout.includes(n));
     return missing.length === 0 ? { supported: true, reason: "" } : { supported: false, reason: `${t.repo} の ${t.workflow.ref} の ${t.workflow.file} に、入力 ${missing.join(" / ")} がまだ無い(新しい入力つきのワークフローが、その ref に入っていない)` };
@@ -338,10 +344,23 @@ async function runSet(targets, io, opts, { gh, sleep, now, prompt, report }) {
   }
 
   const deps = { gh, sleep, now };
+  // dispatch が「入力を受け取れない版」(422)で返ったサイトは、警告つきで飛ばして続ける。ほかのエラーは例外のまま(中断)
+  const dispatchOrSkip = async (t) => {
+    try {
+      return await dispatch(t, opts, deps);
+    } catch (e) {
+      if (!(e instanceof SkipSite)) throw e;
+      skipped.push({ t, reason: e.message });
+      if (report) { report.skipped.push({ site: t.site, env: t.env, reason: e.message }); report.runnable = Math.max(0, report.runnable - 1); }
+      io.log(`  [警告] 飛ばす: [${t.site}/${t.env}] ${e.message}`);
+      return null;
+    }
+  };
   try {
     const started = [];
     for (const t of dev) {
-      const run = await dispatch(t, opts, deps);
+      const run = await dispatchOrSkip(t);
+      if (!run) continue;
       io.log(`  ${label(t)}: 起動しました ${run.url}`);
       started.push({ t, run });
     }
@@ -351,7 +370,8 @@ async function runSet(targets, io, opts, { gh, sleep, now, prompt, report }) {
       if (report) report.ran++;
     }
     for (const t of prod) {
-      const run = await dispatch(t, opts, deps);
+      const run = await dispatchOrSkip(t);
+      if (!run) continue;
       io.log(`  ${label(t)}: 起動しました ${run.url}`);
       await watch(t, run, deps);
       io.log(`  ${label(t)}: 成功しました ${run.url}`);
@@ -362,7 +382,12 @@ async function runSet(targets, io, opts, { gh, sleep, now, prompt, report }) {
     io.error("中断しました。これ以降の対象は実行していません（起動済みのものは GitHub の Actions で確認してください）");
     return 1;
   }
-  io.log("すべて成功しました。値は status で確認できます（反映に数十秒かかることがあります）");
+  const ranCount = report ? report.ran : todo.length - skipped.filter((x) => todo.includes(x.t)).length;
+  if (ranCount === 0) {
+    io.error("実行できた対象がありません（すべて飛ばされました。何も反映されません）");
+    return opts.allowEmpty ? 0 : 1;
+  }
+  io.log(`成功しました${skipped.length > 0 ? `（飛ばしたサイトが ${skipped.length} 件あります。上の警告を確認）` : ""}。値は status で確認できます（反映に数十秒かかることがあります）`);
   return 0;
 }
 

@@ -156,7 +156,9 @@ kit のリポジトリ(`fara1991/fara-site-kit`)の Actions →「**Set maintena
 - 飛ばしたサイトと理由は、**必ずジョブサマリー**に出る(`dev` job の計画に、本番の分も含めて出る。production job のサマリーにも出る)
 - 選んだ対象が**すべて飛ばされた**ら失敗(何も反映されなかったことが分かる)。一部だけなら成功で、飛ばしたサイトは警告として残る
 - ワークフローのファイルがその ref に無い(404)ときも飛ばす
-- PAT に **Contents: Read** が無いと、確かめられない(403)ので、飛ばさずに従来どおり dispatch する(失敗したら、サイト名と「まだ入っていない可能性」の案内が出て中断する)。Contents: Read の付与を推奨する理由の 1 つ
+- PAT に **Contents: Read** が無いと、事前確認の GET が 403 になり、確かめられない。このときは飛ばさずに dispatch する。dispatch が **HTTP 422 `Unexpected inputs provided`**(そのサイトのその ref のワークフローが、入力を受け取れない版)で返ったら、**失敗にせず、そのサイトを「飛ばす(警告)」にして続行する**(サマリーにも出る。dev でも本番でも同じ)。422 以外のエラー(認証・ワークフロー不在・その他の 4xx / 5xx)は、従来どおり失敗で中断する。すべて飛ばされたら失敗、の規則は同じ
+- **Contents: Read-only が必要なリポジトリ**: 非公開のリポジトリ(**avatar と portfolio**)は、PAT に Contents: Read-only が無いと、事前確認の GET が 403 になる(公開のリポジトリは、トークンが無くても読めるが、PAT の権限が絞られていても通る場合がある)。付けておくと、事前確認で飛ばす判断ができ、起動した run のコミット照合もできる
+- 事前確認のパスは `.github/workflows/{ファイル名}`(ワークフローのファイルは、リポジトリの `.github/workflows/` の下にある)
 - 現状: 各サイトの master 側は、すべて未対応(各サイトの develop → master のマージまで)。avatar の develop も未対応。この間は、飛ばされる旨の警告が出る
 
 ### 注意点
@@ -202,6 +204,7 @@ PAT は repository secret ではなく、**Environment のシークレット**�
    - Environment の承認画面(本番。`develop-maintenance` にレビュワーを付けたなら dev も)が出て、承認後に動くこと
    - `develop` ブランチ上から実行しようとすると、`validate` で止まること
    - 問題がなければ `master` もチェックして使う
+   - 失敗例と対処(v0.3.2 の初回実行): 事前確認が `pokemon` と `bot` の「ワークフローが見つからない」(404)で飛ばされた → 原因は事前確認のパスが `.github/workflows/` を欠いていたバグ(v0.3.3 で修正。実在するファイルは見つかる)。`avatar` と `portfolio`(非公開)は事前確認が 403 になり dispatch に進み、avatar の develop が旧ワークフロー(入力なし)で `HTTP 422: Unexpected inputs provided` となって中断された → v0.3.3 からは、422 は「飛ばす(警告)」になり、残りを続行する。403 が出るときは PAT に Contents: Read-only を付ける
 
 ### 安全性(kit は公開リポジトリ)
 
