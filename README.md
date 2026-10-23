@@ -11,7 +11,7 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 | --- | --- | --- |
 | `worker/` | Worker の共有 JS（`maintenance.js`: メンテナンス表示、`report.js`: 作者への報告の受け口）と、そのテスト | K0 で取り込み（develop 時点で pokemon と同一内容） |
 | `docs/` | 利用方法・変更履歴・メンテナンス一括変更 CLI の使い方（`maintenance-cli.md`） | K0 で作成 |
-| `tools/` | `maintenance.mjs`（複数サイトの `MAINTENANCE_MODE` / `MAINTENANCE_MESSAGE` を Cloudflare の API でまとめて変える CLI）と対象の一覧 | 0.3.0 |
+| `tools/` | `maintenance.mjs`（複数サイトの `MAINTENANCE_MODE` / `MAINTENANCE_MESSAGE` を、`status` でまとめて見る・`set` で各サイトの deploy ワークフローを `gh` で実行して切り替える CLI。Cloudflare API へは書き込まない）と対象の一覧 | 0.3.0 |
 | `src/FaraSiteKit.Core/` | C#（UI と通信に依存しない共通コード）: `SiteLinks`（確認用ホストへの切り替え）・`MaintenanceInfo`（メンテナンス状態の読み取り）・`ReportForm`（報告の入力の検査） | K0-2 |
 | `tests/FaraSiteKit.Core.Tests/` | 上の C# の xUnit テスト（`dotnet test`） | K0-2 |
 | `.github/workflows/ci.yml` | `npm test`（Node 22、ubuntu）と `dotnet test`（global.json の SDK） | K0 |

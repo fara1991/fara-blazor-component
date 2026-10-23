@@ -33,7 +33,7 @@ Worker の変数（ダッシュボードの「変数とシークレット」、�
 
 - **旧名 `MAINTENANCE` は 0.3.0 から読まない**（残っていても何も起きない＝通常動作）。0.2.x 以前から上げるサイトは、`docs/changelog.md` の 0.3.0 の移行手順に従う。
 - 本番の公開前にお知らせを出す運用（`require-maintenance.mjs` 相当）や、公開と同時に `--var MAINTENANCE_MODE:true` を付けるワークフローも、新しい名前に合わせる。
-- 複数サイトの変数をまとめて見る・変えるには `tools/maintenance.mjs`（`docs/maintenance-cli.md`）。
+- 複数サイトの変数をまとめて見る・切り替えるには `tools/maintenance.mjs`（`status` は読み取り、`set` は deploy ワークフローを `gh` で実行。雛形と手順は `docs/maintenance-cli.md`）。
 
 ## 3. C# の共通コードを使う（`src/FaraSiteKit.Core`）
 

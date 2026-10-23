@@ -8,19 +8,20 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 
 - `worker/maintenance.js`: `getMaintenance(env)` が `env.MAINTENANCE_MODE` を読む。旧名だけの設定は通常（テストで固定）。
 - コメント・説明文（`MaintenanceInfo`・`MaintenanceBanner`・`MaintenanceScreen`・CSS）の変数名を更新。C# の公開 API・Worker の `/api/maintenance` の JSON の形は変わらない。
-- 追加: 一括変更 CLI `tools/maintenance.mjs`（Node・依存なし）と対象の一覧 `tools/maintenance-sites.json`。`status`（現在値の一覧）・`set`（`--env` `--site` `--mode` `--message`）・`rename`（旧 `MAINTENANCE` → `MAINTENANCE_MODE`。移行用）。既定はドライラン、`--apply` で実行、本番はサイト名の入力が必須。使い方は `docs/maintenance-cli.md`。テスト `tests/tools/maintenance-cli.test.mjs`（API は fetch を差し替え）。
+- 追加: 一括変更 CLI `tools/maintenance.mjs`（Node・依存なし）と対象の一覧 `tools/maintenance-sites.json`。`status`（Cloudflare API の GET だけで、現在値の一覧）と `set`（各サイトの deploy ワークフローを `gh workflow run` で手動実行し、入力 `maintenance_mode` / `maintenance_message` を `wrangler deploy --var` で反映）。Cloudflare API への書き込みはしない。既定はドライラン、`--apply` で実行、dev を先に流して成功したら production（本番は `--confirm` にサイト名の再入力が必須。1 つでも失敗したら中断）。使い方とワークフローの雛形は `docs/maintenance-cli.md`。テスト `tests/tools/maintenance-cli.test.mjs`（gh と fetch を差し替え）。
 - `docs/usage.md` に 2.1「メンテナンスの変数」を追加。
 
 ### 各サイトの移行手順（kit を 0.3.0 に上げるとき）
 
-kit を上げた Worker が公開された時点から旧名は効かなくなる。**公開（本番）の前に、新しい変数を用意しておく**（順序を守らないと、メンテナンス中・お知らせ中の Worker が通常に戻る）。
+旧変数 `MAINTENANCE` は新しいコードが読まないので、Cloudflare に残っていても無害（消すのは任意）。新しい変数 `MAINTENANCE_MODE` は、サイトの公開（`wrangler deploy --var MAINTENANCE_MODE:...`）で設定する。
 
-1. Cloudflare の各 Worker に `MAINTENANCE_MODE` を作り、いまの `MAINTENANCE` と同じ値にする。まとめてやるなら `node tools/maintenance.mjs rename --env dev`（ドライランで確認 → `--apply`）、続けて `--env production`。`MAINTENANCE` を消すのは手順 4。（`rename` は新変数の作成と旧変数の削除を一度に行う。kit を上げる前に旧変数を消してよいのは、まだ旧い kit の Worker が動いていない＝公開前のサイトだけ。公開済みのサイトは、kit を上げて公開してから `rename` する。その間の短い時間、状態は通常に戻る）
-2. サイトの `wrangler` / ワークフローの `--var MAINTENANCE:...` を `--var MAINTENANCE_MODE:...` に変える（`deploy.yml` / `site.yml` など）。
-3. `require-maintenance.mjs` 相当のスクリプトが読む変数名（`readMaintenanceValue` の `b.name === "MAINTENANCE"`）を `MAINTENANCE_MODE` にし、メッセージ・テストも合わせる。`SKIP_MAINTENANCE_CHECK` は変えない。
-4. 旧変数 `MAINTENANCE` を各 Worker から削除する（`rename` を使った場合は削除済み）。
-5. サイトの README・docs・テストの `MAINTENANCE`（変数名としての参照）を `MAINTENANCE_MODE` に直す。`MAINTENANCE_MESSAGE` は直さない。
-6. submodule を `v0.3.0` に上げる PR（develop 向け）→ 確認用で、`notice` / `true` / `false` の表示を確認。
+1. サイトの kit（submodule）を `v0.3.0` に上げる。
+2. サイトの `require-maintenance.mjs`（本番公開前のゲート）が読む変数名を `MAINTENANCE_MODE` にする（`readMaintenanceValue` の `b.name === "MAINTENANCE_MODE"`。メッセージ・テストも合わせる。`SKIP_MAINTENANCE_CHECK` は変えない）。
+3. deploy ワークフローの `--var MAINTENANCE:...` を `--var MAINTENANCE_MODE:...` に変え、`workflow_dispatch` の入力 `maintenance_mode` / `maintenance_message` を足す（雛形は `docs/maintenance-cli.md`）。ワークフローの文字列を調べるテストも合わせる。
+4. サイトの README・docs・テスト・コメントの `MAINTENANCE`（変数名としての参照）を `MAINTENANCE_MODE` に直す。`MAINTENANCE_MESSAGE` は直さない。
+5. 確認用（dev）: develop に入れて公開されたら、`node tools/maintenance.mjs set --env dev --mode notice --message "..." --apply` で値を設定し、`notice` / `true` / `false` の表示を確認する。
+6. 本番: master への公開は、従来どおり公開前のゲートで `MAINTENANCE_MODE` が `notice` かを確かめ、公開と同時に `--var MAINTENANCE_MODE:true` を渡す。ゲートが新名を読むため、最初の 1 回だけは本番の Worker にまだ `MAINTENANCE_MODE` が無くて止まる。ダッシュボードで本番の `MAINTENANCE_MODE` を `notice`（と `MAINTENANCE_MESSAGE`）で作っておくか、手動実行の `skip_maintenance_check` で公開する。2 回目以降は、`set --env production --mode notice ... --apply` でお知らせを出してから公開できる。
+7. 旧変数 `MAINTENANCE` は、不要ならダッシュボードで手動で削除する（CLI は消さない）。
 
 ## 0.2.1
 

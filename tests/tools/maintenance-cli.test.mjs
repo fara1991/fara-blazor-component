@@ -1,361 +1,330 @@
-// tools/maintenance.mjs のテスト。実 API は叩かない（fetch を差し替える）。  node --test tests/tools/maintenance-cli.test.mjs
+// tools/maintenance.mjs のテスト。実 gh・実 API は叩かない（gh と fetch を差し替える）。  node --test tests/tools/maintenance-cli.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { main, buildBindings, verifyAfter, parseArgs, validateMessage } from "../../tools/maintenance.mjs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { main, parseArgs, validateMessage, displayCommand, dispatchArgs, INPUT_MODE, INPUT_MESSAGE } from "../../tools/maintenance.mjs";
 
 const TOKEN = "tok_SECRET_VALUE_12345";
 const ENV = { CLOUDFLARE_API_TOKEN: TOKEN, CLOUDFLARE_ACCOUNT_ID: "acc123" };
+const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const dir = mkdtempSync(join(tmpdir(), "mcli-"));
 const sitesPath = join(dir, "sites.json");
+const wf = (file, ref) => ({ file, ref });
 writeFileSync(sitesPath, JSON.stringify({
   sites: [
-    { name: "pokemon", workers: { production: "w-pk", dev: "w-pk-dev" } },
-    { name: "portfolio", workers: { production: "w-pf", dev: "w-pf-dev" } },
+    { name: "pokemon", repo: "o/pk", workflows: { dev: wf("deploy-develop.yml", "develop"), production: wf("deploy.yml", "master") }, workers: { production: "w-pk", dev: "w-pk-dev" } },
+    { name: "portfolio", repo: "o/pf", workflows: { dev: wf("deploy-develop.yml", "develop"), production: wf("deploy.yml", "master") }, workers: { production: "w-pf", dev: "w-pf-dev" } },
+    { name: "devonly", repo: "o/do", workflows: { dev: wf("wasm.yml", "migration/wasm") }, workers: { dev: "w-do-dev" } },
   ],
 }));
 
-const baseBindings = () => [
-  { type: "plain_text", name: "MAINTENANCE_MODE", text: "false" },
-  { type: "plain_text", name: "MAINTENANCE_MESSAGE", text: "旧い文面" },
-  { type: "plain_text", name: "OTHER_VAR", text: "keep" },
+/**
+ * gh の模擬。run list（起動済みの run）・workflow run（run を増やす）・run watch（成功/失敗）を再現し、呼び出しを記録する。
+ * failWatch: その repo の run watch を失敗させる。failDispatch: その repo の workflow run を失敗させる。noRun: 起動しても run が一覧に出ない。
+ */
+function fakeGh({ failWatch = [], failDispatch = [], noRun = [] } = {}) {
+  const calls = [];
+  const runs = new Map(); // repo -> [{databaseId, url}]
+  let next = 100;
+  const repoOf = (a) => a[a.indexOf("--repo") + 1];
+  const gh = async (args) => {
+    calls.push(args);
+    const repo = repoOf(args);
+    if (args[0] === "run" && args[1] === "list") return { code: 0, stdout: JSON.stringify(runs.get(repo) ?? []), stderr: "" };
+    if (args[0] === "workflow" && args[1] === "run") {
+      if (failDispatch.includes(repo)) return { code: 1, stdout: "", stderr: "HTTP 422: Workflow does not have 'workflow_dispatch' trigger" };
+      if (!noRun.includes(repo)) {
+        const id = next++;
+        runs.set(repo, [{ databaseId: id, url: `https://github.com/${repo}/actions/runs/${id}` }, ...(runs.get(repo) ?? [])]);
+      }
+      return { code: 0, stdout: "", stderr: "" };
+    }
+    if (args[0] === "run" && args[1] === "watch") return failWatch.includes(repo) ? { code: 1, stdout: "", stderr: "failed" } : { code: 0, stdout: "", stderr: "" };
+    throw new Error(`想定外の gh 呼び出し: ${args.join(" ")}`);
+  };
+  return { gh, calls, dispatches: () => calls.filter((a) => a[0] === "workflow"), watches: () => calls.filter((a) => a[1] === "watch") };
+}
+
+const noFetch = async () => { throw new Error("set では Cloudflare の API を呼ばない"); };
+const noGh = async () => { throw new Error("status では gh を呼ばない"); };
+
+function run(argv, extra = {}) {
+  const out = [];
+  const err = [];
+  return main(argv, { env: ENV, fetchImpl: noFetch, gh: noGh, sleep: async () => {}, sitesPath, log: (t) => out.push(String(t)), error: (t) => err.push(String(t)), prompt: async () => null, ...extra })
+    .then((code) => ({ code, out: out.join("\n"), err: err.join("\n"), all: `${out.join("\n")}\n${err.join("\n")}` }));
+}
+
+test("set の既定はドライラン: 実行する gh のコマンドを順に表示し、gh も API も呼ばない", async () => {
+  const r = await run(["set", "--env", "all", "--site", "pokemon", "--mode", "notice", "--message", "10月25日 20:00 ごろ更新します"]);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /ドライラン/);
+  assert.match(r.out, /gh workflow run deploy-develop\.yml --repo o\/pk --ref develop -f maintenance_mode=notice -f "maintenance_message=10月25日 20:00 ごろ更新します"/);
+  assert.match(r.out, /gh workflow run deploy\.yml --repo o\/pk --ref master -f maintenance_mode=notice/);
+  assert.ok(r.out.indexOf("deploy-develop.yml") < r.out.indexOf("--ref master"), "dev が先");
+  assert.match(r.out, /--apply/);
+});
+
+test("ドライランでは、本番でも確認を求めない", async () => {
+  const r = await run(["set", "--env", "production", "--site", "pokemon", "--mode", "false"], { prompt: async () => { throw new Error("求めない"); } });
+  assert.equal(r.code, 0);
+});
+
+test("--apply (dev): ワークフローに入力が渡り、run の URL が表示される。Cloudflare の API は呼ばない", async () => {
+  const g = fakeGh();
+  const r = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "notice", "--message", "更新します", "--apply"], { gh: g.gh });
+  assert.equal(r.code, 0, r.all);
+  assert.deepEqual(g.dispatches(), [["workflow", "run", "deploy-develop.yml", "--repo", "o/pk", "--ref", "develop", "-f", `${INPUT_MODE}=notice`, "-f", `${INPUT_MESSAGE}=更新します`]]);
+  assert.equal(g.watches().length, 1);
+  assert.deepEqual(g.watches()[0].slice(0, 4), ["run", "watch", "100", "--repo"]);
+  assert.ok(g.watches()[0].includes("--exit-status"));
+  assert.match(r.out, /起動しました https:\/\/github\.com\/o\/pk\/actions\/runs\/100/);
+  assert.match(r.out, /成功しました https:\/\/github\.com\/o\/pk\/actions\/runs\/100/);
+});
+
+test("--mode だけ・--message だけのときは、指定した入力だけを渡す", async () => {
+  const g = fakeGh();
+  await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "false", "--apply"], { gh: g.gh });
+  assert.deepEqual(g.dispatches()[0].slice(7), ["-f", "maintenance_mode=false"]);
+  const g2 = fakeGh();
+  await run(["set", "--env", "dev", "--site", "pokemon", "--message", "x", "--apply"], { gh: g2.gh });
+  assert.deepEqual(g2.dispatches()[0].slice(7), ["-f", "maintenance_message=x"]);
+});
+
+test("順序: dev をすべて起動 → dev の結果を待つ → production（起動 → 待つ）", async () => {
+  const g = fakeGh();
+  const r = await run(["set", "--env", "all", "--site", "pokemon,portfolio", "--mode", "true", "--apply", "--confirm", "production pokemon,portfolio"], { gh: g.gh });
+  assert.equal(r.code, 0, r.all);
+  const seq = g.calls.filter((a) => a[0] === "workflow" || a[1] === "watch").map((a) => (a[0] === "workflow" ? `run:${a[a.indexOf("--repo") + 1]}:${a[a.indexOf("--ref") + 1]}` : `watch:${a[a.indexOf("--repo") + 1]}`));
+  assert.deepEqual(seq, [
+    "run:o/pk:develop", "run:o/pf:develop", // dev をすべて起動
+    "watch:o/pk", "watch:o/pf",             // dev の結果
+    "run:o/pk:master", "watch:o/pk",        // production（1 サイトずつ）
+    "run:o/pf:master", "watch:o/pf",
+  ]);
+});
+
+test("dev が 1 つ失敗したら中断: production は起動しない。終了コード 1", async () => {
+  const g = fakeGh({ failWatch: ["o/pf"] });
+  const r = await run(["set", "--env", "all", "--site", "pokemon,portfolio", "--mode", "true", "--apply", "--confirm", "production pokemon,portfolio"], { gh: g.gh });
+  assert.equal(r.code, 1);
+  assert.equal(g.dispatches().filter((a) => a.includes("master")).length, 0, "production を起動しない");
+  assert.match(r.err, /実行が失敗しました: https:\/\/github\.com\/o\/pf\/actions\/runs\//);
+  assert.match(r.err, /中断/);
+});
+
+test("production の 1 つ目が失敗したら、2 つ目は起動しない", async () => {
+  const g = fakeGh({ failWatch: ["o/pk"] });
+  // dev を含めず production だけ。pokemon が失敗 → portfolio は起動しない
+  const r = await run(["set", "--env", "production", "--site", "pokemon,portfolio", "--mode", "true", "--apply", "--confirm", "production pokemon,portfolio"], { gh: g.gh });
+  assert.equal(r.code, 1);
+  assert.equal(g.dispatches().length, 1);
+});
+
+test("gh workflow run の失敗（入力が未定義など）は中断。理由とヒントを出す", async () => {
+  const g = fakeGh({ failDispatch: ["o/pk"] });
+  const r = await run(["set", "--env", "dev", "--mode", "true", "--apply"], { gh: g.gh });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /gh workflow run が失敗しました.*workflow_dispatch/);
+  assert.match(r.err, /maintenance_mode/);
+  assert.equal(g.dispatches().length, 1, "失敗したら後続を起動しない");
+});
+
+test("起動した run が一覧に出ないときは、待ち直したうえで失敗にする", async () => {
+  const g = fakeGh({ noRun: ["o/pk"] });
+  let slept = 0;
+  const r = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--apply"], { gh: g.gh, sleep: async () => { slept++; } });
+  assert.equal(r.code, 1);
+  assert.equal(slept, 10);
+  assert.match(r.err, /見つかりませんでした/);
+});
+
+test("本番: --confirm が無い（対話もできない）と、何も実行しない", async () => {
+  const g = fakeGh();
+  const r = await run(["set", "--env", "production", "--site", "pokemon", "--mode", "true", "--apply"], { gh: g.gh });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /--confirm "production pokemon"/);
+  assert.equal(g.calls.length, 0);
+});
+
+test("本番: --confirm が違うと、何も実行しない（dev も実行しない）", async () => {
+  for (const wrong of ["production", "production pokemon", "pokemon,portfolio", "production portfolio,pokemon", "PRODUCTION pokemon,portfolio"]) {
+    const g = fakeGh();
+    const r = await run(["set", "--env", "all", "--site", "pokemon,portfolio", "--mode", "true", "--apply", "--confirm", wrong], { gh: g.gh });
+    assert.equal(r.code, 1, wrong);
+    assert.equal(g.calls.length, 0, wrong);
+  }
+});
+
+test("本番: 対象のサイト名の再入力（アルファベット順・カンマ区切り）で実行できる。対話の入力でもよい", async () => {
+  const g = fakeGh();
+  assert.equal((await run(["set", "--env", "production", "--site", "portfolio,pokemon", "--mode", "false", "--apply", "--confirm", " production pokemon,portfolio "], { gh: g.gh })).code, 0);
+  assert.equal(g.dispatches().length, 2);
+  const g2 = fakeGh();
+  let asked = "";
+  const r = await run(["set", "--env", "production", "--site", "pokemon", "--mode", "false", "--apply"], { gh: g2.gh, prompt: async (q) => { asked = q; return "production pokemon"; } });
+  assert.equal(r.code, 0);
+  assert.match(asked, /production pokemon/);
+});
+
+test("dev だけなら確認は要らない", async () => {
+  const g = fakeGh();
+  const r = await run(["set", "--env", "dev", "--mode", "false", "--apply"], { gh: g.gh });
+  assert.equal(r.code, 0);
+});
+
+test("dev だけのサイト（production のワークフローが無い）は、--env all では dev だけ、--env production では使い方の誤り", async () => {
+  const g = fakeGh();
+  const all = await run(["set", "--env", "all", "--site", "devonly", "--mode", "true", "--apply"], { gh: g.gh });
+  assert.equal(all.code, 0, all.all);
+  assert.deepEqual(g.dispatches().map((a) => a[a.indexOf("--ref") + 1]), ["migration/wasm"]);
+  const prod = await run(["set", "--env", "production", "--site", "devonly", "--mode", "true"]);
+  assert.equal(prod.code, 2);
+});
+
+test("文面は 1 つの引数としてそのまま渡る（シェルを通さない）。表示は制御文字を外して引用する", async () => {
+  const message = `a b "c" $(x) ; 'd' &`;
+  const g = fakeGh();
+  await run(["set", "--env", "dev", "--site", "pokemon", "--message", message, "--apply"], { gh: g.gh });
+  assert.equal(g.dispatches()[0].at(-1), `maintenance_message=${message}`);
+  const shown = displayCommand(["workflow", "run", "-f", `maintenance_message=${message}`]);
+  assert.match(shown, /^gh workflow run -f "maintenance_message=a b \\"c\\" \$\(x\) ; 'd' &"$/);
+});
+
+test("使い方の誤りは終了コード 2（gh も API も呼ばない）", async () => {
+  const bad = [
+    ["set", "--mode", "true"],
+    ["set", "--env", "dev"],
+    ["set", "--env", "dev", "--mode", "maintenance"],
+    ["set", "--env", "staging", "--mode", "true"],
+    ["set", "--env", "dev", "--site", "nope", "--mode", "true"],
+    ["set", "--env", "dev", "--message", "a\nb"],
+    ["set", "--env", "dev", "--message", ""],
+    ["set", "--env", "dev", "--message", "あ".repeat(201)],
+    ["set", "--env", "dev", "--mode", "true", "--wat"],
+    ["set", "--env", "dev", "--mode"],
+    ["status", "--mode", "true"],
+    ["status", "--apply"],
+    [],
+    ["bogus"],
+    // 廃止したサブコマンドは、通常の「不明」と同じ扱い
+    ["rename", "--env", "dev"],
+  ];
+  for (const argv of bad) {
+    const r = await run(argv);
+    assert.equal(r.code, 2, JSON.stringify(argv));
+  }
+  const r = await run(["rename", "--env", "dev"]);
+  assert.doesNotMatch(r.err, /廃止|rename/);
+  assert.equal((await run(["set", "--env", "dev", "--mode", "true"], { env: {} })).code, 0, "set は Cloudflare のトークンが無くてもドライランできる");
+});
+
+test("--message は 200 文字ちょうどまで。parseArgs / validateMessage の基本", () => {
+  assert.doesNotThrow(() => validateMessage("あ".repeat(200)));
+  assert.doesNotThrow(() => validateMessage("😀".repeat(200)));
+  assert.throws(() => validateMessage("😀".repeat(201)));
+  const o = parseArgs(["set", "--env", "dev", "--site", "a,b", "--site", "c", "--mode", "true", "--apply", "--confirm", "x"]);
+  assert.deepEqual([o.env, o.sites, o.mode, o.apply, o.confirm], ["dev", ["a", "b", "c"], "true", true, "x"]);
+  assert.deepEqual(dispatchArgs({ workflow: wf("a.yml", "develop"), repo: "o/r" }, { mode: "true" }), ["workflow", "run", "a.yml", "--repo", "o/r", "--ref", "develop", "-f", "maintenance_mode=true"]);
+});
+
+// ---- status ----
+
+const bindings = (extra = []) => [
+  { type: "plain_text", name: "MAINTENANCE_MODE", text: "notice" },
+  { type: "plain_text", name: "MAINTENANCE_MESSAGE", text: "10月25日に更新\n行2" },
   { type: "secret_text", name: "SECRET_A" },
-  { type: "durable_object_namespace", name: "ROSTER", class_name: "RosterSlot", namespace_id: "ns1" },
-  { type: "assets", name: "ASSETS" },
+  { type: "durable_object_namespace", name: "ROSTER", class_name: "RosterSlot" },
+  ...extra,
 ];
 
-/**
- * Cloudflare の settings API のごく簡単な模擬。
- * PATCH は bindings を「置き換え」、inherit は直前の同名バインディングを引き継ぐ（秘密の値は保持）。
- * ignoreInherit: inherit を無視して落とす（壊れたサーバーの想定。書き込み後の検査が失敗を見つけること）。
- */
-function fakeCloudflare(workers, { ignoreInherit = false, failPatchFor = [] } = {}) {
+function fakeCloudflare(workers, { status = {} } = {}) {
   const calls = [];
-  const secrets = new Map(); // worker -> { name: value }（GET には出ない）
-  for (const name of Object.keys(workers)) secrets.set(name, { SECRET_A: "s3cret-value" });
   const fetchImpl = async (url, init = {}) => {
-    const method = init.method ?? "GET";
+    calls.push({ url, method: init.method, headers: init.headers, body: init.body });
     const m = /accounts\/([^/]+)\/workers\/scripts\/([^/]+)\/settings$/.exec(url);
-    calls.push({ method, url, headers: init.headers, body: init.body });
     assert.ok(m, `想定外の URL: ${url}`);
     assert.equal(m[1], "acc123");
     assert.equal(init.headers.Authorization, `Bearer ${TOKEN}`);
     const worker = decodeURIComponent(m[2]);
-    const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+    const json = (code, body) => new Response(JSON.stringify(body), { status: code, headers: { "content-type": "application/json" } });
+    if (status[worker]) return json(status[worker], { success: false, errors: [{ code: 10000, message: `bad token ${TOKEN}` }] });
     if (!(worker in workers)) return json(404, { success: false, errors: [{ code: 10007, message: "not found" }] });
-    if (method === "GET") return json(200, { success: true, result: { bindings: structuredClone(workers[worker]) } });
-    assert.equal(method, "PATCH");
-    assert.ok(init.body instanceof FormData, "multipart/form-data で送る");
-    if (failPatchFor.includes(worker)) return json(500, { success: false, errors: [{ code: 1, message: "boom" }] });
-    const sent = JSON.parse(init.body.get("settings")).bindings;
-    const old = workers[worker];
-    workers[worker] = sent.flatMap((b) => {
-      if (b.type !== "inherit") return [b];
-      if (ignoreInherit) return [];
-      const prev = old.find((o) => o.name === b.name);
-      return prev ? [prev] : [];
-    });
-    return json(200, { success: true, result: {} });
+    return json(200, { success: true, result: { bindings: workers[worker] } });
   };
-  return { fetchImpl, calls, workers };
+  return { fetchImpl, calls };
 }
 
-function run(argv, cf, extra = {}) {
-  const out = [];
-  const err = [];
-  return main(argv, { env: ENV, fetchImpl: cf.fetchImpl, sitesPath, log: (t) => out.push(String(t)), error: (t) => err.push(String(t)), prompt: async () => null, ...extra })
-    .then((code) => ({ code, out: out.join("\n"), err: err.join("\n"), all: `${out.join("\n")}\n${err.join("\n")}` }));
-}
-
-const world = () => ({ "w-pk": baseBindings(), "w-pk-dev": baseBindings(), "w-pf": baseBindings(), "w-pf-dev": baseBindings() });
-const patches = (cf) => cf.calls.filter((c) => c.method === "PATCH");
-const backupArgs = () => ["--backup-dir", mkdtempSync(join(dir, "bk-"))];
-
-test("既定はドライラン: 差分を表示し、PATCH しない", async () => {
-  const cf = fakeCloudflare(world());
-  const r = await run(["set", "--env", "dev", "--mode", "notice", "--message", "新しい文面"], cf);
-  assert.equal(r.code, 0);
-  assert.equal(patches(cf).length, 0);
-  assert.match(r.out, /ドライラン/);
-  assert.match(r.out, /MAINTENANCE_MODE: "false" -> "notice"/);
-  assert.match(r.out, /MAINTENANCE_MESSAGE: "旧い文面" -> "新しい文面"/);
-  assert.match(r.out, /--apply/);
+test("status: 読み取り（GET）だけ。表に MAINTENANCE_MODE と MAINTENANCE_MESSAGE を出す。シークレットは種類だけ", async () => {
+  const cf = fakeCloudflare({ "w-pk": bindings(), "w-pk-dev": bindings([{ type: "plain_text", name: "MAINTENANCE", text: "true" }]), "w-pf": bindings(), "w-pf-dev": bindings() });
+  const r = await run(["status", "--site", "pokemon"], { fetchImpl: cf.fetchImpl });
+  assert.equal(r.code, 0, r.all);
+  assert.ok(cf.calls.length === 2 && cf.calls.every((c) => c.method === "GET" && c.body === undefined), "GET だけ");
+  assert.match(r.out, /pokemon\s+dev\s+w-pk-dev\s+"notice"\s+"10月25日に更新 行2"\s+旧 MAINTENANCE が残っています/);
+  assert.match(r.out, /pokemon\s+production\s+w-pk\s+"notice"/);
+  assert.doesNotMatch(r.out, /SECRET_A|RosterSlot/);
+  const sec = fakeCloudflare({ "w-pk": [{ type: "secret_text", name: "MAINTENANCE_MODE" }], "w-pk-dev": [] });
+  const r2 = await run(["status", "--site", "pokemon"], { fetchImpl: sec.fetchImpl });
+  assert.match(r2.out, /\(secret_text\)/);
+  assert.match(r2.out, /pokemon\s+dev\s+w-pk-dev\s+\(未設定\)\s+\(未設定\)/);
+  assert.equal(r2.code, 0);
 });
 
-test("set --apply (dev): 対象の変数だけ変わり、ほかのバインディングは残る", async () => {
-  const cf = fakeCloudflare(world());
-  const r = await run(["set", "--env", "dev", "--mode", "true", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 0, r.all);
-  assert.equal(patches(cf).length, 2);
-  for (const w of ["w-pk-dev", "w-pf-dev"]) {
-    const b = cf.workers[w];
-    assert.equal(b.find((x) => x.name === "MAINTENANCE_MODE").text, "true");
-    assert.equal(b.find((x) => x.name === "MAINTENANCE_MESSAGE").text, "旧い文面");
-    assert.equal(b.find((x) => x.name === "OTHER_VAR").text, "keep");
-    assert.deepEqual(b.find((x) => x.name === "SECRET_A"), { type: "secret_text", name: "SECRET_A" });
-    assert.equal(b.find((x) => x.name === "ROSTER").class_name, "RosterSlot");
-    assert.ok(b.find((x) => x.name === "ASSETS"));
-    assert.equal(b.length, 6);
+test("status: Worker が見つからない・権限エラーは備考に出して終了コード 1。取得できた行は表に出る。トークンは伏せる", async () => {
+  const cf = fakeCloudflare({ "w-pk": bindings(), "w-pf": bindings() }, { status: { "w-pf-dev": 403 } });
+  const r = await run(["status"], { fetchImpl: cf.fetchImpl });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /w-pk-dev\s+-\s+-\s+Worker が見つかりません/);
+  assert.match(r.out, /w-pf-dev\s+-\s+-\s+失敗: .*HTTP 403.*Read/);
+  assert.match(r.out, /pokemon\s+production\s+w-pk\s+"notice"/);
+  assert.ok(!r.all.includes(TOKEN), "トークンは出力に出ない");
+  assert.match(r.out, /\*\*\*/);
+});
+
+test("status: トークンまたはアカウント ID が無いと使い方の誤り（2）", async () => {
+  assert.equal((await run(["status"], { env: { CLOUDFLARE_ACCOUNT_ID: "a" } })).code, 2);
+  assert.equal((await run(["status"], { env: { CLOUDFLARE_API_TOKEN: TOKEN } })).code, 2);
+});
+
+test("status: 想定外の応答は失敗として扱う", async () => {
+  const fetchImpl = async () => new Response(JSON.stringify({ success: true, result: {} }), { status: 200 });
+  const r = await run(["status", "--site", "pokemon", "--env", "dev"], { fetchImpl });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /想定しない応答/);
+});
+
+// ---- 同梱ファイル・ドキュメント ----
+
+test("同梱の maintenance-sites.json は読め、4 サイトの dev・production のワークフローと Worker がそろっている", async () => {
+  const sites = JSON.parse(readFileSync(join(root, "tools", "maintenance-sites.json"), "utf8")).sites;
+  assert.deepEqual(sites.map((s) => s.name), ["pokemon", "avatar", "bot", "portfolio"]);
+  for (const s of sites) {
+    assert.match(s.repo, /^fara1991\//);
+    assert.equal(s.workflows.dev.ref, "develop");
+    assert.equal(s.workflows.production.ref, "master");
+    assert.ok(s.workers.dev.endsWith("-dev") && !s.workers.production.endsWith("-dev"));
   }
-  // production は触らない
-  assert.equal(cf.workers["w-pk"].find((x) => x.name === "MAINTENANCE_MODE").text, "false");
-});
-
-test("送る bindings: 変数以外は inherit で、秘密の値・DO・assets は消さない", () => {
-  const sent = buildBindings(baseBindings(), { MAINTENANCE_MODE: "notice" });
-  assert.deepEqual(sent.filter((b) => b.type === "inherit").map((b) => b.name).sort(), ["ASSETS", "ROSTER", "SECRET_A"]);
-  assert.ok(sent.some((b) => b.name === "OTHER_VAR" && b.type === "plain_text" && b.text === "keep"));
-  assert.ok(sent.some((b) => b.name === "MAINTENANCE_MESSAGE" && b.text === "旧い文面"));
-  assert.deepEqual(sent.filter((b) => b.name === "MAINTENANCE_MODE"), [{ type: "plain_text", name: "MAINTENANCE_MODE", text: "notice" }]);
-  assert.equal(sent.length, 6);
-  assert.ok(!JSON.stringify(sent).includes("s3cret"));
-});
-
-test("変数がまだ無い Worker には追加する", async () => {
-  const w = world();
-  w["w-pk-dev"] = w["w-pk-dev"].filter((b) => !b.name.startsWith("MAINTENANCE"));
-  const cf = fakeCloudflare(w);
-  const r = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "notice", "--message", "追加", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 0, r.all);
-  assert.equal(patches(cf).length, 1);
-  assert.equal(cf.workers["w-pk-dev"].find((x) => x.name === "MAINTENANCE_MODE").text, "notice");
-  assert.equal(cf.workers["w-pk-dev"].find((x) => x.name === "MAINTENANCE_MESSAGE").text, "追加");
-  assert.ok(cf.workers["w-pk-dev"].find((x) => x.name === "SECRET_A"));
-});
-
-test("本番: 確認が無い・違うと書き込まない。サイト名の入力で書き込む", async () => {
-  let cf = fakeCloudflare(world());
-  let r = await run(["set", "--env", "production", "--site", "pokemon", "--mode", "notice", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 1);
-  assert.equal(patches(cf).length, 0);
-  assert.match(r.err, /--confirm "production pokemon"/);
-
-  cf = fakeCloudflare(world());
-  r = await run(["set", "--env", "production", "--site", "pokemon", "--mode", "notice", "--apply", ...backupArgs()], cf, { prompt: async () => "pokemon" });
-  assert.equal(r.code, 1);
-  assert.equal(patches(cf).length, 0);
-
-  cf = fakeCloudflare(world());
-  r = await run(["set", "--env", "production", "--site", "pokemon", "--mode", "notice", "--apply", "--confirm", "production portfolio", ...backupArgs()], cf);
-  assert.equal(r.code, 1);
-  assert.equal(patches(cf).length, 0);
-
-  cf = fakeCloudflare(world());
-  r = await run(["set", "--env", "production", "--site", "pokemon", "--mode", "notice", "--apply", ...backupArgs()], cf, { prompt: async (q) => { assert.match(q, /production pokemon/); return "production pokemon"; } });
-  assert.equal(r.code, 0, r.all);
-  assert.equal(patches(cf).length, 1);
-  assert.equal(cf.workers["w-pk"].find((x) => x.name === "MAINTENANCE_MODE").text, "notice");
-  assert.equal(cf.workers["w-pf"].find((x) => x.name === "MAINTENANCE_MODE").text, "false");
-});
-
-test("本番の確認はドライランでは求めない。dev だけなら確認なし", async () => {
-  const cf = fakeCloudflare(world());
-  const r = await run(["set", "--env", "all", "--mode", "notice"], cf, { prompt: async () => { throw new Error("聞かない"); } });
+  const r = await new Promise((resolve) => {
+    const out = [];
+    main(["set", "--env", "all", "--mode", "false"], { env: {}, log: (t) => out.push(t), error: (t) => out.push(t) }).then((code) => resolve({ code, out: out.join("\n") }));
+  });
   assert.equal(r.code, 0);
-  assert.equal(patches(cf).length, 0);
+  assert.equal((r.out.match(/gh workflow run/g) ?? []).length, 8);
 });
 
-test("--env all の本番を含む複数サイトは、サイト名の並びを入力する", async () => {
-  const cf = fakeCloudflare(world());
-  const r = await run(["set", "--env", "all", "--mode", "notice", "--apply", "--confirm", "production pokemon,portfolio", ...backupArgs()], cf);
-  assert.equal(r.code, 0, r.all);
-  assert.equal(patches(cf).length, 4);
-});
-
-test("変更なしの Worker には書き込まない", async () => {
-  const cf = fakeCloudflare(world());
-  const r = await run(["set", "--env", "dev", "--mode", "false", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 0);
-  assert.equal(patches(cf).length, 0);
-  assert.match(r.out, /変更なし/);
-});
-
-test("書き込み後の検査: サーバーがバインディングを落としたら失敗（終了コード 1）", async () => {
-  const cf = fakeCloudflare(world(), { ignoreInherit: true });
-  const r = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 1);
-  assert.match(r.err, /書き込み後の検査に失敗/);
-  assert.match(r.err, /SECRET_A/);
-});
-
-test("API エラー: 一部の Worker が失敗しても続けて、終了コード 1。トークンは出力に出ない", async () => {
-  const cf = fakeCloudflare(world(), { failPatchFor: ["w-pk-dev"] });
-  const r = await run(["set", "--env", "dev", "--mode", "true", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 1);
-  assert.match(r.err, /w-pk-dev.*HTTP 500.*boom/);
-  assert.equal(cf.workers["w-pf-dev"].find((x) => x.name === "MAINTENANCE_MODE").text, "true");
-  assert.ok(!r.all.includes(TOKEN));
-});
-
-test("トークンが API のエラー文に含まれても、出力では伏せる", async () => {
-  const fetchImpl = async () => new Response(JSON.stringify({ success: false, errors: [{ code: 9109, message: `Invalid token ${TOKEN}` }] }), { status: 403 });
-  const r = await run(["status"], { fetchImpl });
-  assert.equal(r.code, 1);
-  assert.ok(!r.all.includes(TOKEN));
-  assert.match(r.all, /HTTP 403/);
-  assert.match(r.all, /\*\*\*/);
-});
-
-test("取得に失敗した Worker があるときは、--apply でも何も書き込まない", async () => {
-  const w = world();
-  delete w["w-pf-dev"];
-  const cf = fakeCloudflare(w);
-  const r = await run(["set", "--env", "dev", "--mode", "true", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 1);
-  assert.equal(patches(cf).length, 0);
-  assert.match(r.err, /Worker がありません/);
-});
-
-test("MAINTENANCE_MODE が secret のときは変更しない", async () => {
-  const w = world();
-  w["w-pk-dev"] = w["w-pk-dev"].map((b) => (b.name === "MAINTENANCE_MODE" ? { type: "secret_text", name: "MAINTENANCE_MODE" } : b));
-  const cf = fakeCloudflare(w);
-  const r = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 1);
-  assert.equal(patches(cf).length, 0);
-  assert.match(r.err, /secret_text/);
-});
-
-test("status: 表に MAINTENANCE_MODE と MAINTENANCE_MESSAGE を出す。旧変数が残っていれば備考に出す", async () => {
-  const w = world();
-  w["w-pk"] = [...w["w-pk"], { type: "plain_text", name: "MAINTENANCE", text: "true" }];
-  w["w-pf"] = w["w-pf"].map((b) => (b.name === "MAINTENANCE_MESSAGE" ? { ...b, text: "改行\nあり" } : b));
-  const cf = fakeCloudflare(w);
-  const r = await run(["status"], cf);
-  assert.equal(r.code, 0);
-  assert.equal(patches(cf).length, 0);
-  assert.match(r.out, /w-pk\s+"false"\s+"旧い文面"\s+旧 MAINTENANCE が残っています/);
-  assert.match(r.out, /"改行 あり"/);
-  assert.equal(r.out.split("\n").length, 5);
-});
-
-test("rename: 旧 MAINTENANCE の値を MAINTENANCE_MODE に写して旧変数を消す。ほかは残す", async () => {
-  const w = world();
-  for (const k of Object.keys(w)) w[k] = w[k].filter((b) => b.name !== "MAINTENANCE_MODE").concat([{ type: "plain_text", name: "MAINTENANCE", text: "notice" }]);
-  const cf = fakeCloudflare(w);
-  const dry = await run(["rename", "--env", "dev"], cf);
-  assert.equal(dry.code, 0);
-  assert.equal(patches(cf).length, 0);
-  assert.match(dry.out, /MAINTENANCE_MODE: \(未設定\) -> "notice"/);
-  assert.match(dry.out, /MAINTENANCE: "notice" -> \(削除\)/);
-
-  const r = await run(["rename", "--env", "dev", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 0, r.all);
-  for (const k of ["w-pk-dev", "w-pf-dev"]) {
-    const b = cf.workers[k];
-    assert.equal(b.find((x) => x.name === "MAINTENANCE_MODE").text, "notice");
-    assert.equal(b.find((x) => x.name === "MAINTENANCE"), undefined);
-    assert.ok(b.find((x) => x.name === "SECRET_A") && b.find((x) => x.name === "ROSTER") && b.find((x) => x.name === "ASSETS"));
-    assert.equal(b.find((x) => x.name === "MAINTENANCE_MESSAGE").text, "旧い文面");
-  }
-  assert.ok(cf.workers["w-pk"].find((x) => x.name === "MAINTENANCE")); // production は触らない
-  // 2 回目は変更なし（冪等）
-  const again = await run(["rename", "--env", "dev", "--apply", ...backupArgs()], cf);
-  assert.equal(again.code, 0);
-  assert.equal(patches(cf).length, 2);
-});
-
-test("rename: 新旧の値が違うときは --overwrite が無いと止める", async () => {
-  const w = world();
-  w["w-pk-dev"] = w["w-pk-dev"].concat([{ type: "plain_text", name: "MAINTENANCE", text: "true" }]);
-  const cf = fakeCloudflare(w);
-  let r = await run(["rename", "--env", "dev", "--site", "pokemon", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 1);
-  assert.equal(patches(cf).length, 0);
-  assert.match(r.err, /--overwrite/);
-  r = await run(["rename", "--env", "dev", "--site", "pokemon", "--overwrite", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 0, r.all);
-  assert.equal(cf.workers["w-pk-dev"].find((x) => x.name === "MAINTENANCE_MODE").text, "true");
-  assert.equal(cf.workers["w-pk-dev"].find((x) => x.name === "MAINTENANCE"), undefined);
-});
-
-test("rename: 旧変数が secret のときは移行しない", async () => {
-  const w = world();
-  w["w-pk-dev"] = w["w-pk-dev"].concat([{ type: "secret_text", name: "MAINTENANCE" }]);
-  const cf = fakeCloudflare(w);
-  const r = await run(["rename", "--env", "dev", "--site", "pokemon", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 1);
-  assert.equal(patches(cf).length, 0);
-});
-
-test("rename: 本番も確認が要る", async () => {
-  const w = world();
-  w["w-pk"] = w["w-pk"].concat([{ type: "plain_text", name: "MAINTENANCE", text: "false" }]);
-  const cf = fakeCloudflare(w);
-  const r = await run(["rename", "--env", "production", "--site", "pokemon", "--apply", ...backupArgs()], cf);
-  assert.equal(r.code, 1);
-  assert.equal(patches(cf).length, 0);
-});
-
-test("変更前のバインディングをバックアップに保存する（トークンは含まない）", async () => {
-  const cf = fakeCloudflare(world());
-  const bk = mkdtempSync(join(dir, "bk-"));
-  const r = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--apply", "--backup-dir", bk], cf);
-  assert.equal(r.code, 0, r.all);
-  const files = readdirSync(bk);
-  assert.equal(files.length, 1);
-  const text = readFileSync(join(bk, files[0]), "utf8");
-  const saved = JSON.parse(text);
-  assert.equal(saved[0].worker, "w-pk-dev");
-  assert.equal(saved[0].bindings.find((b) => b.name === "MAINTENANCE_MODE").text, "false");
-  assert.ok(!text.includes(TOKEN));
-});
-
-test("使い方の誤りは終了コード 2（API は呼ばない）", async () => {
-  const bad = [
-    ["set", "--mode", "true"],
-    ["set", "--env", "dev"],
-    ["set", "--env", "dev", "--mode", "maybe"],
-    ["set", "--env", "staging", "--mode", "true"],
-    ["set", "--env", "dev", "--mode", "true", "--site", "nope"],
-    ["set", "--env", "dev", "--message", "a".repeat(201)],
-    ["set", "--env", "dev", "--message", "a\nb"],
-    ["set", "--env", "dev", "--mode", "true", "--bogus"],
-    ["status", "--mode", "true"],
-    ["rename"],
-    ["frobnicate"],
-    [],
-  ];
-  for (const argv of bad) {
-    const cf = fakeCloudflare(world());
-    const r = await run(argv, cf);
-    assert.equal(r.code, 2, JSON.stringify(argv));
-    assert.equal(cf.calls.length, 0, JSON.stringify(argv));
-  }
-  const cf = fakeCloudflare(world());
-  const r = await main(["status"], { env: {}, fetchImpl: cf.fetchImpl, sitesPath, log() {}, error() {} });
-  assert.equal(r, 2);
-  assert.equal(cf.calls.length, 0);
-});
-
-test("同梱の maintenance-sites.json は読め、4 サイトの本番・dev がそろっている", async () => {
-  const cf = fakeCloudflare({});
-  const out = [];
-  const code = await main(["status"], { env: ENV, fetchImpl: cf.fetchImpl, log: (t) => out.push(t), error() {} });
-  assert.equal(code, 1); // 模擬には Worker が無い → 404
-  const names = cf.calls.map((c) => decodeURIComponent(/scripts\/([^/]+)\//.exec(c.url)[1])).sort();
-  assert.deepEqual(names, [
-    "fara-avatar", "fara-avatar-dev", "fara-portfolio", "fara-portfolio-dev", "fara-pokemon", "fara-pokemon-dev", "fara-twitch-bot", "fara-twitch-bot-dev",
-  ].sort());
-});
-
-test("--message は空にもできる。parseArgs / validateMessage の基本", () => {
-  assert.equal(parseArgs(["set", "--message", ""]).message, "");
-  assert.deepEqual(parseArgs(["set", "--site", "a,b", "--site", "c"]).sites, ["a", "b", "c"]);
-  assert.doesNotThrow(() => validateMessage("あ".repeat(200)));
-  assert.doesNotThrow(() => validateMessage("😀".repeat(200)));
-  assert.throws(() => validateMessage("😀".repeat(201)));
-});
-
-test("verifyAfter: 減った・型が変わった・値が狙いと違うを見つける", () => {
-  const before = baseBindings();
-  const changes = { MAINTENANCE_MODE: "true" };
-  const good = buildBindings(before, changes).map((b) => (b.type === "inherit" ? before.find((x) => x.name === b.name) : b));
-  assert.deepEqual(verifyAfter(before, good, changes), []);
-  assert.equal(verifyAfter(before, good.filter((b) => b.name !== "ROSTER"), changes).length, 1);
-  assert.equal(verifyAfter(before, good.map((b) => (b.name === "SECRET_A" ? { type: "plain_text", name: "SECRET_A", text: "" } : b)), changes).length, 1);
-  assert.equal(verifyAfter(before, before, changes).length, 1);
+test("docs/maintenance-cli.md の雛形は、CLI が渡す入力名と合い、新しい変数名 MAINTENANCE_MODE だけを --var で渡す", () => {
+  const md = readFileSync(join(root, "docs", "maintenance-cli.md"), "utf8");
+  const yaml = [...md.matchAll(/```yaml\n([\s\S]*?)```/g)].map((m) => m[1]).join("\n");
+  assert.ok(yaml.includes(`${INPUT_MODE}:`) && yaml.includes(`${INPUT_MESSAGE}:`), "入力名");
+  assert.ok(yaml.includes("${{ inputs.maintenance_mode }}") && yaml.includes("${{ inputs.maintenance_message }}"));
+  assert.match(yaml, /--var "MAINTENANCE_MODE:\$MAINTENANCE_MODE_INPUT"/);
+  assert.match(yaml, /--var "MAINTENANCE_MESSAGE:\$MAINTENANCE_MESSAGE_INPUT"/);
+  assert.doesNotMatch(yaml, /--var "?MAINTENANCE:/, "旧名は渡さない");
+  assert.doesNotMatch(yaml, /\$\{\{\s*inputs\.maintenance_(mode|message)\s*\}\}[^\n]*\n\s*(run|npx)/, "入力をシェルに直接埋め込まない");
+  assert.match(yaml, /if \[ -n "\$MAINTENANCE_MESSAGE_INPUT" \]/, "空なら --var を付けない");
+  assert.doesNotMatch(md, /全部の置き換え|inherit|rename/);
 });

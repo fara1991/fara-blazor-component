@@ -25,6 +25,3 @@ Desktop.ini
 
 ## Logs
 *.log
-
-## 一括変更 CLI の変更前のバックアップ（tools/maintenance.mjs）
-maintenance-backup/
