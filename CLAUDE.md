@@ -41,7 +41,8 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 - `csp/`: `_headers` のテンプレートと生成関数（`render-headers.mjs`）。Cloudflare の上限を検査する（`_headers` はルール 100 個まで・1 行 2000 文字まで、`_redirects` は静的 2000 件まで・1 行 1000 文字まで）
 - `tests/build/`・`tests/csp/`・`tests/fixtures/pokemon/`: 上の 2 つの Node テスト。pokemon の出力と同じになることを確かめる（fixtures は pokemon のファイルのコピー）
 - `docs/`: 利用方法（`usage.md`）と変更履歴（`changelog.md`）、一括変更 CLI の使い方（`maintenance-cli.md`）
-- `tools/maintenance.mjs`: サイトの Worker の `MAINTENANCE_MODE` / `MAINTENANCE_MESSAGE` をまとめて扱う CLI。`status` は Cloudflare API の GET だけ（Read 権限）。`set` は Cloudflare API に書き込まず、各サイトの deploy ワークフローを `gh workflow run` で手動実行して（入力 `maintenance_mode` / `maintenance_message`）`wrangler deploy --var` で反映する。dev を先に流し、失敗で中断。対象は `tools/maintenance-sites.json`（repo・workflow・ref・Worker 名）。ワークフローの雛形は `docs/maintenance-cli.md`（テストが雛形の入力名を検査）。実 gh・実 API のテストはしない（`tests/tools/`、差し替え）。Worker の変数名は `MAINTENANCE_MODE`（0.3.0 で変更。旧名は読まない）
+- メンテナンス表示の切り替えは、第一の手段が各サイトの Actions「Run workflow」画面（入力 `maintenance_mode` / `maintenance_message`。Cloudflare のトークン・環境変数は不要。実行後にジョブサマリーへ値を出す）。雛形は `docs/maintenance-cli.md`
+- `tools/maintenance.mjs`（補助）: サイトの Worker の `MAINTENANCE_MODE` / `MAINTENANCE_MESSAGE` をまとめて扱う CLI。`status` は Cloudflare API の GET だけ（Read 権限）。`set` は Cloudflare API に書き込まず、各サイトの deploy ワークフローを `gh workflow run` で手動実行して（入力 `maintenance_mode` / `maintenance_message`）`wrangler deploy --var` で反映する。dev を先に流し、失敗で中断。対象は `tools/maintenance-sites.json`（repo・workflow・ref・Worker 名）。ワークフローの雛形は `docs/maintenance-cli.md`（テストが雛形の入力名を検査）。実 gh・実 API のテストはしない（`tests/tools/`、差し替え）。Worker の変数名は `MAINTENANCE_MODE`（0.3.0 で変更。旧名は読まない）
 - `src/FaraSiteKit.Core/`: C#（`SiteLinks`・`MaintenanceInfo`・`ReportForm`）。UI と通信に依存しない純粋なコードだけを置く（Razor・MudBlazor は K0-4 で別のプロジェクトに）
 - `tests/FaraSiteKit.Core.Tests/`: C# のテスト（xUnit）。`global.json` の SDK（10.0.x）で実行する
 - `.github/workflows/ci.yml`: `npm test`（Node 22）と `dotnet test` を、ubuntu と windows の matrix で並列に実行

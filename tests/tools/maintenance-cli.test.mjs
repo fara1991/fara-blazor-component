@@ -434,3 +434,22 @@ test("雛形: ゲートは mode に true / notice / false のどれかが指定�
   assert.ok(md.includes(`if: \${{ !contains(fromJSON('["true","notice","false"]'), inputs.maintenance_mode) }}`));
   assert.doesNotMatch(md, /inputs\.maintenance_mode == ''/);
 });
+
+test("雛形: 実行後のサマリーに、設定した値と反映後の現在値が出る。トークンは出ない。文面の ` は無害化される", () => {
+  const sh = templateRun(mdText(), "Summary (maintenance)");
+  const dir2 = mkdtempSync(join(tmpdir(), "mcli-sum-"));
+  const summary = join(dir2, "summary.md");
+  writeFileSync(summary, "");
+  const stub = `globalThis.fetch = async (url, init) => { if (!String(url).includes("/accounts/acc1/workers/scripts/w-x/settings") || init.headers.Authorization !== "Bearer ${TOKEN}") throw new Error("bad request"); return { json: async () => ({ result: { bindings: [{ type: "plain_text", name: "MAINTENANCE_MODE", text: "notice" }, { type: "plain_text", name: "MAINTENANCE_MESSAGE", text: "20:00 \`更新\`" }, { type: "secret_text", name: "SECRET_A" }] } }) }; };`;
+  const nodeFn = `node() { "$NODE_BIN" -e "$STUB"$'\n'"$2"; }\n`;
+  const exec = (env) => execFileSync(BASH, ["-c", nodeFn + sh], { env: { PATH: process.env.PATH, NODE_BIN: process.execPath, STUB: stub, WORKER_NAME: "w-x", CLOUDFLARE_ACCOUNT_ID: "acc1", CLOUDFLARE_API_TOKEN: TOKEN, GITHUB_STEP_SUMMARY: summary, MAINTENANCE_MODE_INPUT: "", MAINTENANCE_MESSAGE_INPUT: "", ...env }, encoding: "utf8" });
+  exec({ MAINTENANCE_MODE_INPUT: "notice", MAINTENANCE_MESSAGE_INPUT: "20:00 `更新`" });
+  const text = readFileSync(summary, "utf8");
+  assert.match(text, /### メンテナンス表示 \(w-x\)/);
+  assert.match(text, /設定した値: MAINTENANCE_MODE=`notice` \/ MAINTENANCE_MESSAGE=`20:00 \"更新\"`/);
+  assert.match(text, /反映後の現在値: MAINTENANCE_MODE=`"notice"` \/ MAINTENANCE_MESSAGE=`"20:00 \u0027更新\u0027"`/);
+  assert.ok(!text.includes(TOKEN) && !text.includes("SECRET_A"), "シークレットは出さない");
+  writeFileSync(summary, "");
+  exec({});
+  assert.match(readFileSync(summary, "utf8"), /設定した値: MAINTENANCE_MODE=`\(変更なし\)` \/ MAINTENANCE_MESSAGE=`\(変更なし\)`/);
+});

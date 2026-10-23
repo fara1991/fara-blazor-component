@@ -1,40 +1,63 @@
-# メンテナンス一括変更 CLI（`tools/maintenance.mjs`）
+# メンテナンス表示の切り替え（Actions の画面 / 一括変更 CLI）
 
-複数サイトの Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTENANCE_MESSAGE`（文面）を、まとめて見る・切り替える。Node 22 以上、依存なし（`fetch` と GitHub CLI の `gh` だけ）。
+Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTENANCE_MESSAGE`（文面）を切り替える方法は 2 つ。**第一の手段は、GitHub Actions の「Run workflow」画面で入力して実行する方法**（スマホの GitHub アプリからも可）。Cloudflare のトークンも、手元の環境変数も要らない。4 サイトをまとめて切り替えたいときだけ、手元の CLI（`tools/maintenance.mjs`）を使う（補助）。
+
+| 方法 | 使う場面 | 必要なもの |
+| --- | --- | --- |
+| 1. Actions の画面で実行する | 1 サイトずつ。いつでも・どこからでも | GitHub のアカウントだけ(ブラウザかスマホアプリ) |
+| 2. CLI の `set` | 4 サイトをまとめて(dev を先に流し、成功したら本番) | `gh auth login` 済みの `gh`。環境変数は不要 |
+| 2. CLI の `status` | 4 サイトの現在値を 1 つの表で見る(任意) | Cloudflare の読み取りトークン(Workers Scripts の Read)。無くてもよい(結果は Actions のジョブサマリーにも出る) |
+
+どちらの方法でも、実際の反映は各サイトの deploy ワークフロー(`wrangler deploy --var ...`)が行う。両方とも同じ入力 `maintenance_mode` / `maintenance_message` を使う。**公開されるのは、実行するブランチ(dev = `develop`、本番 = `master`)の最新のコード**である点に注意する。
+
+## 1. Actions の画面で実行する(第一の手段)
+
+1. サイトのリポジトリ → **Actions** → 対象のワークフロー(pokemon・portfolio は dev が「Deploy (develop)」、本番が「Deploy」。avatar・bot は 1 つのワークフローで、ブランチで dev / 本番が決まる)を開く。スマホの GitHub アプリでも、リポジトリ → Actions → ワークフロー → 「Run workflow」で同じ入力欄が出る
+2. **Run workflow** を押し、**Use workflow from** でブランチを選ぶ(dev = `develop`、本番 = `master`)
+3. 入力欄に入れる:
+   - `maintenance_mode`: `true` = 全体メンテナンス(全ページがメンテナンス画面・503)、`notice` = お知らせ帯、`false` = 通常、空 = 変更しない
+   - `maintenance_message`: お知らせ・メンテナンス画面に出す文(200 文字まで・改行なし)。空 = 変更しない
+4. 実行する。終わったら、その実行のページ下部の**ジョブサマリー**に、設定した値と反映後の現在値(`MAINTENANCE_MODE` と `MAINTENANCE_MESSAGE`)が出る
+
+本番を `notice` や `false` にしたいだけのとき、`maintenance_mode` を空にして `maintenance_message` だけを入れると、モードは変えずに文面だけを変える(本番を勝手にメンテナンス画面にはしない)。まず dev で試してから、本番で実行する。
+
+## 2. CLI でまとめて実行する(補助)
+
+`tools/maintenance.mjs`。Node 22 以上、依存なし(`fetch` と GitHub CLI の `gh` だけ)。
 
 | サブコマンド | やること | 使うもの |
 | --- | --- | --- |
-| `status` | 全 Worker の現在値を表にする（**読み取りだけ**） | Cloudflare API の `GET`。トークンは Workers Scripts の **Read** 権限で足りる |
-| `set` | 各サイトの deploy ワークフローを手動実行（`workflow_dispatch`）して、値を反映する | `gh`（ログイン済み）。**Cloudflare の API には書き込まない・トークンも使わない** |
+| `status` | 全 Worker の現在値を表にする(**読み取りだけ**) | Cloudflare API の `GET`。トークンは Workers Scripts の **Read** 権限で足りる(任意) |
+| `set` | 各サイトの deploy ワークフローを手動実行(`workflow_dispatch`)して、値を反映する(上の 1 を、複数サイトに対してまとめて行う) | `gh`(ログイン済み)。**環境変数は不要。Cloudflare の API には書き込まない・トークンも使わない** |
 
-- 終了コード: `0` = 成功（ドライランを含む）、`1` = 失敗・中断・確認の不一致、`2` = 使い方の誤り
+- 終了コード: `0` = 成功(ドライランを含む)、`1` = 失敗・中断・確認の不一致、`2` = 使い方の誤り
 
-## なぜ Cloudflare API で書き込まないのか
+### なぜ Cloudflare API で書き込まないのか
 
 Worker の設定を API で書き換える方式は採らない。シークレットの値は API から読み出せないため、設定を書き換えて壊したときに復元できないからである。代わりに、サイトの公開と同じ経路（ワークフローの `wrangler deploy --var ...`）で変数を渡す。`wrangler deploy` は、`wrangler.jsonc` の `keep_vars = true` の設定により、ダッシュボードで足した変数とシークレットを保持する。`--var` で渡した変数だけが、その公開で上書きされる。
 
-## 準備
+### 準備
 
-### `set` に必要なもの
+#### `set` に必要なもの
 
 - `gh auth login` 済みであること（各サイトのリポジトリのワークフローを実行できる権限）
 - 各サイトの deploy ワークフローに、下の「ワークフローの雛形」の入力と `--var` の渡し方が入っていること
 
-### `status` に必要なもの（API トークン）
+#### `status` に必要なもの(任意。API トークン)
 
 Cloudflare ダッシュボード → 右上のプロフィール → **My Profile → API Tokens → Create Token → Create Custom Token**。
 
 - 権限: **Account → Workers Scripts → Read** の 1 つだけ（書き込み権限は要らない）
 - Account Resources: 対象のアカウントだけ
 - 有効期限（TTL）は任意。短くしておくと安全。公開（デプロイ）用のトークンを使い回さない
-- 環境変数で渡す（コマンドの引数やログに出さない。この CLI も出力に出さない）:
+- `status` を使うときだけ、環境変数で渡す(コマンドの引数やログに出さない。この CLI も出力に出さない):
 
 ```bash
 export CLOUDFLARE_API_TOKEN=...    # 上で作ったトークン
 export CLOUDFLARE_ACCOUNT_ID=...   # ダッシュボードの Workers & Pages の右側
 ```
 
-### 対象のサイト（`tools/maintenance-sites.json`）
+#### 対象のサイト(`tools/maintenance-sites.json`)
 
 サイトごとに、GitHub のリポジトリ（`repo`）、環境（`dev` / `production`）ごとの deploy ワークフローのファイル名と ref（`workflows`）、`status` で読む Worker 名（`workers`。各サイトの `wrangler.jsonc` / `wrangler.toml` の `name` と同じ）を書く。同梱の例:
 
@@ -47,7 +70,7 @@ export CLOUDFLARE_ACCOUNT_ID=...   # ダッシュボードの Workers & Pages �
 
 別の一覧を使うときは `--sites-file <パス>`。Worker を足すときは JSON にサイトを足す（dev だけのサイトも可。例: avatar の WASM 移行用の確認用 Worker は、Cloudflare 側の作成後に足す）。
 
-## `status` — 現在値の一覧
+### `status` — 現在値の一覧
 
 ```bash
 node tools/maintenance.mjs status                      # 全サイトの dev・production
@@ -58,7 +81,7 @@ node tools/maintenance.mjs status --env dev --site pokemon
 
 終了コード: 全 Worker の値を取得できたら `0`。1 件でも取得できなかった（Worker が見つからない = 名前かアカウントの誤り、権限や通信の失敗）ら `1`。取得できた行は表に出る。
 
-## `set` — 値を切り替える
+### `set` — 値を切り替える
 
 ```bash
 node tools/maintenance.mjs set --env dev|production|all [--site <名前>...] [--mode true|notice|false] [--message "文面"] [--apply] [--confirm "production サイト名,..."]
@@ -110,12 +133,12 @@ on:
   workflow_dispatch:
     inputs:
       maintenance_mode:
-        description: "メンテナンス表示を切り替える（true = メンテナンス画面、notice = お知らせ、false = 通常。空なら変えない）"
+        description: "メンテナンス表示の切り替え。true = 全体メンテナンス（全ページがメンテナンス画面・503）、notice = お知らせ帯、false = 通常。空 = 変更しない"
         type: choice
         options: ["", "true", "notice", "false"]
         default: ""
       maintenance_message:
-        description: "お知らせ・メンテナンス画面の文（200 文字まで。空なら変えない）"
+        description: "お知らせ・メンテナンス画面に出す文（200 文字まで・改行なし）。空 = 変更しない"
         type: string
         default: ""
 ```
@@ -185,9 +208,44 @@ on:
 
 **`choice` の空文字の選択肢（`options: [""...]`）は、GitHub が受け付けるか未検証**。最初に dev のワークフローで、Actions の「Run workflow」の画面と `gh workflow run` の両方で確かめる。使えないときは、`type: string`（既定 `""`）にして、ワークフローの先頭のステップで `true` / `notice` / `false` / 空のどれかであることを検査する（`case "$MAINTENANCE_MODE_INPUT" in true|notice|false|"") ;; *) echo "::error::maintenance_mode が不正です"; exit 1;; esac`）。CLI が渡す値は変わらない。
 
-### 3. 適用の手順（サイトごと）
+### 3. 実行後のサマリー(公開のステップの後に足す)
 
-1. 上の入力と公開のステップを、サイトの deploy ワークフロー（pokemon: `deploy.yml` と `deploy-develop.yml`、avatar: `deploy.yml`、bot: `site.yml`、portfolio: `deploy.yml` と `deploy-develop.yml`）に入れる。avatar と bot は 1 つのワークフローが dev と production の両方を担うので、ステップの `--env` の式（`github.ref_name == 'master' && 'production' || 'dev'`）はそのまま使い、`--var` の部分だけ置き換える
+`status` を使わなくても結果が分かるように、公開の後に、設定した値と反映後の現在値をジョブサマリー(`$GITHUB_STEP_SUMMARY`)に出す。文面はサマリーに出してよい。シークレットは出さない(トークンは Authorization ヘッダにだけ使い、出力しない)。`WORKER_NAME` は各サイトの Worker 名(dev は `...-dev`)にする。公開が失敗したときも出す(`always()`)。
+
+```yaml
+      - name: Summary (maintenance)
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          msg="$(printf '%s' "$MAINTENANCE_MESSAGE_INPUT" | tr '`' '"')"
+          {
+            echo "### メンテナンス表示 (${WORKER_NAME})"
+            echo "- 設定した値: MAINTENANCE_MODE=\`${MAINTENANCE_MODE_INPUT:-(変更なし)}\` / MAINTENANCE_MESSAGE=\`${msg:-(変更なし)}\`"
+            node -e '
+              const j = (v) => JSON.stringify(v);
+              fetch(`https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${process.env.WORKER_NAME}/settings`, { headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}` } })
+                .then((r) => r.json())
+                .then((b) => {
+                  const list = b?.result?.bindings ?? [];
+                  const v = (n) => { const x = list.find((y) => y.name === n); return x ? (x.type === "plain_text" ? j(x.text).replaceAll("`", "\u0027") : `(${x.type})`) : "(未設定)"; };
+                  console.log(`- 反映後の現在値: MAINTENANCE_MODE=\`${v("MAINTENANCE_MODE")}\` / MAINTENANCE_MESSAGE=\`${v("MAINTENANCE_MESSAGE")}\``);
+                })
+                .catch(() => console.log("- 反映後の現在値: 取得できませんでした"));
+            '
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          MAINTENANCE_MODE_INPUT: ${{ inputs.maintenance_mode }}
+          MAINTENANCE_MESSAGE_INPUT: ${{ inputs.maintenance_message }}
+          WORKER_NAME: fara-portfolio
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+反映後の現在値が `(secret_text)` や `(未設定)` になるときは、`--var` の変数が API の GET で値として見えない可能性がある(下の適用手順 6)。
+
+### 4. 適用の手順（サイトごと）
+
+1. 上の入力・公開のステップ・実行後のサマリーのステップを、サイトの deploy ワークフロー（pokemon: `deploy.yml` と `deploy-develop.yml`、avatar: `deploy.yml`、bot: `site.yml`、portfolio: `deploy.yml` と `deploy-develop.yml`）に入れる。avatar と bot は 1 つのワークフローが dev と production の両方を担うので、ステップの `--env` の式（`github.ref_name == 'master' && 'production' || 'dev'`）はそのまま使い、`--var` の部分だけ置き換える
 2. `require-maintenance.mjs` が読む変数名を `MAINTENANCE_MODE` にする（`b.name === "MAINTENANCE_MODE"`）。メッセージ・テストも合わせる
 3. ワークフローを参照しているテスト（`--var MAINTENANCE:true` の文字列を探すもの）を、新しい式に合わせる
 4. **ゲートが Worker の不在（404）をどう扱うか**を確かめる（`require-maintenance.mjs` の `run`）。まだ本番の Worker が無いサイト（例: pokemon）では、ゲートが止めるのか通すのかで、初回の手順が変わる。止めるなら、初回は `set --mode true` でゲートを飛ばして作る（下の「本番の初回」）
