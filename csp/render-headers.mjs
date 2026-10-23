@@ -1,0 +1,130 @@
+// Cloudflare の _headers（CSP・確認用の noindex・キャッシュ）を書き出す。サイトに依存しない（ホストはサイトが渡す）。
+//   import { renderHeaders } from "../csp/render-headers.mjs";
+//   renderHeaders({ scriptSrc: ["https://challenges.cloudflare.com"], connectSrc: [], noindex: false })
+// 方針（docs/usage.md・CLAUDE.md）: script-src に 'unsafe-inline' と 'unsafe-eval' は使わない。
+// style-src の 'unsafe-inline' は MudBlazor のため固定で入る。wasm-unsafe-eval は固定で入る。
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const TEMPLATE_PATH = join(dirname(fileURLToPath(import.meta.url)), "_headers.template");
+
+/** Cloudflare の _headers の上限: ルール（パスの行）は 100 個まで、1 行は 2000 文字まで。 */
+export const MAX_HEADER_RULES = 100;
+export const MAX_HEADER_LINE = 2000;
+
+/** 外部ホストの欄（許可する値の形）。script・style・font・img・frame は https のみ、connect は wss も可。 */
+const HOST_KEYS = ["scriptSrc", "styleSrc", "fontSrc", "imgSrc", "connectSrc", "frameSrc"];
+const HASH_KEYS = new Set(["scriptSrc", "styleSrc"]);
+const HTTPS_HOST = /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*$/;
+const CONNECT_HOST = /^(https|wss):\/\/[a-z0-9-]+(\.[a-z0-9-]+)*$/;
+/** sha256 のハッシュ（base64 で 44 文字、末尾は =）。sha384 と sha512 は受けない。 */
+const SHA256_HASH = /^'sha256-[A-Za-z0-9+/]{43}='$/;
+const PLACEHOLDER_LINE = /^\{\{[A-Z_]+\}\}$/;
+const OPTION_KEYS = new Set([...HOST_KEYS, "noindex", "cacheRules"]);
+
+const template = readFileSync(TEMPLATE_PATH, "utf8").replace(/\n+$/, "");
+
+/** 外部ホストの一覧を検査して、重複を除いて返す。 */
+function checkHosts(name, list = []) {
+    if (!Array.isArray(list)) throw new Error(`${name} は配列にしてください`);
+    const out = [];
+    for (const token of list) {
+        if (typeof token !== "string" || token === "") throw new Error(`${name}: 空の値は使えません`);
+        if (token === "'unsafe-inline'" || token === "'unsafe-eval'") {
+            throw new Error(`${name}: ${token} は使いません（インラインの script は外部ファイルにする）`);
+        }
+        const ok = (HASH_KEYS.has(name) && SHA256_HASH.test(token))
+            || (name === "connectSrc" ? CONNECT_HOST.test(token) : HTTPS_HOST.test(token));
+        if (!ok) throw new Error(`${name}: 不正な値 "${token}"（https://ホスト名 の形。* や https: だけ、; や空白は使えません。ハッシュは sha256 の 44 文字）`);
+        if (!out.includes(token)) out.push(token);
+    }
+    return out;
+}
+
+/** 1 つの欄を、CSP の値（先頭に空白）にする。 */
+function suffix(list) {
+    return list.map((token) => ` ${token}`).join("");
+}
+
+/** キャッシュ規則（path と Cache-Control の値）を _headers の行にする。 */
+function renderCacheRules(rules = []) {
+    if (!Array.isArray(rules)) throw new Error("cacheRules は配列にしてください");
+    return rules.map((rule) => {
+        if (typeof rule?.path !== "string" || !rule.path.startsWith("/") || /\s/.test(rule.path)) {
+            throw new Error(`cacheRules: 不正な path "${rule?.path}"`);
+        }
+        if (typeof rule.value !== "string" || rule.value === "" || /[\r\n]/.test(rule.value)) {
+            throw new Error(`cacheRules: ${rule.path} の Cache-Control の値が不正です`);
+        }
+        return `${rule.path}\n  Cache-Control: ${rule.value}`;
+    }).join("\n");
+}
+
+/** _headers の上限（ルールの数と 1 行の長さ）を超えたらエラー。ルールは、字下げ・# コメント・空行ではない行（パスの行）。 */
+function checkHeaderLimits(lines) {
+    const rules = lines.filter((line) => line !== "" && !/^\s/.test(line) && !line.startsWith("#")).length;
+    if (rules > MAX_HEADER_RULES) throw new Error(`_headers のルールは ${MAX_HEADER_RULES} 個までです（${rules} 個）`);
+    const long = lines.find((line) => line.length > MAX_HEADER_LINE);
+    if (long !== undefined) throw new Error(`_headers の 1 行は ${MAX_HEADER_LINE} 文字までです（${long.length} 文字）: ${long.slice(0, 40)}…`);
+}
+
+/**
+ * 外部サービスの既定の欄（展開して renderHeaders に渡す。例: renderHeaders({ ...presets.turnstile, ...presets.googleFonts })）。
+ * 追加する前に、サービスの公式の要件を確かめる。ホストは https の固定の値だけ（ワイルドカードは無い）。
+ *   turnstile: 報告フォームの Cloudflare Turnstile（script・frame・確認の通信）
+ *   googleFonts: Google Fonts（CSS と フォントファイル）
+ * Blazor WebAssembly の 'wasm-unsafe-eval' と MudBlazor の style の 'unsafe-inline' は、renderHeaders が常に入れる。
+ * 報告の API（/api/report）は同じオリジンなら 'self' で足りる（別のホストに置く場合は connectSrc に足す）。
+ */
+export const presets = Object.freeze({
+    turnstile: Object.freeze({
+        scriptSrc: Object.freeze(["https://challenges.cloudflare.com"]),
+        frameSrc: Object.freeze(["https://challenges.cloudflare.com"]),
+        connectSrc: Object.freeze(["https://challenges.cloudflare.com"]),
+    }),
+    googleFonts: Object.freeze({
+        styleSrc: Object.freeze(["https://fonts.googleapis.com"]),
+        fontSrc: Object.freeze(["https://fonts.gstatic.com"]),
+    }),
+});
+
+/**
+ * _headers の本文を作る（末尾の改行つき）。
+ * @param {object} options scriptSrc・styleSrc・fontSrc・imgSrc・connectSrc・frameSrc（ホストの配列）、
+ *   noindex（true で X-Robots-Tag: noindex を全ページに付ける。確認用に使う）、cacheRules（[{ path, value }]）
+ */
+export function renderHeaders(options = {}) {
+    for (const key of Object.keys(options)) {
+        if (!OPTION_KEYS.has(key)) throw new Error(`renderHeaders: 知らない項目 "${key}"`);
+    }
+    const hosts = Object.fromEntries(HOST_KEYS.map((key) => [key, checkHosts(key, options[key])]));
+    const values = {
+        scriptSrc: suffix(hosts.scriptSrc),
+        styleSrc: suffix(hosts.styleSrc),
+        fontSrc: suffix(hosts.fontSrc),
+        imgSrc: suffix(hosts.imgSrc),
+        connectSrc: suffix(hosts.connectSrc),
+        frameSrc: hosts.frameSrc.length > 0 ? `; frame-src${suffix(hosts.frameSrc)}` : "",
+        X_ROBOTS_TAG: options.noindex === true ? "  X-Robots-Tag: noindex" : "",
+        CACHE_RULES: renderCacheRules(options.cacheRules),
+    };
+    const lines = [];
+    for (const line of template.split("\n")) {
+        const placeholder = PLACEHOLDER_LINE.exec(line.trim());
+        if (placeholder) {
+            const value = values[placeholder[0].slice(2, -2)];
+            if (value === undefined) throw new Error(`テンプレートの ${placeholder[0]} が未知です`);
+            if (value !== "") lines.push(value);
+            continue;
+        }
+        lines.push(line.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+            if (!(key in values)) throw new Error(`テンプレートの ${match} が未知です`);
+            return values[key];
+        }));
+    }
+    const text = `${lines.join("\n")}\n`;
+    if (text.includes("{{")) throw new Error("_headers に未置換のプレースホルダが残っています");
+    checkHeaderLimits(text.split("\n"));
+    return text;
+}

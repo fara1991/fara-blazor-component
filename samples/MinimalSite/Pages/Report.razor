@@ -1,0 +1,10 @@
+@page "/report"
+@using Microsoft.AspNetCore.Components.Web
+@using FaraSiteKit.Razor.Components
+
+<ReportFormView From="@From" UnavailableNote="お急ぎの場合は、サイトの作者の SNS からお願いします。" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "from")]
+    public string? From { get; set; }
+}

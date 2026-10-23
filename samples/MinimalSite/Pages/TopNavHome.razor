@@ -1,0 +1,10 @@
+@page "/top"
+@layout TopNavLayout
+<PageTitle>上部ナビの例 | Minimal Site</PageTitle>
+
+<h1>上部ナビだけの構成</h1>
+<p>サイドバーを使わず、上部ナビだけで組んだ例です（PC は横に並び、スマホはハンバーガーのメニューに畳みます）。</p>
+@for (var i = 1; i <= 25; i++)
+{
+    <p class="sample-line">本文の段落 @i。上部ナビの構成でも、本文だけがスクロールし、フッターは画面の下に残ります。</p>
+}
