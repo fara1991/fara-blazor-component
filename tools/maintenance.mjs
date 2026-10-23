@@ -33,6 +33,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 export class UsageError extends Error {}
 
+/** 環境。dev = develop 用、production = 本番(master)、wasm-dev = avatar の WASM 移行用の確認用(migration/wasm)。--env all は dev と production だけ(wasm-dev は明示したときだけ)。 */
+export const ENVS = ["dev", "production", "wasm-dev"];
+
 // ---- 引数 ----
 
 const FLAGS_WITH_VALUE = new Set(["--env", "--site", "--mode", "--message", "--confirm", "--sites-file"]);
@@ -75,19 +78,19 @@ export function loadSites(path) {
   for (const s of data.sites) {
     if (!s?.name || typeof s.workers !== "object" || s.workers === null) throw new UsageError(`${path}: name と workers が必要です`);
     for (const [env, w] of Object.entries(s.workers)) {
-      if (!["production", "dev"].includes(env) || typeof w !== "string" || !w) throw new UsageError(`${path}: ${s.name} の workers が不正です（production / dev の Worker 名）`);
+      if (!ENVS.includes(env) || typeof w !== "string" || !w) throw new UsageError(`${path}: ${s.name} の workers が不正です（production / dev の Worker 名）`);
     }
     for (const [env, wf] of Object.entries(s.workflows ?? {})) {
-      if (!["production", "dev"].includes(env) || !SAFE.test(wf?.file ?? "") || !SAFE.test(wf?.ref ?? "")) throw new UsageError(`${path}: ${s.name} の workflows.${env} が不正です（file と ref）`);
+      if (!ENVS.includes(env) || !SAFE.test(wf?.file ?? "") || !SAFE.test(wf?.ref ?? "")) throw new UsageError(`${path}: ${s.name} の workflows.${env} が不正です（file と ref）`);
     }
     if (s.workflows && !/^[\w.-]+\/[\w.-]+$/.test(s.repo ?? "")) throw new UsageError(`${path}: ${s.name} の repo は owner/name の形で書いてください`);
   }
   return data.sites;
 }
 
-/** @returns {{site: string, env: "production"|"dev", worker: string, repo?: string, workflow?: {file: string, ref: string}}[]} */
+/** @returns {{site: string, env: "production"|"dev"|"wasm-dev", worker: string, repo?: string, workflow?: {file: string, ref: string}}[]} */
 export function selectTargets(sites, { env, sites: names }, { needWorkflow = false } = {}) {
-  if (!["dev", "production", "all"].includes(env)) throw new UsageError("--env は dev・production・all のどれかです");
+  if (![...ENVS, "all"].includes(env)) throw new UsageError("--env は dev・production・wasm-dev・all のどれかです");
   const known = new Set(sites.map((s) => s.name));
   for (const n of names) if (!known.has(n)) throw new UsageError(`不明なサイトです: ${n}（${[...known].join("・")}）`);
   const envs = env === "all" ? ["dev", "production"] : [env];
@@ -97,7 +100,8 @@ export function selectTargets(sites, { env, sites: names }, { needWorkflow = fal
     for (const e of envs) {
       if (needWorkflow) {
         if (!s.workflows?.[e]) {
-          if (env !== "all") throw new UsageError(`${s.name} の ${e} のワークフローが maintenance-sites.json にありません`);
+          // サイトを名指ししたのに無いときは誤り。名指ししていない(全サイト)ときは、そのサイトを飛ばす(例: wasm-dev は avatar だけ)
+          if (env !== "all" && names.includes(s.name)) throw new UsageError(`${s.name} の ${e} のワークフローが maintenance-sites.json にありません`);
           continue;
         }
         targets.push({ site: s.name, env: e, worker: s.workers[e], repo: s.repo, workflow: s.workflows[e] });
@@ -237,17 +241,25 @@ async function ghText(gh, args, what) {
  */
 async function dispatch(t, opts, { gh, sleep, now }) {
   const user = await ghText(gh, ["api", "user", "--jq", ".login"], "gh のログインユーザー");
-  const tip = await ghText(gh, ["api", `repos/${t.repo}/commits/${t.workflow.ref}`, "--jq", ".sha"], `${t.workflow.ref} の先頭のコミット`);
+  // ブランチの先頭のコミット(Contents の Read 権限が要る)。取得できなければ、この照合だけ飛ばす(ほかの条件では絞る)
+  const tipRes = await gh(["api", `repos/${t.repo}/commits/${t.workflow.ref}`, "--jq", ".sha"]);
+  const tip = tipRes.code === 0 ? tipRes.stdout.trim() : "";
   const before = new Set((await listRuns(gh, t, user)).map((r) => r.databaseId));
   const startedAt = now();
   const r = await gh(dispatchArgs(t, opts));
-  if (r.code !== 0) throw new Error(`gh workflow run が失敗しました: ${r.stderr.trim() || `終了コード ${r.code}`}（ワークフローに入力 ${INPUT_MODE} / ${INPUT_MESSAGE} が定義され、ref にそのワークフローがあるか確かめる）`);
+  if (r.code !== 0) {
+    const noInput = /unexpected inputs|workflow_dispatch|could not find any workflow|not found/i.test(r.stderr);
+    const hint = noInput
+      ? `${t.repo} の ${t.workflow.ref} のワークフロー(${t.workflow.file})に、入力 ${INPUT_MODE} / ${INPUT_MESSAGE} を受け取る版がまだ入っていない可能性があります(新しい入力つきのワークフローが、その ref にマージされているか確かめる。未対応のサイトは --site で除く)`
+      : `ワークフローに入力 ${INPUT_MODE} / ${INPUT_MESSAGE} が定義され、ref にそのワークフローがあるか確かめる`;
+    throw new Error(`[${t.site}/${t.env}] gh workflow run が失敗しました: ${r.stderr.trim() || `終了コード ${r.code}`}(${hint})`);
+  }
   const since = startedAt - 5 * 60 * 1000; // 時計のずれの余裕
   for (let i = 0; i < 10; i++) {
     const found = (await listRuns(gh, t, user)).filter((x) => !before.has(x.databaseId) && x.headBranch === t.workflow.ref && Date.parse(x.createdAt) >= since);
     if (found.length > 1) throw new Error(`起動したはずの実行が ${found.length} 件見つかりました（${found.map((x) => x.url).join(" ")}）。取り違えを避けるため中断します。GitHub の Actions で確認してください`);
     if (found.length === 1) {
-      if (found[0].headSha !== tip) throw new Error(`起動した実行のコミット（${String(found[0].headSha).slice(0, 7)}）が ${t.workflow.ref} の先頭（${tip.slice(0, 7)}）と違います: ${found[0].url}`);
+      if (tip && found[0].headSha !== tip) throw new Error(`起動した実行のコミット（${String(found[0].headSha).slice(0, 7)}）が ${t.workflow.ref} の先頭（${tip.slice(0, 7)}）と違います: ${found[0].url}`);
       return { id: String(found[0].databaseId), url: found[0].url };
     }
     await sleep(3000);
@@ -262,7 +274,7 @@ async function watch(t, run, { gh }) {
 
 async function runSet(targets, io, opts, { gh, sleep, now, prompt }) {
   const label = (t) => `[${t.site}/${t.env}] ${t.repo} ${t.workflow.file} (${t.workflow.ref})`;
-  const dev = targets.filter((t) => t.env === "dev");
+  const dev = targets.filter((t) => t.env !== "production"); // dev と wasm-dev(確認用)は本番より先
   const prod = targets.filter((t) => t.env === "production");
   // 本番へ文面だけを渡す操作は許さない（ワークフローの公開が、意図しない表示の切り替えにならないよう、mode を明示させる）
   if (prod.length > 0 && opts.mode === undefined) throw new UsageError("production を含むときは --mode が必要です（--message だけの変更は dev だけで使えます）");

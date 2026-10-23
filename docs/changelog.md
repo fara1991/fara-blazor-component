@@ -2,6 +2,13 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 0.3.1
+
+追加のみ(破壊的変更なし)。
+
+- kit の Actions「Set maintenance (all sites)」(`.github/workflows/set-maintenance-all.yml`、`workflow_dispatch` のみ)を追加。入力 `target_branch`(develop = 各サイトの dev / master = 各サイトの本番 / migration/wasm = avatar の確認用)・`maintenance_mode`・`maintenance_message`・`sites` で、4 サイトの deploy ワークフローをまとめて起動する(`tools/maintenance-all.mjs` → `tools/maintenance.mjs set`)。本番の job には Environment `production-maintenance`(必須レビュワー)の承認を付け、シークレット `SITES_DISPATCH_TOKEN`(4 リポジトリ限定の fine-grained PAT)は gh を動かす step にだけ渡す。登録手順と注意点は `docs/maintenance-cli.md` の 3。
+- CLI: 環境 `wasm-dev`(avatar の `fara-avatar-wasm-dev`、`migration/wasm`。`--env all` には含めず明示したときだけ)。全サイト対象のとき、その環境のワークフローが無いサイトは飛ばす(名指ししたときは誤り)。入力を受け取らない版のワークフローに dispatch して失敗したときは、サイト名と対処(`--site` で除く)を出す。コミットを読む権限が無いときは、起動 run の `headSha` 照合だけ飛ばす。
+
 ## 0.3.0
 
 **破壊的変更**: Worker の変数名 `MAINTENANCE` を **`MAINTENANCE_MODE`** に変更した。値（`true` / `notice` / `false`）と挙動（true = 全体 503 のメンテナンス画面、notice = お知らせ帯、false = 通常）は同じ。`MAINTENANCE_MESSAGE` は変えない。**旧名 `MAINTENANCE` は読まない**（フォールバックなし）。旧名だけが設定されている Worker は、通常動作になる（メンテナンス画面もお知らせも出ない）。
