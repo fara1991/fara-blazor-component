@@ -13,7 +13,7 @@ Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTEN
 
 ## 1. Actions の画面で実行する(第一の手段)
 
-1. サイトのリポジトリ → **Actions** → 対象のワークフロー(pokemon・portfolio は dev が「Deploy (develop)」、本番が「Deploy」。avatar・bot は 1 つのワークフローで、ブランチで dev / 本番が決まる)を開く。スマホの GitHub アプリでも、リポジトリ → Actions → ワークフロー → 「Run workflow」で同じ入力欄が出る
+1. サイトのリポジトリ → **Actions** → 対象のワークフロー(pokemon・portfolio は dev が「Deploy (develop)」、本番が「Deploy (production)」。avatar・bot は 1 つのワークフロー「Deploy」で、ブランチで dev / 本番が決まる)を開く。スマホの GitHub アプリでも、リポジトリ → Actions → ワークフロー → 「Run workflow」で同じ入力欄が出る
 2. **Run workflow** を押し、**Use workflow from** でブランチを選ぶ(dev = `develop`、本番 = `master`)
 3. 入力欄に入れる:
    - `maintenance_mode`: `true` = 全体メンテナンス(全ページがメンテナンス画面・503)、`notice` = お知らせ帯、`false` = 通常、空 = 変更しない
