@@ -65,17 +65,19 @@ node tools/maintenance.mjs set --env dev|production|all [--site <名前>...] [--
 ```
 
 - `--env` は必須（うっかり全部を変えないため）。`--site` は繰り返し・カンマ区切りで複数指定できる。省略すると全サイト
-- `--mode` か `--message` の少なくとも一方が必要。`--message` は 200 文字まで・改行なし・空は不可。指定しなかった方は、その公開では渡さない（`wrangler deploy` が現在の値を保持する）。文面を出したくないときは、`--mode false` に戻す（`false` では文面は出ない）
+- `--mode` か `--message` の少なくとも一方が必要。**production を含むときは `--mode` が必須**（`--message` だけの変更は dev だけ。本番の公開が意図しない表示の切り替えにならないようにするため）。`--message` は 200 文字まで・改行なし・空は不可。指定しなかった方は、その公開では渡さない（`wrangler deploy` が現在の値を保持する）。文面を出したくないときは、`--mode false` に戻す（`false` では文面は出ない）
 - **既定はドライラン**: 実行する `gh workflow run ...` のコマンドを順に表示するだけ。`--apply` を付けたときだけ実行する
 
 実行の順序:
 
 1. dev のワークフローを、すべて起動する（`gh workflow run <file> --repo <repo> --ref <ref> -f maintenance_mode=... -f maintenance_message=...`）
 2. それぞれの実行の URL を表示し、`gh run watch --exit-status` で結果を待って表示する
-3. dev がすべて成功したら、production を 1 サイトずつ、起動 → 待つ → 表示
+3. dev がすべて成功したら、production を 1 サイトずつ、起動 → 待つ → 表示（**production は、master の最新のコードが `wrangler deploy` で公開される**。実行前の確認文言にも出る）
 4. **どれかが失敗したら、そこで中断**する（それ以降は実行しない。終了コード 1）
 
-production を含む `--apply` は、`--confirm` に **`production <サイト名をカンマ区切り・アルファベット順>`**（例: `production pokemon,portfolio`）の再入力が必要。ターミナルで対話できるときは、`--confirm` を省くと入力を求められる。一致しなければ、何も実行しない。ドライランでは求めない。
+起動した run は、起動前の一覧との差に加えて、`gh` のログインユーザーが起動した `workflow_dispatch` であること・対象のブランチであること・作成時刻・`headSha` がブランチの先頭のコミットと一致することで特定する。条件に合う新しい run が 2 つ以上見つかったら、取り違えを避けるために中断する。
+
+production を含む `--apply` は、`--confirm`（実行すると master の最新が公開される）に **`production <サイト名をカンマ区切り・アルファベット順>`**（例: `production pokemon,portfolio`）の再入力が必要。ターミナルで対話できるときは、`--confirm` を省くと入力を求められる。一致しなければ、何も実行しない。ドライランでは求めない。
 
 例:
 
@@ -141,13 +143,19 @@ on:
 
 `push` で動いたとき（`inputs` が空）は `--var` が付かないので、従来どおり現在の値が保持される。
 
-**production**（`master`）: 従来の「公開の前に `MAINTENANCE_MODE` が `notice` かを確かめ、公開と同時に `true` にする」運用を残しつつ、`set` で値を指定したときはそちらを使う。
+**production**（`master`）: 従来の「公開の前に `MAINTENANCE_MODE` が `notice` かを確かめ、公開と同時に `true` にする」運用を残しつつ、`set` で mode を指定したときはそちらを使う。分岐は次のとおり（テストが、この `run` を実際に bash で動かして固定している）:
+
+| きっかけ | `--var MAINTENANCE_MODE` | `--var MAINTENANCE_MESSAGE` |
+| --- | --- | --- |
+| push（master）、または mode も message も空の手動実行 | `true`（公開と同時にメンテナンス画面）。`skip_maintenance_check` が true なら付けない | 付けない |
+| mode を指定した手動実行（`set`） | 指定した値 | message があれば付ける |
+| mode が空で message だけの手動実行 | 付けない（現在の値を保持） | 付ける |
 
 ```yaml
       # push（master）と、値を指定しない手動実行は、従来どおり: 公開の前に notice を確かめる（skip_maintenance_check で飛ばせる）
-      # 値を指定した手動実行（maintenance-cli の set）は、操作した人の意思なので、確認を飛ばす
+      # mode に true / notice / false のどれかを指定した手動実行（maintenance-cli の set）は、操作した人の意思なので、確認を飛ばす
       - name: Require MAINTENANCE_MODE=notice
-        if: ${{ inputs.maintenance_mode == '' }}
+        if: ${{ !contains(fromJSON('["true","notice","false"]'), inputs.maintenance_mode) }}
         run: node .github/scripts/require-maintenance.mjs fara-portfolio
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -160,8 +168,8 @@ on:
           vars=()
           if [ -n "$MAINTENANCE_MODE_INPUT" ]; then
             vars+=(--var "MAINTENANCE_MODE:$MAINTENANCE_MODE_INPUT")
-          elif [ "$SKIP_MAINTENANCE_CHECK" != "true" ]; then
-            vars+=(--var "MAINTENANCE_MODE:true")   # 従来どおり、公開と同時にメンテナンス画面にする
+          elif [ -z "$MAINTENANCE_MESSAGE_INPUT" ] && [ "$SKIP_MAINTENANCE_CHECK" != "true" ]; then
+            vars+=(--var "MAINTENANCE_MODE:true")   # push と、何も指定しない手動実行だけ: 従来どおり、公開と同時にメンテナンス画面にする
           fi
           if [ -n "$MAINTENANCE_MESSAGE_INPUT" ]; then vars+=(--var "MAINTENANCE_MESSAGE:$MAINTENANCE_MESSAGE_INPUT"); fi
           npx wrangler deploy --env="" "${vars[@]}"
@@ -173,13 +181,31 @@ on:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
 ```
 
+`skip_maintenance_check` だけでは、`MAINTENANCE_MODE` は作られない（`--var` を付けないため）。まだ変数が無い Worker に作るには、`set --mode ...` を使う。
+
+**`choice` の空文字の選択肢（`options: [""...]`）は、GitHub が受け付けるか未検証**。最初に dev のワークフローで、Actions の「Run workflow」の画面と `gh workflow run` の両方で確かめる。使えないときは、`type: string`（既定 `""`）にして、ワークフローの先頭のステップで `true` / `notice` / `false` / 空のどれかであることを検査する（`case "$MAINTENANCE_MODE_INPUT" in true|notice|false|"") ;; *) echo "::error::maintenance_mode が不正です"; exit 1;; esac`）。CLI が渡す値は変わらない。
+
 ### 3. 適用の手順（サイトごと）
 
 1. 上の入力と公開のステップを、サイトの deploy ワークフロー（pokemon: `deploy.yml` と `deploy-develop.yml`、avatar: `deploy.yml`、bot: `site.yml`、portfolio: `deploy.yml` と `deploy-develop.yml`）に入れる。avatar と bot は 1 つのワークフローが dev と production の両方を担うので、ステップの `--env` の式（`github.ref_name == 'master' && 'production' || 'dev'`）はそのまま使い、`--var` の部分だけ置き換える
 2. `require-maintenance.mjs` が読む変数名を `MAINTENANCE_MODE` にする（`b.name === "MAINTENANCE_MODE"`）。メッセージ・テストも合わせる
 3. ワークフローを参照しているテスト（`--var MAINTENANCE:true` の文字列を探すもの）を、新しい式に合わせる
-4. 文面に `:` を含む場合でも、`wrangler deploy --var NAME:値` が最初の `:` で分けて値を受け取ることを、dev で一度確かめる（`set --env dev --message "20:00 ごろ"` → `status`）
-5. dev で `set` を試して、`status` に反映されることと、シークレット・Durable Object・assets などが消えていないこと（サイトが普通に動くこと）を確かめてから、production に使う
+4. **ゲートが Worker の不在（404）をどう扱うか**を確かめる（`require-maintenance.mjs` の `run`）。まだ本番の Worker が無いサイト（例: pokemon）では、ゲートが止めるのか通すのかで、初回の手順が変わる。止めるなら、初回は `set --mode true` でゲートを飛ばして作る（下の「本番の初回」）
+5. 文面に `:` を含む場合でも、`wrangler deploy --var NAME:値` が最初の `:` で分けて値を受け取ることを、dev で一度確かめる（`set --env dev --mode notice --message "20:00 ごろ"` → `status`）
+6. **dev で実測する（`set` → `status`）**: `--var` で渡した変数が、`status`（`GET .../settings`）で `"notice"` のように値が見えること、`require-maintenance.mjs`（同じ GET で読む）が読めることを確かめる。`--var` の変数が値の見えない形（`(secret_text)` や未設定）で返る場合は、次のどちらかにする
+   - ゲートの読み取りを GET 以外にする（例: Worker の `/api/maintenance` を読む）。`status` の値の確認も同様に `/api/maintenance` で行う
+   - 変数をダッシュボードで設定する運用に戻す（`set` は使わず、`wrangler deploy` は `--var` を付けない）
+7. dev で `set` を試して、`status` に反映されることと、シークレット・Durable Object・assets などが消えていないこと（サイトが普通に動くこと）を確かめてから、production に使う
+
+### 本番の初回（Worker がまだ無いサイト）
+
+本番の Worker が未作成のサイト（例: pokemon）は、初回の公開で `MAINTENANCE_MODE=true` を付けて、メンテナンス画面のまま（非公開のまま）作る:
+
+```bash
+node tools/maintenance.mjs set --env production --site pokemon --mode true --apply --confirm "production pokemon"
+```
+
+mode を指定した手動実行はゲートを飛ばし、`--var MAINTENANCE_MODE:true` を付けて公開する。`skip_maintenance_check` だけでは `--var` が付かず、変数は作られない。公開の用意ができたら `set --env production --site pokemon --mode false --apply` で通常に戻す。**production の `set` は、そのとき master にあるコードをすべて公開する**ので、公開してよい状態になってから行う。
 
 ## 旧 `MAINTENANCE` 変数
 

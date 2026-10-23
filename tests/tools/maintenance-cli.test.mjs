@@ -2,6 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,7 +28,7 @@ writeFileSync(sitesPath, JSON.stringify({
  * gh の模擬。run list（起動済みの run）・workflow run（run を増やす）・run watch（成功/失敗）を再現し、呼び出しを記録する。
  * failWatch: その repo の run watch を失敗させる。failDispatch: その repo の workflow run を失敗させる。noRun: 起動しても run が一覧に出ない。
  */
-function fakeGh({ failWatch = [], failDispatch = [], noRun = [] } = {}) {
+function fakeGh({ failWatch = [], failDispatch = [], noRun = [], extraRun = [], wrongSha = [] } = {}) {
   const calls = [];
   const runs = new Map(); // repo -> [{databaseId, url}]
   let next = 100;
@@ -34,12 +36,21 @@ function fakeGh({ failWatch = [], failDispatch = [], noRun = [] } = {}) {
   const gh = async (args) => {
     calls.push(args);
     const repo = repoOf(args);
-    if (args[0] === "run" && args[1] === "list") return { code: 0, stdout: JSON.stringify(runs.get(repo) ?? []), stderr: "" };
+    if (args[0] === "api" && args[1] === "user") return { code: 0, stdout: "fara1991\n", stderr: "" };
+    if (args[0] === "api" && args[1].startsWith("repos/")) return { code: 0, stdout: `${TIP}\n`, stderr: "" };
+    if (args[0] === "run" && args[1] === "list") {
+      assert.equal(args[args.indexOf("--user") + 1], "fara1991", "自分が起動した run だけに絞る");
+      assert.equal(args[args.indexOf("--event") + 1], "workflow_dispatch");
+      return { code: 0, stdout: JSON.stringify(runs.get(repo) ?? []), stderr: "" };
+    }
     if (args[0] === "workflow" && args[1] === "run") {
       if (failDispatch.includes(repo)) return { code: 1, stdout: "", stderr: "HTTP 422: Workflow does not have 'workflow_dispatch' trigger" };
       if (!noRun.includes(repo)) {
-        const id = next++;
-        runs.set(repo, [{ databaseId: id, url: `https://github.com/${repo}/actions/runs/${id}` }, ...(runs.get(repo) ?? [])]);
+        const mk = () => {
+          const id = next++;
+          return { databaseId: id, url: `https://github.com/${repo}/actions/runs/${id}`, createdAt: new Date().toISOString(), headBranch: args[args.indexOf("--ref") + 1], headSha: wrongSha.includes(repo) ? "b".repeat(40) : TIP };
+        };
+        runs.set(repo, [mk(), ...(extraRun.includes(repo) ? [mk()] : []), ...(runs.get(repo) ?? [])]);
       }
       return { code: 0, stdout: "", stderr: "" };
     }
@@ -49,6 +60,7 @@ function fakeGh({ failWatch = [], failDispatch = [], noRun = [] } = {}) {
   return { gh, calls, dispatches: () => calls.filter((a) => a[0] === "workflow"), watches: () => calls.filter((a) => a[1] === "watch") };
 }
 
+const TIP = "a".repeat(40);
 const noFetch = async () => { throw new Error("set では Cloudflare の API を呼ばない"); };
 const noGh = async () => { throw new Error("status では gh を呼ばない"); };
 
@@ -132,6 +144,43 @@ test("gh workflow run の失敗（入力が未定義など）は中断。理由�
   assert.match(r.err, /gh workflow run が失敗しました.*workflow_dispatch/);
   assert.match(r.err, /maintenance_mode/);
   assert.equal(g.dispatches().length, 1, "失敗したら後続を起動しない");
+});
+
+test("起動した run が 2 つ以上見つかったら、取り違えを避けて中断する。コミットが先頭と違う run も中断する", async () => {
+  const many = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--apply"], { gh: fakeGh({ extraRun: ["o/pk"] }).gh });
+  assert.equal(many.code, 1);
+  assert.match(many.err, /2 件見つかりました.*取り違え/);
+  const g = fakeGh({ wrongSha: ["o/pk"] });
+  const sha = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--apply"], { gh: g.gh });
+  assert.equal(sha.code, 1);
+  assert.match(sha.err, /先頭/);
+  assert.equal(g.watches().length, 0, "待たない");
+});
+
+test("古い run（起動の 5 分より前に作られたもの）は、新しい run と見なさない", async () => {
+  const g = fakeGh();
+  const now = Date.now() + 60 * 60 * 1000; // 時計が 1 時間進んでいるとして、gh 側の createdAt は古い
+  const r = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--apply"], { gh: g.gh, now: () => now });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /見つかりませんでした/);
+});
+
+test("production を含む set は --mode が必須（--message だけは dev だけ）。ドライランでも同じ", async () => {
+  const g = fakeGh();
+  for (const argv of [["set", "--env", "production", "--site", "pokemon", "--message", "x"], ["set", "--env", "all", "--site", "pokemon", "--message", "x", "--apply", "--confirm", "production pokemon"]]) {
+    const r = await run(argv, { gh: g.gh });
+    assert.equal(r.code, 2, JSON.stringify(argv));
+    assert.match(r.err, /--mode が必要/);
+  }
+  assert.equal(g.calls.length, 0);
+  assert.equal((await run(["set", "--env", "dev", "--site", "pokemon", "--message", "x", "--apply"], { gh: g.gh })).code, 0);
+});
+
+test("本番の実行前の確認文言と表示に、master の最新が公開されることを出す", async () => {
+  let asked = "";
+  await run(["set", "--env", "production", "--site", "pokemon", "--mode", "false", "--apply"], { gh: fakeGh().gh, prompt: async (q) => { asked = q; return "production pokemon"; } });
+  assert.match(asked, /master の最新が wrangler deploy で公開/);
+  assert.match((await run(["set", "--env", "production", "--site", "pokemon", "--mode", "false"])).out, /master の最新のコードが wrangler deploy で公開/);
 });
 
 test("起動した run が一覧に出ないときは、待ち直したうえで失敗にする", async () => {
@@ -327,4 +376,61 @@ test("docs/maintenance-cli.md の雛形は、CLI が渡す入力名と合い、�
   assert.doesNotMatch(yaml, /\$\{\{\s*inputs\.maintenance_(mode|message)\s*\}\}[^\n]*\n\s*(run|npx)/, "入力をシェルに直接埋め込まない");
   assert.match(yaml, /if \[ -n "\$MAINTENANCE_MESSAGE_INPUT" \]/, "空なら --var を付けない");
   assert.doesNotMatch(md, /全部の置き換え|inherit|rename/);
+});
+
+// ---- 雛形の分岐（docs の YAML の run を、bash で実際に動かして固定する） ----
+
+/** docs の ```yaml ブロックから、名前が stepName のステップの run（| ブロック）を取り出す。 */
+function templateRun(md, stepName) {
+  const lines = [...md.matchAll(/```yaml\n([\s\S]*?)```/g)].flatMap((m) => m[1].split("\n"));
+  const at = lines.findIndex((l) => l.trim() === `- name: ${stepName}`);
+  assert.ok(at >= 0, `${stepName} のステップが見つからない`);
+  const runAt = lines.findIndex((l, i) => i > at && l.trim() === "run: |");
+  assert.ok(runAt > at, "run が見つからない");
+  const body = [];
+  for (let i = runAt + 1; i < lines.length && (lines[i].trim() === "" || /^ {10}/.test(lines[i])); i++) body.push(lines[i].slice(10));
+  return body.join("\n");
+}
+
+/** npx を、引数を 1 行ずつ出す関数に差し替えて bash で動かす。 */
+function runTemplate(script, env) {
+  const full = `npx() { printf '%s\n' "$@"; }
+${script}`;
+  const out = execFileSync(BASH, ["-c", full], { env: { PATH: process.env.PATH, MAINTENANCE_MODE_INPUT: "", MAINTENANCE_MESSAGE_INPUT: "", SKIP_MAINTENANCE_CHECK: "", ...env }, encoding: "utf8" });
+  return out.split("\n").filter(Boolean);
+}
+
+// Windows では PATH 上の bash が WSL のこともあるので、Git for Windows の bash を優先する
+const GIT_BASH = "C:/Program Files/Git/bin/bash.exe";
+const BASH = process.platform === "win32" && existsSync(GIT_BASH) ? GIT_BASH : "bash";
+const mdText = () => readFileSync(join(root, "docs", "maintenance-cli.md"), "utf8");
+
+test("雛形(production): push と何も指定しない手動実行だけ MAINTENANCE_MODE:true。message だけでは true にしない", () => {
+  const sh = templateRun(mdText(), "Deploy to Cloudflare Workers");
+  // wrangler deploy --env="" の引数
+  const head = ["wrangler", "deploy", "--env="];
+  assert.deepEqual(runTemplate(sh, {}), [...head, "--var", "MAINTENANCE_MODE:true"], "push / 何も指定しない手動実行");
+  assert.deepEqual(runTemplate(sh, { SKIP_MAINTENANCE_CHECK: "true" }), head, "skip_maintenance_check では変数を付けない");
+  assert.deepEqual(runTemplate(sh, { MAINTENANCE_MODE_INPUT: "notice" }), [...head, "--var", "MAINTENANCE_MODE:notice"]);
+  assert.deepEqual(runTemplate(sh, { MAINTENANCE_MODE_INPUT: "false", MAINTENANCE_MESSAGE_INPUT: "20:00 ごろ: 更新" }), [...head, "--var", "MAINTENANCE_MODE:false", "--var", "MAINTENANCE_MESSAGE:20:00 ごろ: 更新"]);
+  assert.deepEqual(runTemplate(sh, { MAINTENANCE_MODE_INPUT: "true", SKIP_MAINTENANCE_CHECK: "true" }), [...head, "--var", "MAINTENANCE_MODE:true"], "mode を指定したら skip は関係ない");
+  // message だけ: MAINTENANCE_MODE は渡さない（現在の値を保持）。本番を 503 にしない
+  const only = runTemplate(sh, { MAINTENANCE_MESSAGE_INPUT: "文面だけ" });
+  assert.deepEqual(only, [...head, "--var", "MAINTENANCE_MESSAGE:文面だけ"]);
+  assert.ok(!only.some((a) => a.startsWith("MAINTENANCE_MODE")));
+  // 記号を含む文面もそのまま 1 つの引数
+  assert.deepEqual(runTemplate(sh, { MAINTENANCE_MODE_INPUT: "notice", MAINTENANCE_MESSAGE_INPUT: `$(echo x) "q" ; 'a'` }).at(-1), `MAINTENANCE_MESSAGE:$(echo x) "q" ; 'a'`);
+});
+
+test("雛形(dev): 入力が空なら --var を付けない。指定したものだけ付ける", () => {
+  const sh = templateRun(mdText(), "Deploy to Cloudflare Workers (develop)");
+  assert.deepEqual(runTemplate(sh, {}), ["wrangler", "deploy", "--env", "develop"]);
+  assert.deepEqual(runTemplate(sh, { MAINTENANCE_MESSAGE_INPUT: "m" }), ["wrangler", "deploy", "--env", "develop", "--var", "MAINTENANCE_MESSAGE:m"]);
+  assert.deepEqual(runTemplate(sh, { MAINTENANCE_MODE_INPUT: "notice", MAINTENANCE_MESSAGE_INPUT: "m" }), ["wrangler", "deploy", "--env", "develop", "--var", "MAINTENANCE_MODE:notice", "--var", "MAINTENANCE_MESSAGE:m"]);
+});
+
+test("雛形: ゲートは mode に true / notice / false のどれかが指定されたときだけ飛ばす（明示的な条件）", () => {
+  const md = mdText();
+  assert.ok(md.includes(`if: \${{ !contains(fromJSON('["true","notice","false"]'), inputs.maintenance_mode) }}`));
+  assert.doesNotMatch(md, /inputs\.maintenance_mode == ''/);
 });

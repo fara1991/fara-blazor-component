@@ -11,7 +11,7 @@
 //         Cloudflare のトークンは使わない（gh のログインだけ）。
 //         既定はドライラン（実行する gh のコマンドを表示するだけ）。--apply で実行。
 //         順序: dev をすべて起動 → それぞれの結果を待って表示 → 全部成功したら production（サイトごとに起動して結果を待つ）。1 つでも失敗したら、そこで中断する。
-//         production を含む --apply は、--confirm に「production サイト名（アルファベット順・カンマ区切り）」の再入力が必須。
+//         production を含む --apply は、--mode が必須で、--confirm に「production サイト名（アルファベット順・カンマ区切り）」の再入力が必須（master の最新が wrangler deploy で公開される）。
 // 終了コード: 0 = 成功（ドライランを含む）、1 = 失敗・中断・確認の不一致、2 = 使い方の誤り。
 
 import { execFile } from "node:child_process";
@@ -211,10 +211,10 @@ export function displayCommand(args) {
   return ["gh", ...args].map((a) => (/^[\w./:=@,-]+$/.test(a) ? a : JSON.stringify(a.replace(/[\u0000-\u001f\u007f]/g, " ")))).join(" ");
 }
 
-const listArgs = (t) => ["run", "list", "--repo", t.repo, "--workflow", t.workflow.file, "--branch", t.workflow.ref, "--event", "workflow_dispatch", "--limit", "10", "--json", "databaseId,url"];
+const listArgs = (t, user) => ["run", "list", "--repo", t.repo, "--workflow", t.workflow.file, "--branch", t.workflow.ref, "--event", "workflow_dispatch", "--user", user, "--limit", "20", "--json", "databaseId,url,createdAt,headBranch,headSha"];
 
-async function listRuns(gh, t) {
-  const r = await gh(listArgs(t));
+async function listRuns(gh, t, user) {
+  const r = await gh(listArgs(t, user));
   if (r.code !== 0) throw new Error(`実行の一覧を取得できませんでした: ${r.stderr.trim() || `gh の終了コード ${r.code}`}`);
   try {
     const v = JSON.parse(r.stdout);
@@ -223,14 +223,33 @@ async function listRuns(gh, t) {
   throw new Error("実行の一覧を読めませんでした（gh の出力が想定外）");
 }
 
-/** ワークフローを起動し、起動した run（{id, url}）を返す。起動前の一覧との差で見つける。 */
-async function dispatch(t, opts, { gh, sleep }) {
-  const before = new Set((await listRuns(gh, t)).map((r) => r.databaseId));
+async function ghText(gh, args, what) {
+  const r = await gh(args);
+  const text = r.stdout.trim();
+  if (r.code !== 0 || !text) throw new Error(`${what}を取得できませんでした: ${r.stderr.trim() || `gh の終了コード ${r.code}`}`);
+  return text;
+}
+
+/**
+ * ワークフローを起動し、起動した run（{id, url}）を返す。
+ * 特定の条件: 起動前の一覧に無い・自分（gh のログインユーザー）が起動した workflow_dispatch・対象のブランチ・起動の少し前以降の作成・ブランチの先頭のコミット。
+ * 条件に合う新しい run が 2 つ以上あるときは、取り違えを避けるために中断する。
+ */
+async function dispatch(t, opts, { gh, sleep, now }) {
+  const user = await ghText(gh, ["api", "user", "--jq", ".login"], "gh のログインユーザー");
+  const tip = await ghText(gh, ["api", `repos/${t.repo}/commits/${t.workflow.ref}`, "--jq", ".sha"], `${t.workflow.ref} の先頭のコミット`);
+  const before = new Set((await listRuns(gh, t, user)).map((r) => r.databaseId));
+  const startedAt = now();
   const r = await gh(dispatchArgs(t, opts));
   if (r.code !== 0) throw new Error(`gh workflow run が失敗しました: ${r.stderr.trim() || `終了コード ${r.code}`}（ワークフローに入力 ${INPUT_MODE} / ${INPUT_MESSAGE} が定義され、ref にそのワークフローがあるか確かめる）`);
+  const since = startedAt - 5 * 60 * 1000; // 時計のずれの余裕
   for (let i = 0; i < 10; i++) {
-    const found = (await listRuns(gh, t)).find((x) => !before.has(x.databaseId));
-    if (found) return { id: String(found.databaseId), url: found.url };
+    const found = (await listRuns(gh, t, user)).filter((x) => !before.has(x.databaseId) && x.headBranch === t.workflow.ref && Date.parse(x.createdAt) >= since);
+    if (found.length > 1) throw new Error(`起動したはずの実行が ${found.length} 件見つかりました（${found.map((x) => x.url).join(" ")}）。取り違えを避けるため中断します。GitHub の Actions で確認してください`);
+    if (found.length === 1) {
+      if (found[0].headSha !== tip) throw new Error(`起動した実行のコミット（${String(found[0].headSha).slice(0, 7)}）が ${t.workflow.ref} の先頭（${tip.slice(0, 7)}）と違います: ${found[0].url}`);
+      return { id: String(found[0].databaseId), url: found[0].url };
+    }
     await sleep(3000);
   }
   throw new Error("起動した実行が見つかりませんでした（GitHub の Actions のページで確認してください）");
@@ -241,15 +260,18 @@ async function watch(t, run, { gh }) {
   if (r.code !== 0) throw new Error(`実行が失敗しました: ${run.url}`);
 }
 
-async function runSet(targets, io, opts, { gh, sleep, prompt }) {
+async function runSet(targets, io, opts, { gh, sleep, now, prompt }) {
   const label = (t) => `[${t.site}/${t.env}] ${t.repo} ${t.workflow.file} (${t.workflow.ref})`;
   const dev = targets.filter((t) => t.env === "dev");
   const prod = targets.filter((t) => t.env === "production");
+  // 本番へ文面だけを渡す操作は許さない（ワークフローの公開が、意図しない表示の切り替えにならないよう、mode を明示させる）
+  if (prod.length > 0 && opts.mode === undefined) throw new UsageError("production を含むときは --mode が必要です（--message だけの変更は dev だけで使えます）");
   const change = [opts.mode !== undefined && `${MODE_VAR}=${opts.mode}`, opts.message !== undefined && `${MESSAGE_VAR}=${printable(opts.message)}`].filter(Boolean).join(" ");
 
   io.log(opts.apply ? `実行します（${change}）:` : `ドライラン（${change}）。次の順に実行します（まだ何も実行していません）:`);
   let n = 1;
   for (const t of [...dev, ...prod]) io.log(`  ${n++}. ${label(t)}\n     ${displayCommand(dispatchArgs(t, opts))}`);
+  if (prod.length > 0) io.log("  （production は、master の最新のコードが wrangler deploy で公開されます）");
   if (dev.length > 0 && prod.length > 0) io.log("  （dev をすべて起動して結果を待ち、全部成功したら production。1 つでも失敗したら中断）");
   if (!opts.apply) {
     io.log("実行するには --apply を付けてください");
@@ -258,12 +280,12 @@ async function runSet(targets, io, opts, { gh, sleep, prompt }) {
 
   if (prod.length > 0) {
     const phrase = `production ${[...new Set(prod.map((t) => t.site))].sort().join(",")}`;
-    const answer = opts.confirm !== undefined ? opts.confirm : await prompt(`本番のワークフロー ${prod.length} 件を実行します。続けるには「${phrase}」と入力してください: `);
+    const answer = opts.confirm !== undefined ? opts.confirm : await prompt(`本番のワークフロー ${prod.length} 件を実行します（master の最新が wrangler deploy で公開されます）。続けるには「${phrase}」と入力してください: `);
     if (answer === null) { io.error(`本番を変更するには、対話の入力か --confirm "${phrase}" が必要です`); return 1; }
     if (answer.trim() !== phrase) { io.error("確認の入力が一致しないため、何も実行せずに終了します"); return 1; }
   }
 
-  const deps = { gh, sleep };
+  const deps = { gh, sleep, now };
   try {
     const started = [];
     for (const t of dev) {
@@ -291,7 +313,7 @@ async function runSet(targets, io, opts, { gh, sleep, prompt }) {
 }
 
 /** 本体。終了コードを返す（process.exit はしない）。 */
-export async function main(argv, { env = process.env, fetchImpl = fetch, log = console.log, error = console.error, prompt = defaultPrompt, gh = defaultGh, sleep = defaultSleep, sitesPath } = {}) {
+export async function main(argv, { env = process.env, fetchImpl = fetch, log = console.log, error = console.error, prompt = defaultPrompt, gh = defaultGh, sleep = defaultSleep, now = Date.now, sitesPath } = {}) {
   const io = makeIo({ env, log, error });
   try {
     const opts = parseArgs(argv);
@@ -306,7 +328,7 @@ export async function main(argv, { env = process.env, fetchImpl = fetch, log = c
       throw new UsageError("--mode / --message / --apply / --confirm は set だけで使えます");
     }
     const sites = loadSites(opts.sitesFile ?? sitesPath ?? join(here, "maintenance-sites.json"));
-    if (opts.command === "set") return await runSet(selectTargets(sites, opts, { needWorkflow: true }), io, opts, { gh, sleep, prompt });
+    if (opts.command === "set") return await runSet(selectTargets(sites, opts, { needWorkflow: true }), io, opts, { gh, sleep, now, prompt });
     const targets = selectTargets(sites, opts);
     const token = env.CLOUDFLARE_API_TOKEN;
     const accountId = env.CLOUDFLARE_ACCOUNT_ID;

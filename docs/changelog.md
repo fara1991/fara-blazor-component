@@ -20,7 +20,10 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 3. deploy ワークフローの `--var MAINTENANCE:...` を `--var MAINTENANCE_MODE:...` に変え、`workflow_dispatch` の入力 `maintenance_mode` / `maintenance_message` を足す（雛形は `docs/maintenance-cli.md`）。ワークフローの文字列を調べるテストも合わせる。
 4. サイトの README・docs・テスト・コメントの `MAINTENANCE`（変数名としての参照）を `MAINTENANCE_MODE` に直す。`MAINTENANCE_MESSAGE` は直さない。
 5. 確認用（dev）: develop に入れて公開されたら、`node tools/maintenance.mjs set --env dev --mode notice --message "..." --apply` で値を設定し、`notice` / `true` / `false` の表示を確認する。
-6. 本番: master への公開は、従来どおり公開前のゲートで `MAINTENANCE_MODE` が `notice` かを確かめ、公開と同時に `--var MAINTENANCE_MODE:true` を渡す。ゲートが新名を読むため、最初の 1 回だけは本番の Worker にまだ `MAINTENANCE_MODE` が無くて止まる。ダッシュボードで本番の `MAINTENANCE_MODE` を `notice`（と `MAINTENANCE_MESSAGE`）で作っておくか、手動実行の `skip_maintenance_check` で公開する。2 回目以降は、`set --env production --mode notice ... --apply` でお知らせを出してから公開できる。
+6. 本番: ゲートが新名 `MAINTENANCE_MODE` を読むので、本番の Worker に `MAINTENANCE_MODE` が無い間は、通常の公開（push）がゲートで止まる。**お知らせ（`notice`）を先に出す運用は、お知らせの時点でも `wrangler deploy` が master の最新のコードを公開する**ので、本番ではお知らせを出さず、**公開と同時に `true`（メンテナンス画面）で非公開のまま作る**ことを第一にする。
+   - Worker が未作成のサイト（pokemon）: 初回は `node tools/maintenance.mjs set --env production --site pokemon --mode true --apply --confirm "production pokemon"`。mode を指定した手動実行はゲートを飛ばし、`--var MAINTENANCE_MODE:true` を付けて公開する。`skip_maintenance_check` だけでは `--var` が付かず変数は作られない。公開してよくなったら `set ... --mode false`。
+   - すでに公開済みのサイト: 通常の公開（push）は従来どおり `--var MAINTENANCE_MODE:true` を付けるが、ゲートが `notice` を要求する。`MAINTENANCE_MODE` が無い間は、初回だけ `set --env production --site <名前> --mode notice --apply`（これは master の最新を公開する点に注意）か、ダッシュボードで `MAINTENANCE_MODE=notice` を作ってから公開する。
+   - ゲートが Worker の不在（404）をどう扱うかは、各サイトの適用時に確認する（`docs/maintenance-cli.md` の適用手順 4）。
 7. 旧変数 `MAINTENANCE` は、不要ならダッシュボードで手動で削除する（CLI は消さない）。
 
 ## 0.2.1
