@@ -2,28 +2,36 @@ name: Set maintenance (all sites)
 
 # 4 サイト(pokemon・avatar・bot・portfolio)のメンテナンス表示を、まとめて切り替える。
 # 各サイトの deploy ワークフローを gh workflow run で起動し(tools/maintenance.mjs の set)、各サイトが wrangler deploy --var で反映する。
-# target_branch=develop なら各サイトの dev(確認用)、master なら各サイトの本番に反映する(そのブランチの最新のコードが公開される)。
+# 反映先は、対象ブランチのチェックボックスで選ぶ(複数可)。サイトは常に 4 つすべて(migration_wasm は avatar のみ)。
+#   develop = 各サイトの dev(確認用)、master = 各サイトの本番(そのブランチの最新のコードが公開される)、migration_wasm = avatar の wasm-dev
+# dev 系(develop → migration_wasm)を先に全部起動し、全部成功したら、本番(master)を 1 サイトずつ起動する。
 #
 # 安全のしくみ(docs/maintenance-cli.md の「kit の Actions から 4 サイトまとめて切り替える」):
 #   - トリガは workflow_dispatch だけ(PR・issue・コメントでは動かない。fork の PR にシークレットは渡らない)。実行できるのは書き込み権限のある人だけ
-#   - PAT(SITES_DISPATCH_TOKEN)は Environment のシークレットに置く。dev の job は develop-maintenance(Deployment branches = develop。レビュワーは任意)、本番の job は production-maintenance(Deployment branches = master。必須レビュワー)。
-#     repository secret にしないのは、workflow_dispatch が「実行時に選んだ ref」のワークフローを使うため(書き込み権限者が別ブランチで抜けられる)
-#   - 実行 ref(kit のどのブランチのワークフローを使うか)と target_branch(サイト側のどのブランチに反映するか)の組み合わせを検査する:
-#       実行 ref = master  → target_branch は develop / master / migration/wasm のどれでもよい
-#       実行 ref = develop → target_branch は develop / migration/wasm だけ(master は拒否)
-#       それ以外の ref     → 拒否。本番(master)の job は、Environment の Deployment branches(master のみ)でも、master 以外の ref からは起動できない
+#   - 実行元(Use workflow from)は master だけ。validate が ref を検査する。PAT(SITES_DISPATCH_TOKEN)は Environment のシークレットで、
+#     dev の job は develop-maintenance、本番の job は production-maintenance(必須レビュワー)。どちらも Deployment branches は master のみにする
+#     (repository secret にしないのは、workflow_dispatch が「実行時に選んだ ref」のワークフローを使うため。書き込み権限者が別ブランチで抜けられる)
 #   - 入力は環境変数で受け、tools/maintenance-all.mjs が検査する(シェルには埋め込まない)
 #   - SITES_DISPATCH_TOKEN(4 リポジトリに限定した fine-grained PAT)は、各 job の最後の step(gh を動かす step)にだけ渡す
+#   - 事前確認(計画): 対象ブランチのワークフローが入力 maintenance_mode を受け取れる版かを見て、受け取れないサイトは警告つきで飛ばす。
+#     dev job の計画で、本番を含む選んだ全対象の飛ばすサイトが、本番の承認画面より前にジョブサマリーに出る
 on:
   workflow_dispatch:
     inputs:
-      target_branch:
-        description: "反映先。develop = 各サイトの dev(確認用)、master = 各サイトの本番、migration/wasm = avatar の WASM 移行用の確認用"
-        type: choice
-        options: ["develop", "master", "migration/wasm"]
-        default: "develop"
+      develop:
+        description: "各サイトの dev(develop ブランチ)に反映する"
+        type: boolean
+        default: true
+      master:
+        description: "各サイトの本番(master ブランチ)に反映する。maintenance_mode が必須。承認が要る。master の最新のコードが公開される"
+        type: boolean
+        default: false
+      migration_wasm:
+        description: "avatar の wasm-dev(migration/wasm ブランチ)に反映する"
+        type: boolean
+        default: false
       maintenance_mode:
-        description: "メンテナンス表示の切り替え。true = 全体メンテナンス（全ページがメンテナンス画面・503）、notice = お知らせ帯、false = 通常。空 = 変更しない（master では必須）"
+        description: "メンテナンス表示の切り替え。true = 全体メンテナンス（全ページがメンテナンス画面・503）、notice = お知らせ帯、false = 通常。空 = 変更しない（master を選ぶときは必須）"
         type: choice
         options: ["", "true", "notice", "false"]
         default: ""
@@ -31,10 +39,6 @@ on:
         description: "お知らせ・メンテナンス画面に出す文（200 文字まで・改行なし）。空 = 変更しない"
         type: string
         default: ""
-      sites:
-        description: "対象のサイト。all = 4 サイトすべて、または pokemon,avatar,bot,portfolio のカンマ区切り(未対応のサイトを除くときに使う)"
-        type: string
-        default: "all"
 
 permissions:
   contents: read
@@ -44,11 +48,11 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      # 実行 ref が master でも develop でもなければ止める(組み合わせの検査は、次の Validate inputs が行う)
-      - name: Require master or develop
-        if: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/develop' }}
+      # 実行元は master だけ(組み合わせの検査は、次の Validate inputs も行う)
+      - name: Require master
+        if: ${{ github.ref != 'refs/heads/master' }}
         run: |
-          echo "::error::このワークフローは master か develop から実行してください(Use workflow from)"
+          echo "::error::このワークフローは master から実行してください(Use workflow from: master)"
           exit 1
       # actions/checkout・setup-node は GitHub 公式。このリポジトリでは他のワークフローでも同じ版を使っており、タグ指定のままにしている
       - uses: actions/checkout@v4
@@ -59,15 +63,16 @@ jobs:
         run: node tools/maintenance-all.mjs --validate-only
         env:
           RUN_REF: ${{ github.ref }}
-          TARGET_BRANCH: ${{ inputs.target_branch }}
+          TARGET_DEVELOP: ${{ inputs.develop }}
+          TARGET_MASTER: ${{ inputs.master }}
+          TARGET_MIGRATION_WASM: ${{ inputs.migration_wasm }}
           MAINTENANCE_MODE_INPUT: ${{ inputs.maintenance_mode }}
           MAINTENANCE_MESSAGE_INPUT: ${{ inputs.maintenance_message }}
-          SITES_INPUT: ${{ inputs.sites }}
 
-  # develop(各サイトの dev)と migration/wasm(avatar の確認用)。Environment develop-maintenance(Deployment branches = develop。実行 ref が develop でも動く)
+  # 計画(選んだ全対象の事前確認)と、dev 系(develop → migration_wasm)の実行。Environment develop-maintenance(Deployment branches = master)。
+  # master だけを選んだときも、計画のためにこの job は動く(本番の承認の前に、飛ばすサイトを見せる)
   dev:
     needs: validate
-    if: ${{ inputs.target_branch != 'master' }}
     runs-on: ubuntu-latest
     environment: develop-maintenance
     # 同時に動かすのは 1 つ(実行中のものは cancel しない)。待てるのは 1 件だけで、さらに追加すると古い待機は取り消される。dev と本番は別の枠
@@ -79,20 +84,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Set maintenance (dev)
-        run: node tools/maintenance-all.mjs
+      - name: Plan and set maintenance (dev)
+        run: node tools/maintenance-all.mjs --phase dev
         env:
           RUN_REF: ${{ github.ref }}
-          TARGET_BRANCH: ${{ inputs.target_branch }}
+          TARGET_DEVELOP: ${{ inputs.develop }}
+          TARGET_MASTER: ${{ inputs.master }}
+          TARGET_MIGRATION_WASM: ${{ inputs.migration_wasm }}
           MAINTENANCE_MODE_INPUT: ${{ inputs.maintenance_mode }}
           MAINTENANCE_MESSAGE_INPUT: ${{ inputs.maintenance_message }}
-          SITES_INPUT: ${{ inputs.sites }}
           GH_TOKEN: ${{ secrets.SITES_DISPATCH_TOKEN }}
 
-  # master(各サイトの本番)。Environment production-maintenance の承認(必須レビュワー)が済むまで動かない
+  # master(各サイトの本番)。dev 系が全部成功してから。Environment production-maintenance の承認(必須レビュワー)が済むまで動かない
   production:
-    needs: validate
-    if: ${{ inputs.target_branch == 'master' }}
+    needs: dev
+    if: ${{ inputs.master }}
     runs-on: ubuntu-latest
     environment: production-maintenance
     concurrency:
@@ -104,11 +110,12 @@ jobs:
         with:
           node-version: 22
       - name: Set maintenance (production)
-        run: node tools/maintenance-all.mjs
+        run: node tools/maintenance-all.mjs --phase production
         env:
           RUN_REF: ${{ github.ref }}
-          TARGET_BRANCH: ${{ inputs.target_branch }}
+          TARGET_DEVELOP: ${{ inputs.develop }}
+          TARGET_MASTER: ${{ inputs.master }}
+          TARGET_MIGRATION_WASM: ${{ inputs.migration_wasm }}
           MAINTENANCE_MODE_INPUT: ${{ inputs.maintenance_mode }}
           MAINTENANCE_MESSAGE_INPUT: ${{ inputs.maintenance_message }}
-          SITES_INPUT: ${{ inputs.sites }}
           GH_TOKEN: ${{ secrets.SITES_DISPATCH_TOKEN }}
