@@ -293,8 +293,10 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
 
 ```razor
 <ReportFormView From="@From" ContactRequired="true" ContactFormat="ReportContactFormat.XHandle"
-                ContactLabel="X のユーザー名（@○○）" ContactPlaceholder="@example" />
+                ContactLabel="X のユーザー名（@@○○）" ContactPlaceholder="@@example" />
 ```
+
+  - **Razor の属性（`"…"`）の中の `@` は `@@` と書く**（`@` 1 つのままだと RZ9986 / RZ1005 のコンパイルエラー。画面には `@○○`・`@example` と出る）。C# のコード（`@code`・テスト）の文字列では、そのまま `@` でよい。
 
   - `ContactRequired`: 空のままでは送れない（見出しの末尾が「（必須）」になる。任意のときは「（任意）」）。
   - `ContactFormat`: `Any`（既定。長さだけ検査）／`XHandle`（`@` + 英数字とアンダースコア 1〜15 文字。前後の空白は無視。全角の `＠` は不可）。任意のときは、空なら検査せず、書いたときだけ形を検査する。
