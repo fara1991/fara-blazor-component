@@ -69,7 +69,7 @@ test("チェックボックスと環境の対応: develop = dev、master = produ
   assert.deepEqual(p.stages.map((s) => s.envName), ["dev", "production"]);
   assert.deepEqual(p.stages[0].base, ["set", "--env", "dev", "--mode", "true", "--message", "文面", "--allow-empty"]);
   assert.deepEqual(p.stages[0].sites, ["pokemon", "avatar", "bot", "portfolio", "album"], "サイトは常に 5 つすべて");
-  assert.equal(p.stages[1].confirm, "production album,avatar,bot,pokemon,portfolio");
+  assert.equal(p.stages[1].confirm, "production avatar,bot,pokemon,portfolio");
   assert.equal(p.stages[0].confirm, undefined);
   assert.deepEqual(planFromEnv(base).stages.map((s) => s.envName), ["dev"], "既定は develop だけ");
 });
@@ -108,7 +108,7 @@ test("develop と master の両方: dev を全部起動・成功してから本�
   const r = await go({ ...master });
   assert.equal(r.code, 0, r.out);
   const d = r.g.dispatches();
-  assert.deepEqual(d.map((x) => x.ref), ["develop", "develop", "develop", "develop", "develop", "master", "master", "master", "master", "master"]);
+  assert.deepEqual(d.map((x) => x.ref), ["develop", "develop", "develop", "develop", "develop", "master", "master", "master", "master"]);
   const idx = (pred) => r.g.calls.findIndex(pred);
   const lastDevWatch = r.g.calls.map((a, i) => (a[1] === "watch" ? i : -1)).filter((i) => i >= 0)[3];
   const firstMaster = idx((a) => a[0] === "workflow" && a.includes("master"));
@@ -118,8 +118,8 @@ test("develop と master の両方: dev を全部起動・成功してから本�
 test("master だけ: 各サイトの本番のワークフローを master で起動する(mode 必須)", async () => {
   const r = await go({ TARGET_DEVELOP: "false", ...master, MAINTENANCE_MODE_INPUT: "false" });
   assert.equal(r.code, 0, r.out);
-  assert.deepEqual(r.g.dispatches().map((x) => x.ref), ["master", "master", "master", "master", "master"]);
-  assert.deepEqual(r.g.dispatches().map((x) => x.args[2]).sort(), ["deploy.yml", "deploy.yml", "deploy.yml", "deploy.yml", "site.yml"]);
+  assert.deepEqual(r.g.dispatches().map((x) => x.ref), ["master", "master", "master", "master"]);
+  assert.deepEqual(r.g.dispatches().map((x) => x.args[2]).sort(), ["deploy.yml", "deploy.yml", "deploy.yml", "site.yml"]);
   assert.ok(r.g.dispatches().every((x) => !x.args.some((a) => a.startsWith("maintenance_message"))));
 });
 
@@ -175,7 +175,7 @@ test("段階 dev: master だけを選んでも、計画のために動く(何も
 test("段階 production: 本番だけを起動する。飛ばすサイトは本番側でも除かれる", async () => {
   const r = await go({ ...master }, { contents: { [`${REPOS.pokemon}@master`]: "old" } }, { phase: "production" });
   assert.equal(r.code, 0, r.out);
-  assert.deepEqual(r.g.dispatches().map((x) => x.ref), ["master", "master", "master", "master"]);
+  assert.deepEqual(r.g.dispatches().map((x) => x.ref), ["master", "master", "master"]);
   assert.ok(!r.g.dispatches().some((x) => x.repo === REPOS.pokemon));
   assert.match(r.summary, /本番\(master\)/);
   assert.match(r.summary, /- pokemon \/ production: /);
@@ -187,7 +187,7 @@ test("事前確認の URL は .github/workflows/ 以下(ファイル名だけだ
   const r = await go({});
   assert.equal(r.code, 0, r.out);
   const urls = r.g.calls.filter((a) => a[0] === "api" && a[1].includes("/contents/")).map((a) => a[1]);
-  assert.equal(urls.length, 10, "plan と実行で 5 サイトずつ");
+  assert.equal(urls.length, 10, "dev の 5 サイトを、plan と実行で 1 回ずつ");
   assert.ok(urls.every((u) => u.includes("/contents/.github/workflows/")), urls.join("\n"));
   assert.ok(urls.includes("repos/fara1991/fara-pokemon-battle-assistant/contents/.github/workflows/deploy-develop.yml?ref=develop"));
   assert.ok(urls.includes("repos/fara1991/fara-bot-moderator/contents/.github/workflows/site.yml?ref=develop"));
@@ -219,7 +219,7 @@ test("422 で飛ばすのは本番でも同じ。飛ばした事実はサマリ�
   const r = await go({ TARGET_DEVELOP: "false", ...master }, { contents: noPreflight("master"), failDispatch: { [REPOS.pokemon]: unexpected } }, { phase: "production" });
   assert.equal(r.code, 0, r.out);
   assert.match(r.summary, /- pokemon \/ production: /);
-  assert.equal(r.g.calls.filter((a) => a[1] === "watch").length, 4);
+  assert.equal(r.g.calls.filter((a) => a[1] === "watch").length, 3);
 });
 
 test("422 ですべて飛ばされたら失敗(何も反映されない)。dev の段階では、あとで本番が実行できるなら失敗にしない", async () => {

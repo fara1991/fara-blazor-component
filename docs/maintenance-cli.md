@@ -125,6 +125,8 @@ node tools/maintenance.mjs set --env all --mode false --apply --confirm "product
 
 ## 3. kit の Actions から 5 サイトまとめて切り替える
 
+> album（fara-vrc-photo-album）は **develop（確認用）だけ**が対象。本番は初回公開がメンテナンス画面のままなので、公開準備ができるまで載せない。載せるときは `tools/maintenance-sites.json` の album に `workflows.production`（`{ "file": "deploy.yml", "ref": "master" }`）と `workers.production`（`fara-vrc-album`）を足し、テスト（`tests/tools/`）の本番側の期待値（dispatch 数・確認の再入力 `production album,avatar,…`）を更新する。それまで album の本番は、album の Actions → Deploy → Run workflow（`maintenance_mode`）で操作する。
+
 kit のリポジトリ(`fara1991/fara-site-kit`)の Actions →「**Set maintenance (all sites)**」→ Run workflow で、5 サイトに一度に反映する。手元の環境変数も CLI も要らない(スマホの GitHub アプリからも可)。中身は 2 の `set` を、Actions の上で動かしているだけ(`.github/workflows/set-maintenance-all.yml` → `tools/maintenance-all.mjs` → `tools/maintenance.mjs set`)。
 
 **Use workflow from は `master` のみ**(`validate` が検査する。develop など、ほかのブランチ上からは実行できない)。

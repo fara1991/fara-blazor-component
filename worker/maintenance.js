@@ -1,4 +1,4 @@
-// メンテナンス表示（4 つのリポジトリ＝pokemon・avatar・bot・portfolio で同じファイルを使う。各リポジトリの worker/ に同じ内容を置いている。直すときは 4 つともそろえること）。
+// メンテナンス表示（5 つのリポジトリ＝pokemon・avatar・bot・portfolio・album で同じファイルを使う。各リポジトリの worker/ に同じ内容を置いている。直すときは 5 つともそろえること（album は kit の submodule から読む））。
 //
 // Cloudflare のダッシュボード（Worker の「変数とシークレット」）の変数で切り替える。デプロイ（変数の保存）の数秒〜1 分後に反映される。
 //   MAINTENANCE_MODE     "false"（または未設定）= 通常 / "notice" = 通常のページの上に「更新予定」のお知らせを出す / "true" = メンテナンス画面（503）
