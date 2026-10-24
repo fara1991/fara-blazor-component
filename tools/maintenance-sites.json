@@ -36,6 +36,15 @@
         "production": { "file": "deploy.yml", "ref": "master" }
       },
       "workers": { "production": "fara-portfolio", "dev": "fara-portfolio-dev" }
+    },
+    {
+      "name": "album",
+      "repo": "fara1991/fara-vrc-photo-album",
+      "workflows": {
+        "dev": { "file": "deploy.yml", "ref": "develop" },
+        "production": { "file": "deploy.yml", "ref": "master" }
+      },
+      "workers": { "production": "fara-vrc-album", "dev": "fara-vrc-album-dev" }
     }
   ]
 }
