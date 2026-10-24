@@ -2,6 +2,16 @@ using System.Text.Json;
 
 namespace FaraSiteKit.Core;
 
+/// <summary>連絡先の欄に書く内容の形（検査の種類）。</summary>
+public enum ReportContactFormat
+{
+    /// <summary>自由な文字列（メールアドレス・SNS の ID など。長さだけ検査する）。既定。</summary>
+    Any,
+
+    /// <summary>X（Twitter）のユーザー名。<c>@</c> に続けて、英数字とアンダースコアを 1〜15 文字（例: <c>@game_fara</c>）。</summary>
+    XHandle,
+}
+
 /// <summary>
 /// 「作者へ報告」の入力（各サイトの報告画面に置く）。送り先は同じサイトの POST /api/report（worker/report.js と同じ形）。
 /// 長さ・種類の制限は、サーバー側（worker/report.js）と同じにしておく（先にここで確かめて、無駄な通信をしない）。
@@ -20,6 +30,19 @@ public sealed class ReportForm
         ("other", "その他"),
     };
 
+    /// <summary>X のユーザー名（<c>@</c> を含む）。<c>@</c> + 英数字とアンダースコア 1〜15 文字。</summary>
+    public static bool IsXHandle(string? text) =>
+        text is { Length: >= 2 and <= 16 } && text[0] == '@' && text.Skip(1).All(c => char.IsAsciiLetterOrDigit(c) || c == '_');
+
+    /// <summary>連絡先を必須にするか。既定は任意（従来どおり）。サイトが報告画面で設定する（<c>ReportFormView.ContactRequired</c>）。</summary>
+    public bool ContactRequired { get; set; }
+
+    /// <summary>連絡先の形の検査。既定は <see cref="ReportContactFormat.Any"/>（長さだけ）。空の連絡先は、必須でなければ形を検査しない。</summary>
+    public ReportContactFormat ContactFormat { get; set; } = ReportContactFormat.Any;
+
+    /// <summary>エラー文に出す連絡先の呼び名。既定は「連絡先」。</summary>
+    public string ContactName { get; set; } = "連絡先";
+
     public string Category { get; set; } = "";
     public string Message { get; set; } = "";
     public string Contact { get; set; } = "";
@@ -37,7 +60,11 @@ public sealed class ReportForm
         var length = CountCharacters(message);
         if (length < MinMessage) return $"内容を {MinMessage} 文字以上で書いてください";
         if (length > MaxMessage) return $"内容は {MaxMessage} 文字までにしてください（いま {length} 文字）";
-        if (CountCharacters(Contact.Trim()) > MaxContact) return $"連絡先は {MaxContact} 文字までにしてください";
+        var contact = Contact.Trim();
+        if (ContactRequired && contact.Length == 0) return $"{ContactName}を入力してください";
+        if (CountCharacters(contact) > MaxContact) return $"{ContactName}は {MaxContact} 文字までにしてください";
+        if (ContactFormat == ReportContactFormat.XHandle && contact.Length > 0 && !IsXHandle(contact))
+            return $"{ContactName}は、@ に続けて英数字とアンダースコア（_）を 1〜15 文字で入力してください（例: @game_fara）";
         if (string.IsNullOrEmpty(TurnstileToken)) return "「ロボットではありません」の確認が終わっていません。表示された確認をしてから、もう一度押してください";
         return null;
     }

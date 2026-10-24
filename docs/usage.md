@@ -272,7 +272,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
 | `ThemeSwitch` | ライト／ダーク（スイッチ。`AsButton` で文字のボタン） | `AsButton` `LightLabel` `DarkLabel` |
 | `SiteNavMenu` | サイドバーの項目（見出しと項目は `SiteNavGroup`・`SiteNavItem`） | `Groups` `Top` |
 | `SiteFooter` | フッター（サイト名・問い合わせ・プライバシー・©・SNS）。`<footer>`（contentinfo）として、本文の外に置く | （`SiteOptions` から） |
-| `ReportFormView` | 「作者へ報告」（問い合わせ）のフォーム。Turnstile・送信の状態・noindex | `Title` `Lead` `From` `NoIndex` `UnavailableNote` `MessagePlaceholder` `ContactHint` `Timeout` |
+| `ReportFormView` | 「作者へ報告」（問い合わせ）のフォーム。Turnstile・送信の状態・noindex | `Title` `Lead` `From` `NoIndex` `UnavailableNote` `MessagePlaceholder` `ContactHint` `Timeout` `ContactRequired` `ContactFormat` `ContactLabel` `ContactPlaceholder` |
 | `NotFoundView` | 404（ページが見つからない） | `Code` `Title` `Lead` `HomeHref` `HomeText` `NoIndex` |
 | `MaintenanceBanner` | 「更新予定」のお知らせ（Notice のときだけ） | `Info` |
 | `MaintenanceScreen` | メンテナンス中の画面（Program.cs で切り替える）。文言は文字として出す（HTML は出さない。改行だけが改行） | `Info` `Heading` `Lead` `Contact` |
@@ -288,6 +288,18 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
     [SupplyParameterFromQuery(Name = "from")] public string? From { get; set; }
 }
 ```
+
+- 連絡先を必須にする・X のユーザー名に限る（既定は従来どおり任意・自由な文字列）:
+
+```razor
+<ReportFormView From="@From" ContactRequired="true" ContactFormat="ReportContactFormat.XHandle"
+                ContactLabel="X のユーザー名（@○○）" ContactPlaceholder="@example" />
+```
+
+  - `ContactRequired`: 空のままでは送れない（見出しの末尾が「（必須）」になる。任意のときは「（任意）」）。
+  - `ContactFormat`: `Any`（既定。長さだけ検査）／`XHandle`（`@` + 英数字とアンダースコア 1〜15 文字。前後の空白は無視。全角の `＠` は不可）。任意のときは、空なら検査せず、書いたときだけ形を検査する。
+  - `ContactLabel`・`ContactHint`・`ContactPlaceholder`: 欄の見出し・説明・例。未指定は、必須か任意かに合わせた既定の文。
+  - 検査は画面側（`ReportForm.Validate`）だけ。Worker（`worker/report.js`）は従来どおり連絡先の長さしか見ない（直接 POST されれば空や別の形でも通る。連絡先は返信のためで、安全のための検査ではない）。
 
 - 報告の送信先は `SiteOptions.ReportApiPath`（既定 `api/report`）・確認の設定は `ReportConfigPath`（既定 `api/report/config`）。Worker（`worker/report.js`）と同じ形。
 - 報告の文字数は、コードポイント単位（絵文字も 1 文字。worker/report.js と同じ数え方）。UTF-16 の長さとは違う。

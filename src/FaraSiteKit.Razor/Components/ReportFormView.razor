@@ -49,10 +49,10 @@
                               Value="@Form.Message" ValueChanged="@(v => Form.Message = v ?? "")" Placeholder="@MessagePlaceholder" />
             </div>
             <div class="fsk-form-group fsk-mb-3">
-                <label class="fsk-form-label" for="report-contact">連絡先（任意）</label>
-                <p class="fsk-small fsk-muted fsk-mb-1">@ContactHint</p>
+                <label class="fsk-form-label" for="report-contact">@ContactLabelText</label>
+                <p class="fsk-small fsk-muted fsk-mb-1">@ContactHintText</p>
                 <MudTextField T="string" Variant="Variant.Outlined" Margin="Margin.Dense" Class="fsk-field" InputId="report-contact" MaxLength="@ReportForm.MaxContact"
-                              Value="@Form.Contact" ValueChanged="@(v => Form.Contact = v ?? "")" Placeholder="返信が必要なときだけ" />
+                              Value="@Form.Contact" ValueChanged="@(v => Form.Contact = v ?? "")" Placeholder="@ContactPlaceholderText" UserAttributes="@ContactAttributes" />
             </div>
             @* ボット対策の罠。人には見えない（CSS で画面の外に出す、.report-trap）。入っていたら、サーバーは何も送らずに成功を返す *@
             <div class="fsk-report-trap" aria-hidden="true">
@@ -89,8 +89,20 @@
     /// <summary>内容の欄の例文。</summary>
     [Parameter] public string MessagePlaceholder { get; set; } = "例: 〇〇の画面で、結果が出ません（操作の手順も書いてもらえると助かります）";
 
-    /// <summary>連絡先の欄の説明。</summary>
-    [Parameter] public string ContactHint { get; set; } = "返信が欲しいときだけ、メールアドレスや SNS の ID などを書いてください。書かなくても送れます。";
+    /// <summary>連絡先の欄の説明。未指定なら、任意のときは「返信が欲しいときだけ…」、必須のときは「返信先として…」。</summary>
+    [Parameter] public string? ContactHint { get; set; }
+
+    /// <summary>連絡先を必須にするか。既定は任意（従来どおり）。必須のときは、空のままでは送れない。</summary>
+    [Parameter] public bool ContactRequired { get; set; }
+
+    /// <summary>連絡先の形の検査。既定は <see cref="ReportContactFormat.Any"/>。<see cref="ReportContactFormat.XHandle"/> は X のユーザー名（@ + 英数字とアンダースコア 1〜15 文字）。</summary>
+    [Parameter] public ReportContactFormat ContactFormat { get; set; } = ReportContactFormat.Any;
+
+    /// <summary>連絡先の欄の見出し（例: 「X のユーザー名（@○○）」）。未指定は「連絡先」。末尾に「（必須）」か「（任意）」を付ける。エラー文の呼び名にも使う。</summary>
+    [Parameter] public string? ContactLabel { get; set; }
+
+    /// <summary>連絡先の欄の例。未指定なら、任意のときは「返信が必要なときだけ」、必須のときは「返信先」。</summary>
+    [Parameter] public string? ContactPlaceholder { get; set; }
 
     /// <summary>送信の待ち時間の上限（これを過ぎたら、通信できなかったものとして案内する）。</summary>
     [Parameter] public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(15);
@@ -99,6 +111,31 @@
 
     /// <summary>入力の内容（テストからも見る）。</summary>
     internal ReportForm Form { get; set; } = new();
+
+    private string ContactLabelText => (ContactLabel ?? "連絡先") + (ContactRequired ? "（必須）" : "（任意）");
+
+    private string ContactHintText => ContactHint ?? (ContactRequired
+        ? "返信先として、連絡のつくメールアドレスや SNS の ID などを書いてください。"
+        : "返信が欲しいときだけ、メールアドレスや SNS の ID などを書いてください。書かなくても送れます。");
+
+    // 必須のとき、入力欄に aria-required を付ける（支援技術が「必須」と読み上げる）。MudTextField の Required は英語のエラーが出るので使わない
+    private static readonly Dictionary<string, object> RequiredAttributes = new() { ["aria-required"] = "true" };
+
+    private static readonly Dictionary<string, object> NoAttributes = new();
+
+    private Dictionary<string, object> ContactAttributes => ContactRequired ? RequiredAttributes : NoAttributes;
+
+    private string ContactPlaceholderText => ContactPlaceholder ?? (ContactRequired ? "返信先" : "返信が必要なときだけ");
+
+    /// <summary>パラメーターの連絡先の規則を、入力の検査（ReportForm）に反映する。</summary>
+    private void ApplyContactRules()
+    {
+        Form.ContactRequired = ContactRequired;
+        Form.ContactFormat = ContactFormat;
+        Form.ContactName = ContactLabel is { Length: > 0 } label ? label : "連絡先";
+    }
+
+    protected override void OnParametersSet() => ApplyContactRules();
 
     private bool sent;
     private bool sending;
@@ -195,6 +232,7 @@
     private void StartOver()
     {
         Form = new ReportForm();
+        ApplyContactRules();
         sent = false;
         error = "";
         mounted = false;

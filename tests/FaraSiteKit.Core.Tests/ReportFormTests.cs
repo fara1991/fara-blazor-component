@@ -89,6 +89,87 @@ public class ReportFormTests
     }
 
     [Fact]
+    public void The_contact_is_optional_by_default_even_when_empty()
+    {
+        var form = Valid();
+        Assert.False(form.ContactRequired);
+        Assert.Equal(ReportContactFormat.Any, form.ContactFormat);
+        form.Contact = "";
+        Assert.Null(form.Validate());
+        form.Contact = "何でもよい 自由な文字列";
+        Assert.Null(form.Validate());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_required_contact_cannot_be_empty(string contact)
+    {
+        var form = Valid();
+        form.ContactRequired = true;
+        form.Contact = contact;
+        Assert.Contains("連絡先を入力", form.Validate());
+        form.ContactName = "X のユーザー名（@○○）";
+        Assert.Contains("X のユーザー名（@○○）を入力", form.Validate());
+        form.Contact = "me@example.com";
+        Assert.Null(form.Validate());
+    }
+
+    [Theory]
+    [InlineData("@a", true)]
+    [InlineData("@game_fara", true)]
+    [InlineData("@Fara_1991", true)]
+    [InlineData("@123456789012345", true)]       // 15 文字
+    [InlineData("@1234567890123456", false)]      // 16 文字
+    [InlineData("@", false)]
+    [InlineData("game_fara", false)]               // @ が無い
+    [InlineData("@game fara", false)]
+    [InlineData("@game-fara", false)]
+    [InlineData("@ゲームfara", false)]
+    [InlineData("＠game_fara", false)]             // 全角の ＠
+    [InlineData("@@game", false)]
+    [InlineData("https://x.com/game_fara", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsXHandle_follows_the_x_username_rule(string? text, bool expected) =>
+        Assert.Equal(expected, ReportForm.IsXHandle(text));
+
+    [Fact]
+    public void An_x_handle_format_rejects_other_text_and_trims_spaces()
+    {
+        var form = Valid();
+        form.ContactRequired = true;
+        form.ContactFormat = ReportContactFormat.XHandle;
+        form.Contact = "  @game_fara  ";
+        Assert.Null(form.Validate());
+        form.Contact = "game_fara";
+        Assert.Contains("1〜15 文字", form.Validate());
+        form.Contact = "me@example.com";
+        Assert.Contains("@game_fara", form.Validate());
+    }
+
+    [Fact]
+    public void An_empty_contact_is_not_format_checked_unless_required()
+    {
+        var form = Valid();
+        form.ContactFormat = ReportContactFormat.XHandle;
+        form.Contact = "";
+        Assert.Null(form.Validate());          // 任意 + X の形: 空なら通る
+        form.Contact = "bad name";
+        Assert.NotNull(form.Validate());       // 書いたなら形を検査する
+    }
+
+    [Fact]
+    public void Json_sends_the_trimmed_x_handle_as_the_contact()
+    {
+        var form = Valid();
+        form.ContactFormat = ReportContactFormat.XHandle;
+        form.Contact = " @game_fara ";
+        using var doc = JsonDocument.Parse(form.ToJson());
+        Assert.Equal("@game_fara", doc.RootElement.GetProperty("contact").GetString());
+    }
+
+    [Fact]
     public void Json_uses_the_names_the_server_reads_and_trims_the_text()
     {
         var form = Valid();
