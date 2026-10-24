@@ -1,5 +1,4 @@
-// 作者への報告の受け口（POST /api/report）。Pokémon Battle Assistant・Avatar Modding Guide・FaraBotModerator の 3 サイトで同じファイルを使う
-// （各リポジトリの worker/ に同じ内容を置いている。直すときは 3 つともそろえること）。
+// 作者への報告の受け口（POST /api/report）。fara-site-kit の共有ファイル（各サイトは submodule で読む。直すときは kit で直す）。
 //
 //   GET  /api/report/config → 200 {"enabled": bool, "siteKey": "Turnstile のサイトキー" | null}
 //   POST /api/report        ← {"category": "bug" | "request" | "other", "message": "...", "contact"?: "...", "page"?: "...", "turnstileToken": "...", "website": ""}
@@ -11,12 +10,17 @@
 //   TURNSTILE_SECRET     シークレットキー（シークレット）
 //   DISCORD_WEBHOOK_URL  通知を送る Discord の Webhook の URL（シークレット）
 // どれかが無いときは 503 を返す（報告ページには「いまは受け付けていません」と出る）。
-// シークレットと Webhook の URL は、ログ・エラーメッセージ・応答に出さない（このファイルでは console.* を使わない）。
+// シークレットと Webhook の URL は、ログ・エラーメッセージ・応答に出さない。サーバー側のログ（console.error）は、Turnstile を使えないとき
+// （siteverify の非 2xx・結果を読めない・シークレット不正）と、Discord への送信の失敗の、固定の文と状態コード・error-codes だけ。
+// Turnstile 側の問題（利用者の失敗ではない）は 503（いまは受け付けていません）にして、ログに残す。トークンの不正・期限切れは従来どおり 400。
 // 報告の本文は個人情報になりうるので、保存しない（Discord に送るだけ）。
 
-const MAX_BODY_CHARS = 8 * 1024;
-/** Content-Length（バイト）の上限。日本語 2000 文字（1 文字 3 バイト）と余白を入れても、これを超えない。 */
-const MAX_BODY_BYTES = 16 * 1024;
+/**
+ * 本文のバイト数の上限（Content-Length の宣言も、実際に読んだ量も）。32 KB。
+ * JSON が非 ASCII を \uXXXX（6 文字。絵文字は 12 文字）にする送り手でも通る大きさ:
+ * メッセージ 2000 文字×12 + 連絡先 200 文字×12 + トークン 2048 + ページ 300 + 余白 ≒ 29 KB。（文字数は、バイト数より大きくならないので別には数えない。）
+ */
+const MAX_BODY_BYTES = 32 * 1024;
 /** 外へ出る通信（Turnstile・Discord）を待つ最大の時間。 */
 const FETCH_TIMEOUT_MS = 5000;
 const MAX_MESSAGE = 2000;
@@ -24,6 +28,9 @@ const MAX_CONTACT = 200;
 const MAX_PAGE = 300;
 const MIN_MESSAGE = 5;
 const TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+/** siteverify が返す error-codes のうち、利用者ではなくこちらの設定・Turnstile 側の問題を示すもの（400 にしない）。 */
+const TURNSTILE_SERVER_ERRORS = new Set(["missing-input-secret", "invalid-input-secret", "internal-error"]);
+const TURNSTILE_FAILED_MESSAGE = "「ロボットではありません」の確認に失敗しました。もう一度お試しください";
 const CATEGORIES = { bug: "不具合", request: "要望・提案", other: "その他" };
 
 const json = (status, body, headers = {}) =>
@@ -49,9 +56,40 @@ export function cleanPage(value) {
   return typeof value === "string" && /^\/[A-Za-z0-9\-_/.]{0,299}$/.test(value) && !value.startsWith("//") ? value : "";
 }
 
+/**
+ * 本文を最大 MAX_BODY_BYTES バイトまで読む。超えたら読むのをやめて null（Content-Length が無い・うそでも、全部は読まない）。
+ * @returns {Promise<string | null>}
+ */
+async function readLimitedText(request) {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return new TextDecoder().decode(bytes);
+}
+
 /** Origin ヘッダーのホスト。読めないもの（"null" など）は null。 */
 function originHost(origin) {
   try { return new URL(origin).host; } catch { return null; }
+}
+
+/** Turnstile を使えないとき（利用者の失敗ではない）。ログに残して 503。reason に秘密は入れない。 */
+function turnstileUnavailable(reason) {
+  console.error("report: turnstile unavailable:", reason);
+  return json(503, { error: "verify_unavailable", message: "いまは報告を受け付けていません" });
 }
 
 /** 報告の受け口が使える設定か（3 つの値がそろっているか）。 */
@@ -83,11 +121,11 @@ export async function handleReport(request, env, siteName, deps = {}) {
   if (!origin || originHost(origin) !== url.host) return json(403, { error: "forbidden" });
   if (!(request.headers.get("Content-Type") ?? "").toLowerCase().startsWith("application/json")) return json(415, { error: "unsupported_media_type" });
 
-  // 大きな本文は、読み込む前に断る（Content-Length がうそでも、読んだあとの長さで再度確かめる）
+  // 大きな本文は、読み込む前に断る。宣言が無い・うそのときも、読みながらバイト数を数えて、超えたらそこでやめる
   const declared = Number(request.headers.get("Content-Length"));
   if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return json(413, { error: "too_large" });
-  const text = await request.text();
-  if (text.length > MAX_BODY_CHARS) return json(413, { error: "too_large" });
+  const text = await readLimitedText(request);
+  if (text === null) return json(413, { error: "too_large" });
   let body;
   try { body = JSON.parse(text); } catch { return json(400, { error: "invalid_json", message: "送信内容を読めませんでした" }); }
   if (body === null || typeof body !== "object" || Array.isArray(body)) return json(400, { error: "invalid_body", message: "送信内容を読めませんでした" });
@@ -113,15 +151,22 @@ export async function handleReport(request, env, siteName, deps = {}) {
   let result;
   try {
     const res = await doFetch(TURNSTILE_URL, { method: "POST", body: form, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    // Turnstile 側の障害（5xx）は、こちらの入力の問題ではないので 502
-    if (res.status >= 500) return json(502, { error: "verify_failed", message: "確認に失敗しました。もう一度お試しください" });
-    result = res.ok ? await res.json() : null;
-  } catch {
+    // 2xx 以外は、利用者の失敗ではなく Turnstile 側（またはこちらの設定）の問題
+    if (!res.ok) return turnstileUnavailable(`siteverify status ${res.status}`);
+    try { result = await res.json(); } catch { return turnstileUnavailable("siteverify response unreadable"); }
+  } catch (error) {
+    console.error("report: turnstile siteverify request failed", error?.name ?? "error");
     return json(502, { error: "verify_failed", message: "確認に失敗しました。もう一度お試しください" });
   }
-  // 確認が通ったページが、いま送っているこのサイトのものか（別のサイトで取ったトークンを使い回されないように）。hostname が無いときは確かめない
-  const hostOk = typeof result?.hostname !== "string" || result.hostname === url.hostname;
-  if (result?.success !== true || !hostOk) return json(400, { error: "turnstile_failed", message: "「ロボットではありません」の確認に失敗しました。もう一度お試しください" });
+  if (result === null || typeof result !== "object" || typeof result.success !== "boolean") return turnstileUnavailable("siteverify result unusable");
+  if (result.success !== true) {
+    const codes = Array.isArray(result["error-codes"]) ? result["error-codes"].filter((c) => typeof c === "string") : [];
+    // シークレットの不正など、こちらの設定の問題。トークンの不正・期限切れ（timeout-or-duplicate・invalid-input-response）は利用者の失敗で 400
+    if (codes.some((code) => TURNSTILE_SERVER_ERRORS.has(code))) return turnstileUnavailable(`siteverify error-codes ${codes.join(",")}`);
+    return json(400, { error: "turnstile_failed", message: TURNSTILE_FAILED_MESSAGE });
+  }
+  // 確認が通ったページが、いま送っているこのサイトのものか（別のサイトで取ったトークンを使い回されないように）。hostname が無いときも失敗扱い
+  if (result.hostname !== url.hostname) return json(400, { error: "turnstile_failed", message: TURNSTILE_FAILED_MESSAGE });
 
   // Discord へ。@everyone などのメンションは無効にする
   const fields = [{ name: "種類", value: CATEGORIES[category], inline: true }];
@@ -142,8 +187,12 @@ export async function handleReport(request, env, siteName, deps = {}) {
   };
   try {
     const res = await doFetch(env.DISCORD_WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!res.ok) return json(502, { error: "notify_failed", message: "送信に失敗しました。しばらくしてからもう一度お試しください" });
-  } catch {
+    if (!res.ok) {
+      console.error("report: discord webhook failed, status", res.status);
+      return json(502, { error: "notify_failed", message: "送信に失敗しました。しばらくしてからもう一度お試しください" });
+    }
+  } catch (error) {
+    console.error("report: discord webhook request failed", error?.name ?? "error");
     return json(502, { error: "notify_failed", message: "送信に失敗しました。しばらくしてからもう一度お試しください" });
   }
   return json(200, { ok: true });

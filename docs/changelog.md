@@ -2,6 +2,22 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 0.3.5
+
+報告フォーム(`worker/report.js`・`ReportForm`・`report.js`)のレビュー指摘の修正。各サイトは submodule をこのタグに上げて取り込む。
+
+- `worker/report.js`(**挙動の変更**):
+  - Turnstile の siteverify が 2xx 以外、結果を読めない(JSON でない・形が違う)、または `error-codes` に `invalid-input-secret` / `missing-input-secret` / `internal-error` があるときは、利用者の失敗(400)ではなく **503**(`verify_unavailable`)にして、サーバー側のログ(`console.error`。状態コードと error-codes だけ。シークレット・Webhook の URL は出さない)に残す。トークンの不正・期限切れ(`timeout-or-duplicate`・`invalid-input-response` など)は従来どおり 400。通信できない・時間切れは従来どおり 502(ログにも残す)。以前は siteverify の 5xx を 502、4xx を 400 にしていた。
+  - 本文は、読みながらバイト数を数え、**32 KB** を超えたらそこで読むのをやめて 413(Content-Length が無い・うそでも全部は読まない。宣言が超えていれば読む前に断る)。以前は文字数 8192 の上限で、`\uXXXX` に直す送り手(旧 `ReportForm.ToJson`)では日本語が約 1300 文字で弾かれていた。32 KB は、`\uXXXX` の最悪値(メッセージ 2000 文字×12 + 連絡先 200 文字×12 + トークン 2048 + ページ 300 + 余白 ≒ 29 KB)が通る大きさ。文字数の別の上限(`MAX_BODY_CHARS`)は廃止。
+  - Discord への送信の失敗(非 2xx・例外)も、状態コード(例外は名前)だけを `console.error` に残す(Webhook の URL・本文・連絡先は出さない)。応答は従来どおり 502。
+  - Turnstile の結果の `hostname` が無い(文字列でない)ときも、400(`turnstile_failed`)。以前は確かめずに通していた。**各サイトの確認**: Turnstile のテスト用キー(ローカル)は本番のホスト名と違う `hostname` を返すことがある。ローカルで試すときは注意。
+  - ファイル先頭の「3 つのリポジトリに同じファイル」の記述を、kit の共有ファイルである旨に直した。
+- `ReportForm.ToJson`: `JavaScriptEncoder.UnsafeRelaxedJsonEscaping` で作る(日本語を `\uXXXX` にしない。2000 文字が約 6 KB)。JSON は `application/json` の本文としてだけ使い HTML には埋め込まないので安全。引用符・バックスラッシュ・制御文字は従来どおり escape される。絵文字は escape されることがある(最悪でも 32 KB 以内)。
+- `ReportForm.DescribeFailure`: Worker が返さない 429 専用の文を削除(429 は既定の文になる)。
+- `report.js`(クライアント): CSP のコメントを実態に合わせた(script-src だけでなく frame-src・connect-src も必要。`presets.turnstile`)。
+- 報告フォームの色の直書き: kit の CSS には無く(トークンのみ)、変更なし。
+- テスト: `worker/report.test.mjs`(siteverify の非 2xx・読めない・秘密の不正→503 とログ、トークン不正→400、ストリームでの 413、hostname 無し→400、Discord 失敗のログに秘密が出ない、トークンを 2048 文字で切る、`\uXXXX` 形式の最悪値(日本語 2000+連絡先 200+トークン 2048、絵文字 2000 個)が通る、32 KB ちょうど・+1 バイトの境界)、`ReportFormTests`(429、`ToJson` の escape と読み戻し)。
+
 ## 0.3.4
 
 avatar の WASM 移行(Phase 5)が develop に統合され、確認用 Worker `fara-avatar-wasm-dev` と avatar の `deploy-wasm-dev.yml`・wrangler の `env.wasm-dev` が廃止されたことに合わせた整理。
