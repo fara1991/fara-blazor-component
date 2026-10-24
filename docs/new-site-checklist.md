@@ -52,7 +52,7 @@ kit を使う新しいサイト（Blazor WebAssembly + MudBlazor を Cloudflare 
 - `verify-site.mjs` は avatar のものを写すときに 2 点直す: (1) 本番の `_headers` に `/people` など一部のパスの `X-Robots-Tag: noindex` を足すサイトでは、**`/*` のルールの中だけ**を見る（全体を grep すると本番の出力を拒否する）、(2) 必須ファイルをサイトのページに合わせる。`require-maintenance.mjs` は avatar と同一内容にしておく（kit への切り出しの候補）
 - deploy.yml の公開ステップの `run` は、テストで実際に bash で動かせる（`npx` を引数を出す関数に差し替える）。`deploy-workflow.test.mjs`（portfolio・vrc-photo-album）が雛形
 - **ワークフローのファイルを含む push は SSH で行う**（gh の OAuth token に `workflow` スコープが無い）
-- ワークフローを書いたら、`tools/maintenance-sites.json` にサイトを足す（repo・workflows・workers）。**対象のブランチに workflow がまだ無いと、事前確認が 404 で「飛ばす」警告になる**ので、deploy.yml が develop と master に入ってからマージする。`tests/tools/` の「4 サイト」前提のテストも直す。`SITES_DISPATCH_TOKEN` の PAT の対象リポジトリにも追加する（ユーザー作業）
+- ワークフローを書いたら、`tools/maintenance-sites.json` にサイトを足す（repo・workflows・workers）。**対象のブランチに workflow がまだ無いと、事前確認が 404 で「飛ばす」警告になる**ので、deploy.yml が develop と master に入ってからマージする。`tests/tools/` の「4 サイト」前提のテストも直す。`SITES_DISPATCH_TOKEN` の PAT の対象リポジトリにも追加する（ユーザー作業）。**本番の初回公開をメンテナンス画面のまま作るサイトは、公開準備ができるまで、本番（production）の workflow・Worker を載せない**（本番を含む一括切替の `notice` / `false` が、メンテ画面のままの本番を意図せず公開するため。develop だけ載せ、本番は公開準備ができてから足す。fara-vrc-photo-album がこの扱い）
 
 ## 6. Cloudflare・GitHub の手作業（ユーザー）
 
