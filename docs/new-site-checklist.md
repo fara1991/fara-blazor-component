@@ -4,7 +4,7 @@ kit を使う新しいサイト（Blazor WebAssembly + MudBlazor を Cloudflare 
 
 ## 0. 先に決めること
 
-- リポジトリ名・公開範囲（人名などを含むなら private。**private + 無料プランはブランチ保護・Environments の保護が使えない**。他の private サイトも同じ。取り違えは deploy.yml の中の照合と、下の関門で防ぐ）
+- リポジトリ名・公開範囲（人名などを含むなら private。**private + 無料プランではブランチ保護（branch protection）が設定できない**（API が 403。avatar・portfolio も同じ。kit は public で ruleset がある）。Environments のブランチ制限は private でも使えている（avatar・portfolio で確認）。取り違えは deploy.yml の中の照合と、下の関門で防ぐ）
 - ホスト名（本番 `xxx.fara-labs.com`・確認用 `xxx-dev.fara-labs.com`）と Worker 名（`fara-xxx`・`fara-xxx-dev`）
 - .NET: kit は net10.0。`global.json` は kit と同じ（SDK 10.0.100、`rollForward: latestFeature`）。MudBlazor は kit と同じ版（9.11.0）にそろえる（ずれると二重になる）
 - 保存のキー（`<サイト>.settings`・`<サイト>.sidebar-hidden`）。**C# の `SiteOptions`・index.html の `theme-init.js` の `data-*`・既定テーマの JS の 3 か所を同じ値にする**
@@ -60,7 +60,7 @@ kit を使う新しいサイト（Blazor WebAssembly + MudBlazor を Cloudflare 
 
 1. DNS に新ホストの既存レコードが無いこと（あるとカスタムドメインの自動作成が失敗）
 2. GitHub: Secrets `CLOUDFLARE_API_TOKEN`、Variables `CLOUDFLARE_ACCOUNT_ID`（既存サイトと同じトークンを使える。Workers Scripts Edit・Workers Routes Edit・Zone DNS Edit・Account Settings Read）
-3. Environments `production`（master のみ）・`develop`（develop のみ）（private + 無料では保護が使えない場合あり）
+3. Environments `production`（master のみ）・`develop`（develop のみ）（private でも branch_policy は使える）
 4. Cloudflare Access: 確認用ホストを既存の Application に追加
 5. Turnstile: 新ホストを追加。Worker に `TURNSTILE_SITE_KEY`・`TURNSTILE_SECRET`・`DISCORD_WEBHOOK_URL`（シークレット）・`MAINTENANCE_MODE`・`MAINTENANCE_MESSAGE`（テキスト）
 6. 初回の公開 → 確認用で確認 → master へのマージ（ユーザー）→ メンテナンス画面のまま作られる → Run workflow で `maintenance_mode=false`
