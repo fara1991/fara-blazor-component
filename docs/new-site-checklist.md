@@ -59,7 +59,7 @@ kit を使う新しいサイト（Blazor WebAssembly + MudBlazor を Cloudflare 
 新サイトの `docs/cloudflare-setup.md` に、優先順の表で書く（vrc-photo-album のものが雛形）。
 
 1. DNS に新ホストの既存レコードが無いこと（あるとカスタムドメインの自動作成が失敗）
-2. GitHub: Secrets `CLOUDFLARE_API_TOKEN`、Variables `CLOUDFLARE_ACCOUNT_ID`（既存サイトと同じトークンを使える。Workers Scripts Edit・Workers Routes Edit・Zone DNS Edit・Account Settings Read）
+2. GitHub: Secrets `CLOUDFLARE_API_TOKEN`、Variables `CLOUDFLARE_ACCOUNT_ID`（既存サイトと同じトークンを使える。Workers Scripts の Edit（Read を含む）が必要。Workers Routes Edit・Zone DNS Edit はカスタムドメインの自動作成用。Account Settings の Read は `require-maintenance` が Worker の設定を読むためと書いてきたが、表記が実態と合うかは未確認）
 3. Environments `production`（master のみ）・`develop`（develop のみ）（private でも branch_policy は使える）
 4. Cloudflare Access: 確認用ホストを既存の Application に追加
 5. Turnstile: 新ホストを追加。Worker に `TURNSTILE_SITE_KEY`・`TURNSTILE_SECRET`・`DISCORD_WEBHOOK_URL`（シークレット）・`MAINTENANCE_MODE`・`MAINTENANCE_MESSAGE`（テキスト）
@@ -69,6 +69,6 @@ kit を使う新しいサイト（Blazor WebAssembly + MudBlazor を Cloudflare 
 
 `playwright-core` は作業用フォルダに入れる。`wrangler dev` で配信して、PC 1280・スマホ 390 × ダーク・ライトで、(1) JS 無効で静的 HTML に本文がある (2) 起動後に同じ見出しが残り `#boot-indicator` が外れる (3) CSP 違反 0・コンソールのエラー 0（外部の画像は route で止めず 1x1 の画像を返すとコンソールが静か）(4) ヘッダーのロゴ・フォーカス枠 (5) メンテナンス（`/api/maintenance` を差し替え）(6) 404。
 
-- **既知の落とし穴**: kit の `.fsk-header :focus-visible` は `outline-color` だけで、MudBlazor の reset により `outline-style: none` のまま。ヘッダーのブランドのリンクにキーボードのフォーカス枠が出ない（文字でも画像でも同じ）。サイトの CSS で `.xxx-brand:focus-visible { outline: 2px solid #e9d5ff }` を足す（kit 側の修正候補）
+- **既知の落とし穴（フォーカス枠）**: MudBlazor の reset により、サイト全体の `a` で `outline-style: none` になり、キーボードのフォーカス枠が出ない。kit の `.fsk-header :focus-visible` は `outline-color` だけを決めていて、ヘッダーのブランドのリンクも同じ（文字でも画像でも）。**kit 側で全リンクに枠を戻すのが本筋**（修正候補）。それまでは、サイトの CSS で本文・ギャラリー・フッター・ブランドのリンクに `:focus-visible { outline: 2px solid … }` を足し、Tab で到達して枠が見えることを Playwright で確かめる（vrc-photo-album の `tools/verify/m0-smoke.mjs`）
 - 配信が重いと `requestfailed: …/api/maintenance` が 1 件出ることがある（`MaintenanceInfo` の 2 秒の打ち切り。不具合ではない）。もう一度実行する
 - Windows の node には `E:/…` の形でパスを渡す（`/e/…` は解釈されない）。起動した `wrangler dev` は PID を控えて `taskkill /PID <pid> /T /F` で止める
