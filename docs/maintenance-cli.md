@@ -1,13 +1,13 @@
 # メンテナンス表示の切り替え（Actions の画面 / 一括変更 CLI）
 
-Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTENANCE_MESSAGE`（文面）を切り替える方法は 3 つ。**第一の手段は、GitHub Actions の「Run workflow」画面で入力して実行する方法**（スマホの GitHub アプリからも可）。Cloudflare のトークンも、手元の環境変数も要らない。4 サイトをまとめて切り替えたいときは、kit の Actions（3）か、手元の CLI（2。補助）を使う。
+Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTENANCE_MESSAGE`（文面）を切り替える方法は 3 つ。**第一の手段は、GitHub Actions の「Run workflow」画面で入力して実行する方法**（スマホの GitHub アプリからも可）。Cloudflare のトークンも、手元の環境変数も要らない。5 サイトをまとめて切り替えたいときは、kit の Actions（3）か、手元の CLI（2。補助）を使う。
 
 | 方法 | 使う場面 | 必要なもの |
 | --- | --- | --- |
 | 1. Actions の画面で実行する | 1 サイトずつ。いつでも・どこからでも | GitHub のアカウントだけ(ブラウザかスマホアプリ) |
-| 2. CLI の `set`(補助) | 4 サイトをまとめて(dev を先に流し、成功したら本番) | `gh auth login` 済みの `gh`。環境変数は不要 |
-| 3. kit の Actions「Set maintenance (all sites)」 | 4 サイトをまとめて、スマホからでも。手元の環境変数も CLI も不要 | 一度だけ: PAT(`SITES_DISPATCH_TOKEN`)と Environment の登録(下の 3) |
-| 2. CLI の `status`(補助) | 4 サイトの現在値を 1 つの表で見る(任意) | Cloudflare の読み取りトークン(Workers Scripts の Read)。無くてもよい(結果は Actions のジョブサマリーにも出る) |
+| 2. CLI の `set`(補助) | 5 サイトをまとめて(dev を先に流し、成功したら本番) | `gh auth login` 済みの `gh`。環境変数は不要 |
+| 3. kit の Actions「Set maintenance (all sites)」 | 5 サイトをまとめて、スマホからでも。手元の環境変数も CLI も不要 | 一度だけ: PAT(`SITES_DISPATCH_TOKEN`)と Environment の登録(下の 3) |
+| 2. CLI の `status`(補助) | 5 サイトの現在値を 1 つの表で見る(任意) | Cloudflare の読み取りトークン(Workers Scripts の Read)。無くてもよい(結果は Actions のジョブサマリーにも出る) |
 
 1・2・3 のどの方法でも、実際の反映は各サイトの deploy ワークフロー(`wrangler deploy --var ...`)が行う。いずれも同じ入力 `maintenance_mode` / `maintenance_message` を使う。**公開されるのは、実行するブランチ(dev = `develop`、本番 = `master`)の最新のコード**である点に注意する。
 
@@ -123,13 +123,15 @@ node tools/maintenance.mjs set --env all --mode false --apply --confirm "product
 
 `set` は、サイトのコードを公開し直す（`wrangler deploy`）。つまり、そのブランチ（dev は `develop`、production は `master`）の最新の内容が公開される。公開してはいけない変更が `master` に入っていないか、実行の前に確かめる。
 
-## 3. kit の Actions から 4 サイトまとめて切り替える
+## 3. kit の Actions から 5 サイトまとめて切り替える
 
-kit のリポジトリ(`fara1991/fara-site-kit`)の Actions →「**Set maintenance (all sites)**」→ Run workflow で、4 サイトに一度に反映する。手元の環境変数も CLI も要らない(スマホの GitHub アプリからも可)。中身は 2 の `set` を、Actions の上で動かしているだけ(`.github/workflows/set-maintenance-all.yml` → `tools/maintenance-all.mjs` → `tools/maintenance.mjs set`)。
+> album（fara-vrc-photo-album）は **develop（確認用）だけ**が対象。本番は初回公開がメンテナンス画面のままなので、公開準備ができるまで載せない。載せるときは `tools/maintenance-sites.json` の album に `workflows.production`（`{ "file": "deploy.yml", "ref": "master" }`）と `workers.production`（`fara-vrc-album`）を足し、テスト（`tests/tools/`）の本番側の期待値（dispatch 数・確認の再入力 `production album,avatar,…`）を更新する。それまで album の本番は、album の Actions → Deploy → Run workflow（`maintenance_mode`）で操作する。
+
+kit のリポジトリ(`fara1991/fara-site-kit`)の Actions →「**Set maintenance (all sites)**」→ Run workflow で、5 サイトに一度に反映する。手元の環境変数も CLI も要らない(スマホの GitHub アプリからも可)。中身は 2 の `set` を、Actions の上で動かしているだけ(`.github/workflows/set-maintenance-all.yml` → `tools/maintenance-all.mjs` → `tools/maintenance.mjs set`)。
 
 **Use workflow from は `master` のみ**(`validate` が検査する。develop など、ほかのブランチ上からは実行できない)。
 
-入力(反映先は**チェックボックス**で選ぶ。複数チェック可。サイトは常に 4 つすべて):
+入力(反映先は**チェックボックス**で選ぶ。複数チェック可。サイトは常に 5 つすべて):
 
 | 入力 | 値 |
 | --- | --- |
@@ -174,7 +176,7 @@ PAT は repository secret ではなく、**Environment のシークレット**�
 
 1. fine-grained PAT を作る: GitHub → 右上のアイコン → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
    - Resource owner: 自分(`fara1991`)
-   - Repository access: **Only select repositories** → `fara-pokemon-battle-assistant`、`fara-avatar-modding-guide`、`fara-bot-moderator`、`fara-portfolio-site` の **4 つだけ**
+   - Repository access: **Only select repositories** → `fara-pokemon-battle-assistant`、`fara-avatar-modding-guide`、`fara-bot-moderator`、`fara-portfolio-site`、`fara-vrc-photo-album` の **5 つだけ**
    - Repository permissions: **Actions: Read and write**(Metadata: Read-only は自動で付く)。あわせて **Contents: Read-only を付けることを推奨**する。(a) 事前確認(入力を受け取れないサイトを飛ばす)ができる、(b) 起動した run が各ブランチの先頭のコミットのものかまで照合でき、取り違えを防げる(付けなくても動くが、その 2 つが働かない)
    - 有効期限(Expiration): 必ず付ける(短めにして、切れたら作り直す)
 2. Environment を **2 つ**作る: **fara-site-kit → Settings → Environments → New environment**

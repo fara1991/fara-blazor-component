@@ -2,6 +2,19 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 0.4.0
+
+2026-10-25。追加の API のみ（破壊的変更なし）。既存のサイトは、submodule をこのタグに上げるだけで、動作は変わらない。
+
+- 要約: 報告フォーム（`ReportFormView` / `ReportForm`）の**連絡先を必須にするオプション**（`ContactRequired`）と、**X のユーザー名（@○○）の形の検査**（`ContactFormat = XHandle`）、見出し・説明・例の差し替え（`ContactLabel`・`ContactHint`・`ContactPlaceholder`）を追加。既定は従来どおり任意。fara-vrc-photo-album の `/report` で使う。
+- そのほか: `docs/new-site-checklist.md` の追加、`tools/maintenance-sites.json` への album（develop）の追加。
+
+詳細:
+
+- 報告フォームの連絡先を、サイトごとに**必須**にできるようにした（既定は従来どおり任意・自由な文字列で、既存のサイトの動作は変わらない）。`ReportFormView` に `ContactRequired`・`ContactFormat`・`ContactLabel`・`ContactPlaceholder` を追加し、`ContactHint` は未指定（null）のとき必須か任意かに合わせた既定の文を出す（文字列で渡していたサイトはそのまま動く）。`ReportForm`（Core）に `ContactRequired`・`ContactFormat`（`ReportContactFormat.Any` / `XHandle`）・`ContactName`・`IsXHandle`（`@` + 英数字とアンダースコア 1〜15 文字）を追加し、`Validate` が検査する。必須のとき、連絡先の入力欄に `aria-required="true"` を付ける（支援技術の読み上げ。`MudTextField.Required` は英語の「Required」が出るので使わない）。Worker は変更なし（検査は画面側だけ）。テスト（Core・Razor）・docs/usage.md を追加。想定する使い方: fara-vrc-photo-album の `/report`（X のユーザー名を必須）。
+- `docs/new-site-checklist.md` を追加（新しいサイトを立ち上げる手順。fara-vrc-photo-album の M0 で実際に踏んだ順序と、落とし穴）。コードの変更なし。
+- `tools/maintenance-sites.json` に album（`fara1991/fara-vrc-photo-album`）を追加し、一括変更の対象を 5 サイトにした。**album は develop（確認用。deploy.yml・Worker `fara-vrc-album-dev`）だけ**を載せる: 本番は初回公開がメンテナンス画面（`MAINTENANCE_MODE=true`）のままなので、本番を含む一括切替（`notice` / `false`）が、意図せず公開してしまうのを防ぐ。**公開準備ができたら**、`workflows.production`（`deploy.yml`・`master`）と `workers.production`（`fara-vrc-album`）を足す（docs/maintenance-cli.md）。マージは album の deploy.yml が develop に入ってから（無いブランチは事前確認で警告つきで飛ばされる）。`SITES_DISPATCH_TOKEN` の PAT の対象リポジトリにも追加が要る。テストの期待値（サイト数・dispatch 数）、docs・コメントを更新。
+
 ## 0.3.5
 
 報告フォーム(`worker/report.js`・`ReportForm`・`report.js`)のレビュー指摘の修正。各サイトは submodule をこのタグに上げて取り込む。

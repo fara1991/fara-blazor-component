@@ -357,21 +357,26 @@ test("status: 想定外の応答は失敗として扱う", async () => {
 
 // ---- 同梱ファイル・ドキュメント ----
 
-test("同梱の maintenance-sites.json は読め、4 サイトの dev・production のワークフローと Worker がそろっている", async () => {
+test("同梱の maintenance-sites.json は読め、5 サイトの dev と、4 サイトの production のワークフローと Worker がそろっている（album は develop のみ）", async () => {
   const sites = JSON.parse(readFileSync(join(root, "tools", "maintenance-sites.json"), "utf8")).sites;
-  assert.deepEqual(sites.map((s) => s.name), ["pokemon", "avatar", "bot", "portfolio"]);
+  assert.deepEqual(sites.map((s) => s.name), ["pokemon", "avatar", "bot", "portfolio", "album"]);
   for (const s of sites) {
     assert.match(s.repo, /^fara1991\//);
     assert.equal(s.workflows.dev.ref, "develop");
+    if (s.name === "album") continue; // 本番は公開準備ができてから足す（maintenance-sites.json の _comment）
     assert.equal(s.workflows.production.ref, "master");
     assert.ok(s.workers.dev.endsWith("-dev") && !s.workers.production.endsWith("-dev"));
   }
+  const album = sites.find((s) => s.name === "album");
+  assert.equal(album.workflows.production, undefined, "album の本番は、公開準備ができるまで載せない（メンテ画面のままの本番を、一括切替で公開しない）");
+  assert.equal(album.workers.production, undefined);
+  assert.equal(album.workers.dev, "fara-vrc-album-dev");
   const r = await new Promise((resolve) => {
     const out = [];
     main(["set", "--env", "all", "--mode", "false"], { env: {}, log: (t) => out.push(t), error: (t) => out.push(t) }).then((code) => resolve({ code, out: out.join("\n") }));
   });
   assert.equal(r.code, 0);
-  assert.equal((r.out.match(/gh workflow run/g) ?? []).length, 8);
+  assert.equal((r.out.match(/gh workflow run/g) ?? []).length, 9);
 });
 
 test("docs/maintenance-cli.md の雛形は、CLI が渡す入力名と合い、新しい変数名 MAINTENANCE_MODE だけを --var で渡す", () => {
