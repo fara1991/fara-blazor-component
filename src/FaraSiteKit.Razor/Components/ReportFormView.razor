@@ -52,7 +52,7 @@
                 <label class="fsk-form-label" for="report-contact">@ContactLabelText</label>
                 <p class="fsk-small fsk-muted fsk-mb-1">@ContactHintText</p>
                 <MudTextField T="string" Variant="Variant.Outlined" Margin="Margin.Dense" Class="fsk-field" InputId="report-contact" MaxLength="@ReportForm.MaxContact"
-                              Value="@Form.Contact" ValueChanged="@(v => Form.Contact = v ?? "")" Placeholder="@ContactPlaceholderText" />
+                              Value="@Form.Contact" ValueChanged="@(v => Form.Contact = v ?? "")" Placeholder="@ContactPlaceholderText" UserAttributes="@ContactAttributes" />
             </div>
             @* ボット対策の罠。人には見えない（CSS で画面の外に出す、.report-trap）。入っていたら、サーバーは何も送らずに成功を返す *@
             <div class="fsk-report-trap" aria-hidden="true">
@@ -117,6 +117,13 @@
     private string ContactHintText => ContactHint ?? (ContactRequired
         ? "返信先として、連絡のつくメールアドレスや SNS の ID などを書いてください。"
         : "返信が欲しいときだけ、メールアドレスや SNS の ID などを書いてください。書かなくても送れます。");
+
+    // 必須のとき、入力欄に aria-required を付ける（支援技術が「必須」と読み上げる）。MudTextField の Required は英語のエラーが出るので使わない
+    private static readonly Dictionary<string, object> RequiredAttributes = new() { ["aria-required"] = "true" };
+
+    private static readonly Dictionary<string, object> NoAttributes = new();
+
+    private Dictionary<string, object> ContactAttributes => ContactRequired ? RequiredAttributes : NoAttributes;
 
     private string ContactPlaceholderText => ContactPlaceholder ?? (ContactRequired ? "返信先" : "返信が必要なときだけ");
 

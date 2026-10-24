@@ -302,4 +302,16 @@ public class ReportFormViewTests : SiteKitTestContext
         Assert.DoesNotContain("Required", cut.Markup, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll(".mud-input-helper-text"));
     }
+
+    [Fact]
+    public void ARequiredContactMarksTheInputRequiredForAssistiveTechnologyAndAnOptionalOneDoesNot()
+    {
+        var required = RenderForm(extra: p => p.Add(c => c.ContactRequired, true));
+        var input = required.Find("#report-contact");
+        Assert.Equal("true", input.GetAttribute("aria-required"));
+
+        var optional = RenderForm();
+        var plain = optional.Find("#report-contact");
+        Assert.False(plain.HasAttribute("aria-required"));
+    }
 }
