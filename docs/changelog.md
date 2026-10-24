@@ -16,7 +16,7 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 - `ReportForm.DescribeFailure`: Worker が返さない 429 専用の文を削除(429 は既定の文になる)。
 - `report.js`(クライアント): CSP のコメントを実態に合わせた(script-src だけでなく frame-src・connect-src も必要。`presets.turnstile`)。
 - 報告フォームの色の直書き: kit の CSS には無く(トークンのみ)、変更なし。
-- テスト: `worker/report.test.mjs`(siteverify の非 2xx・読めない・秘密の不正→503 とログ、トークン不正→400、ストリームでの 413、hostname 無し→400、Discord 失敗のログに秘密が出ない、トークンを 2048 文字で切る、`\XXXX` 形式の最悪値(日本語 2000+連絡先 200+トークン 2048、絵文字 2000 個)が通る、32 KB ちょうど・+1 バイトの境界)、`ReportFormTests`(429、`ToJson` の escape と読み戻し)。
+- テスト: `worker/report.test.mjs`(siteverify の非 2xx・読めない・秘密の不正→503 とログ、トークン不正→400、ストリームでの 413、hostname 無し→400、Discord 失敗のログに秘密が出ない、トークンを 2048 文字で切る、`\uXXXX` 形式の最悪値(日本語 2000+連絡先 200+トークン 2048、絵文字 2000 個)が通る、32 KB ちょうど・+1 バイトの境界)、`ReportFormTests`(429、`ToJson` の escape と読み戻し)。
 
 ## 0.3.4
 
