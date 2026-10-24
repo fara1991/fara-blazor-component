@@ -1,5 +1,6 @@
 // 「作者へ報告」（問い合わせ）フォームの、Cloudflare Turnstile（ボット判定）の部品。window.faraSiteKit.report の下にまとめる。
-// 外部のスクリプトは https://challenges.cloudflare.com だけ（サイトの CSP で許可する）。
+// 外部のスクリプトは https://challenges.cloudflare.com だけ。サイトの CSP に、script-src・frame-src（ウィジェットの iframe）・connect-src の
+// 3 つで許可が要る（kit の csp/render-headers.mjs の presets.turnstile。pokemon・portfolio は tools/site.json の csp で許可済み。許可が無いと、ウィジェットが出ず送信できない）。
 // 送信先の設定（GET の configPath）は worker/report.js の形: {"enabled": bool, "siteKey": "..." | null}。サイトキーは公開してよい値。
 (function () {
     "use strict";
