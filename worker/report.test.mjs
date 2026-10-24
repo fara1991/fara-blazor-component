@@ -89,7 +89,7 @@ test("JSON 以外・壊れた JSON・大きすぎる本文を断る", async () =
   assert.equal((await run(post("{not json", { raw: true }))).status, 400);
   assert.equal((await run(post("[1]", { raw: true }))).status, 400);
   assert.equal((await run(post("null", { raw: true }))).status, 400);
-  assert.equal((await run(post("x".repeat(9000), { raw: true }))).status, 413);
+  assert.equal((await run(post("x".repeat(40000), { raw: true }))).status, 413);
 });
 
 test("種類・内容・確認の欠けを断る", async () => {
@@ -139,8 +139,17 @@ test("Turnstile の確認に失敗したら 400、通信できなければ 502�
 });
 
 test("Discord への送信に失敗したら 502", async () => {
-  assert.equal((await run(post(valid), ENV, fakeFetch({ discord: { ok: false } }))).status, 502);
-  assert.equal((await run(post(valid), ENV, fakeFetch({ discord: { throws: true } }))).status, 502);
+  for (const discord of [{ ok: false }, { throws: true }]) {
+    let res;
+    const logs = await captureErrors(async () => { res = await run(post(valid), ENV, fakeFetch({ discord })); });
+    assert.equal(res.status, 502);
+    assert.equal(logs.length, 1, "サーバー側のログに残す");
+    // 状態コードなどだけ。Webhook の URL・シークレット・報告の本文・連絡先は出さない
+    const text = logs.join(" ") + await res.text();
+    for (const secret of ["discord.example", "abc", "secret-value", valid.message, valid.contact]) assert.ok(!text.includes(secret), secret);
+  }
+  const logs = await captureErrors(async () => { await run(post(valid), ENV, fakeFetch({ discord: { ok: false } })); });
+  assert.ok(logs[0].includes("500"), "状態コードは出す");
 });
 
 test("応答にシークレットと Webhook の URL を含めない", async () => {
@@ -241,21 +250,58 @@ test("本文の大きさ: Content-Length が無くても、うそでも、上限
     if (declared) assert.equal(req.headers.get("Content-Length"), declared, "テストの前提: 宣言が残っている");
     const f = fakeFetch();
     assert.equal((await run(req, ENV, f)).status, 413, String(declared));
-    assert.ok(pulled <= 20, `無限に読まない（${pulled} 回）`);
+    assert.ok(pulled <= 40, `無限に読まない（${pulled} 回）`);
     assert.equal(cancelled, true);
     assert.equal(f.calls.length, 0);
   }
 });
 
-test("本文の上限ちょうど付近: 日本語 2000 文字・連絡先・トークンの最大の報告は通る", async () => {
-  const big = { ...valid, message: "あ".repeat(2000), contact: "い".repeat(200), turnstileToken: "t".repeat(2048) };
-  assert.equal((await run(post(big))).status, 200);
+/** JSON.stringify の結果の非 ASCII を、すべて \uXXXX（UTF-16 の単位ごと。絵文字は 12 文字）にする。既定の JsonSerializer（旧 ReportForm.ToJson）と同じ形。 */
+const asciiJson = (value) => JSON.stringify(value).replace(/[\u0080-￿]/g, (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
+const postRaw = (text, headers = {}) => new Request(`${HOST}/api/report`, { method: "POST", headers: { "Content-Type": "application/json", Origin: HOST, ...headers }, body: text });
+
+test("最大の報告は、\\uXXXX に直された形（旧クライアントの JSON）でも通る: 日本語 2000 文字・絵文字 2000 個", async () => {
+  const jp = asciiJson({ ...valid, message: "あ".repeat(2000), contact: "い".repeat(200), turnstileToken: "t".repeat(2048) });
+  assert.ok(jp.length > 8192 && jp.length <= 32 * 1024, `日本語の最大の本文は ${jp.length} 文字`);
+  assert.equal((await run(postRaw(jp))).status, 200);
+  const emoji = asciiJson({ ...valid, message: "😀".repeat(2000), contact: "😀".repeat(200), page: "/" + "a".repeat(299), turnstileToken: "t".repeat(2048) });
+  assert.ok(emoji.length > 28000 && emoji.length <= 32 * 1024, `絵文字の最大の本文は ${emoji.length} 文字`);
+  const f = fakeFetch();
+  assert.equal((await run(postRaw(emoji), ENV, f)).status, 200);
+  assert.equal(Array.from(JSON.parse(f.calls[1].init.body).embeds[0].description).length, 2000);
+  // 非 ASCII をそのまま送る形（新クライアント）も通る
+  assert.equal((await run(post({ ...valid, message: "あ".repeat(2000) }))).status, 200);
+});
+
+test("本文の上限の境界: ちょうど 32 KB は通り、1 バイト超えたら 413（宣言も、宣言なしも）", async () => {
+  const LIMIT = 32 * 1024;
+  const pad = (bytes) => { const base = '{"x":""}'; return '{"x":"' + "a".repeat(bytes - base.length) + '"}'; };
+  const atLimit = pad(LIMIT);
+  const over = pad(LIMIT + 1);
+  assert.equal(new TextEncoder().encode(atLimit).length, LIMIT);
+  // 上限ちょうど: 大きさの検査は通り、そのあとの検査（種類が無い）で 400
+  assert.equal((await run(postRaw(atLimit))).status, 400);
+  assert.equal((await run(postRaw(atLimit, { "Content-Length": String(LIMIT) }))).status, 400);
+  assert.equal((await run(postRaw(over))).status, 413);
+  assert.equal((await run(postRaw(over, { "Content-Length": String(LIMIT + 1) }))).status, 413);
+  assert.equal((await run(postRaw(atLimit, { "Content-Length": String(LIMIT + 1) }))).status, 413, "宣言が超えていれば読む前に断る");
+  // 2 バイト文字でバイト数が上限を超える（文字数は上限以下）
+  assert.equal((await run(postRaw('{"x":"' + "é".repeat(LIMIT / 2) + '"}'))).status, 413);
+});
+
+test("トークンは 2048 文字までに切って Turnstile に渡す", async () => {
+  const f = fakeFetch();
+  assert.equal((await run(post({ ...valid, turnstileToken: "t".repeat(3000) }), ENV, f)).status, 200);
+  assert.equal(f.calls[0].init.body.get("response").length, 2048);
+  const g = fakeFetch();
+  await run(post({ ...valid, turnstileToken: "t".repeat(2048) }), ENV, g);
+  assert.equal(g.calls[0].init.body.get("response").length, 2048);
 });
 
 test("宣言された本文の大きさが上限を超えたら、読む前に 413", async () => {
   let read = false;
   const req = post(valid);
-  const big = new Request(req, { headers: new Headers({ "Content-Type": "application/json", Origin: HOST, "Content-Length": String(20 * 1024) }) });
+  const big = new Request(req, { headers: new Headers({ "Content-Type": "application/json", Origin: HOST, "Content-Length": String(40 * 1024) }) });
   big.text = async () => { read = true; return "{}"; };
   assert.equal((await run(big)).status, 413);
   assert.equal(read, false);

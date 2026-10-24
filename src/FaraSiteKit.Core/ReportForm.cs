@@ -48,7 +48,10 @@ public sealed class ReportForm
     /// </summary>
     public static int CountCharacters(string? text) => string.IsNullOrEmpty(text) ? 0 : text.EnumerateRunes().Count();
 
-    /// <summary>サーバーへ送る JSON。</summary>
+    /// <summary>
+    /// サーバーへ送る JSON。非 ASCII を \uXXXX にしない（UnsafeRelaxedJsonEscaping。日本語 2000 文字が約 6 KB で済む）。
+    /// この文字列は application/json の本文としてだけ使い、HTML には埋め込まない（埋め込まないので、緩めた escape でも安全）。
+    /// </summary>
     public string ToJson() => JsonSerializer.Serialize(new
     {
         category = Category,
@@ -57,7 +60,9 @@ public sealed class ReportForm
         page = Page,
         turnstileToken = TurnstileToken,
         website = Website,
-    });
+    }, JsonOptions);
+
+    private static readonly JsonSerializerOptions JsonOptions = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     /// <summary>?from= で渡されたページ（パス）を、送ってよい形にする。パスでなければ空（外部の URL・スクリプトなどは送らない）。</summary>
     public static string CleanPage(string? from)

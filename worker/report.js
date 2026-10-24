@@ -11,13 +11,16 @@
 //   DISCORD_WEBHOOK_URL  通知を送る Discord の Webhook の URL（シークレット）
 // どれかが無いときは 503 を返す（報告ページには「いまは受け付けていません」と出る）。
 // シークレットと Webhook の URL は、ログ・エラーメッセージ・応答に出さない。サーバー側のログ（console.error）は、Turnstile を使えないとき
-// （siteverify の非 2xx・結果を読めない・シークレット不正）の固定の文と、状態コード・error-codes だけ。
+// （siteverify の非 2xx・結果を読めない・シークレット不正）と、Discord への送信の失敗の、固定の文と状態コード・error-codes だけ。
 // Turnstile 側の問題（利用者の失敗ではない）は 503（いまは受け付けていません）にして、ログに残す。トークンの不正・期限切れは従来どおり 400。
 // 報告の本文は個人情報になりうるので、保存しない（Discord に送るだけ）。
 
-const MAX_BODY_CHARS = 8 * 1024;
-/** 本文のバイト数の上限（Content-Length の宣言も、実際に読んだ量も）。日本語 2000 文字（1 文字 3 バイト）と余白を入れても、これを超えない。 */
-const MAX_BODY_BYTES = 16 * 1024;
+/**
+ * 本文のバイト数の上限（Content-Length の宣言も、実際に読んだ量も）。32 KB。
+ * JSON が非 ASCII を \uXXXX（6 文字。絵文字は 12 文字）にする送り手でも通る大きさ:
+ * メッセージ 2000 文字×12 + 連絡先 200 文字×12 + トークン 2048 + ページ 300 + 余白 ≒ 29 KB。（文字数は、バイト数より大きくならないので別には数えない。）
+ */
+const MAX_BODY_BYTES = 32 * 1024;
 /** 外へ出る通信（Turnstile・Discord）を待つ最大の時間。 */
 const FETCH_TIMEOUT_MS = 5000;
 const MAX_MESSAGE = 2000;
@@ -122,7 +125,7 @@ export async function handleReport(request, env, siteName, deps = {}) {
   const declared = Number(request.headers.get("Content-Length"));
   if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return json(413, { error: "too_large" });
   const text = await readLimitedText(request);
-  if (text === null || text.length > MAX_BODY_CHARS) return json(413, { error: "too_large" });
+  if (text === null) return json(413, { error: "too_large" });
   let body;
   try { body = JSON.parse(text); } catch { return json(400, { error: "invalid_json", message: "送信内容を読めませんでした" }); }
   if (body === null || typeof body !== "object" || Array.isArray(body)) return json(400, { error: "invalid_body", message: "送信内容を読めませんでした" });
@@ -184,8 +187,12 @@ export async function handleReport(request, env, siteName, deps = {}) {
   };
   try {
     const res = await doFetch(env.DISCORD_WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!res.ok) return json(502, { error: "notify_failed", message: "送信に失敗しました。しばらくしてからもう一度お試しください" });
-  } catch {
+    if (!res.ok) {
+      console.error("report: discord webhook failed, status", res.status);
+      return json(502, { error: "notify_failed", message: "送信に失敗しました。しばらくしてからもう一度お試しください" });
+    }
+  } catch (error) {
+    console.error("report: discord webhook request failed", error?.name ?? "error");
     return json(502, { error: "notify_failed", message: "送信に失敗しました。しばらくしてからもう一度お試しください" });
   }
   return json(200, { ok: true });

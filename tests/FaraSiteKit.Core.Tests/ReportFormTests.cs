@@ -106,6 +106,42 @@ public class ReportFormTests
         Assert.Equal("", root.GetProperty("website").GetString());
     }
 
+    [Fact]
+    public void Json_keeps_japanese_text_unescaped_so_the_largest_report_stays_small()
+    {
+        var form = Valid();
+        form.Message = new string('あ', 2000);
+        form.Contact = new string('い', 200);
+        var json = form.ToJson();
+        Assert.DoesNotContain("\\u3042", json);   // 日本語を \uXXXX にしない
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(json) < 8 * 1024, "日本語 2000 文字+連絡先 200 文字でも 8 KB 未満");
+        using var doc = JsonDocument.Parse(json);
+        Assert.Equal(form.Message, doc.RootElement.GetProperty("message").GetString());   // 読み戻すと同じ
+        Assert.Equal(form.Contact, doc.RootElement.GetProperty("contact").GetString());
+    }
+
+    [Fact]
+    public void Json_round_trips_emoji_within_the_worker_limit()
+    {
+        var form = Valid();
+        form.Message = string.Concat(Enumerable.Repeat("😀", 2000));   // 絵文字は 😀 のように escape されることがある
+        var json = form.ToJson();
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(json) < 32 * 1024, "worker の上限 32 KB に収まる");
+        using var doc = JsonDocument.Parse(json);
+        Assert.Equal(form.Message, doc.RootElement.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public void Json_still_escapes_quotes_backslashes_and_control_characters()
+    {
+        var form = Valid();
+        form.Message = "a\"b\\c\nd<script>";
+        var json = form.ToJson();
+        using var doc = JsonDocument.Parse(json);
+        Assert.Equal("a\"b\\c\nd<script>", doc.RootElement.GetProperty("message").GetString());
+        Assert.DoesNotContain("\n", json);   // 生の改行は本文に入らない
+    }
+
     [Theory]
     [InlineData("/speed-comparison", "/speed-comparison")]
     [InlineData("/", "/")]
