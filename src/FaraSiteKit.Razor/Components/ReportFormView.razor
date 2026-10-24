@@ -52,7 +52,7 @@
                 <label class="fsk-form-label" for="report-contact">@ContactLabelText</label>
                 <p class="fsk-small fsk-muted fsk-mb-1">@ContactHintText</p>
                 <MudTextField T="string" Variant="Variant.Outlined" Margin="Margin.Dense" Class="fsk-field" InputId="report-contact" MaxLength="@ReportForm.MaxContact"
-                              Value="@Form.Contact" ValueChanged="@(v => Form.Contact = v ?? "")" Placeholder="@ContactPlaceholderText" Required="@ContactRequired" />
+                              Value="@Form.Contact" ValueChanged="@(v => Form.Contact = v ?? "")" Placeholder="@ContactPlaceholderText" />
             </div>
             @* ボット対策の罠。人には見えない（CSS で画面の外に出す、.report-trap）。入っていたら、サーバーは何も送らずに成功を返す *@
             <div class="fsk-report-trap" aria-hidden="true">

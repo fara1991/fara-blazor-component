@@ -291,4 +291,15 @@ public class ReportFormViewTests : SiteKitTestContext
 
         Assert.True(cut.Instance.Form.ContactRequired);
     }
+
+    [Fact]
+    public void ARequiredContactDoesNotShowMudBlazorsOwnEnglishRequiredErrorOnBlur()
+    {
+        var cut = RenderForm(extra: p => p.Add(c => c.ContactRequired, true));
+
+        cut.Find("#report-contact").Blur();
+
+        Assert.DoesNotContain("Required", cut.Markup, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll(".mud-input-helper-text"));
+    }
 }
