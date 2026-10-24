@@ -2,6 +2,10 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 未リリース
+
+- `docs/new-site-checklist.md` を追加（新しいサイトを立ち上げる手順。fara-vrc-photo-album の M0 で実際に踏んだ順序と、落とし穴）。コードの変更なし。
+
 ## 0.3.5
 
 報告フォーム(`worker/report.js`・`ReportForm`・`report.js`)のレビュー指摘の修正。各サイトは submodule をこのタグに上げて取り込む。
