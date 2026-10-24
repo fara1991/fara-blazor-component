@@ -10,8 +10,8 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 | 場所 | 中身 | 状態 |
 | --- | --- | --- |
 | `worker/` | Worker の共有 JS（`maintenance.js`: メンテナンス表示、`report.js`: 作者への報告の受け口）と、そのテスト | K0 で取り込み（develop 時点で pokemon と同一内容） |
+| `.github/workflows/set-maintenance-all.yml` | kit の Actions「Set maintenance (all sites)」。反映先をチェックボックス(develop / master)で選び、5 サイト（album は develop のみ）のメンテナンス表示をまとめて切り替える(`workflow_dispatch` のみ・実行元は master のみ。Environment のシークレット・本番は承認つき。`docs/maintenance-cli.md` の 3) | 0.3.1(0.3.2 でチェックボックスに変更、0.3.4 で migration_wasm を廃止) |
 | `docs/` | 利用方法・変更履歴・メンテナンス一括変更 CLI の使い方（`maintenance-cli.md`）・新しいサイトの立ち上げ手順（`new-site-checklist.md`） | K0 で作成 |
-| `.github/workflows/set-maintenance-all.yml` | kit の Actions「Set maintenance (all sites)」。反映先をチェックボックス(develop / master)で選び、4 サイトのメンテナンス表示をまとめて切り替える(`workflow_dispatch` のみ・実行元は master のみ。Environment のシークレット・本番は承認つき。`docs/maintenance-cli.md` の 3) | 0.3.1(0.3.2 でチェックボックスに変更、0.3.4 で migration_wasm を廃止) |
 | `tools/` | `maintenance.mjs`（補助の CLI。`set` で複数サイトの deploy ワークフローを `gh` でまとめて実行して `MAINTENANCE_MODE` / `MAINTENANCE_MESSAGE` を切り替え、`status` で現在値を見る。Cloudflare API へは書き込まない）と対象の一覧。第一の手段は、各サイトの Actions の「Run workflow」画面で入力して実行する方法（`docs/maintenance-cli.md` の 1。Cloudflare のトークンも手元の環境変数も不要） | 0.3.0 |
 | `src/FaraSiteKit.Core/` | C#（UI と通信に依存しない共通コード）: `SiteLinks`（確認用ホストへの切り替え）・`MaintenanceInfo`（メンテナンス状態の読み取り）・`ReportForm`（報告の入力の検査） | K0-2 |
 | `tests/FaraSiteKit.Core.Tests/` | 上の C# の xUnit テスト（`dotnet test`） | K0-2 |

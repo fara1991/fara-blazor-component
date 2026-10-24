@@ -10,7 +10,7 @@ import { planFromEnv, runAll, STAGES, ALLOWED_RUN_REF } from "../../tools/mainte
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TIP = "a".repeat(40);
 const OK = "inputs: maintenance_mode maintenance_message";
-const REPOS = { pokemon: "fara1991/fara-pokemon-battle-assistant", avatar: "fara1991/fara-avatar-modding-guide", bot: "fara1991/fara-bot-moderator", portfolio: "fara1991/fara-portfolio-site" };
+const REPOS = { pokemon: "fara1991/fara-pokemon-battle-assistant", avatar: "fara1991/fara-avatar-modding-guide", bot: "fara1991/fara-bot-moderator", portfolio: "fara1991/fara-portfolio-site", album: "fara1991/fara-vrc-photo-album" };
 const base = { RUN_REF: "refs/heads/master", TARGET_DEVELOP: "true", TARGET_MASTER: "false", MAINTENANCE_MODE_INPUT: "notice", MAINTENANCE_MESSAGE_INPUT: "" };
 
 /**
@@ -68,7 +68,7 @@ test("チェックボックスと環境の対応: develop = dev、master = produ
   const p = planFromEnv({ ...base, TARGET_MASTER: "true", MAINTENANCE_MODE_INPUT: "true", MAINTENANCE_MESSAGE_INPUT: "文面" });
   assert.deepEqual(p.stages.map((s) => s.envName), ["dev", "production"]);
   assert.deepEqual(p.stages[0].base, ["set", "--env", "dev", "--mode", "true", "--message", "文面", "--allow-empty"]);
-  assert.deepEqual(p.stages[0].sites, ["pokemon", "avatar", "bot", "portfolio"], "サイトは常に 4 つすべて");
+  assert.deepEqual(p.stages[0].sites, ["pokemon", "avatar", "bot", "portfolio", "album"], "サイトは常に 5 つすべて");
   assert.equal(p.stages[1].confirm, "production avatar,bot,pokemon,portfolio");
   assert.equal(p.stages[0].confirm, undefined);
   assert.deepEqual(planFromEnv(base).stages.map((s) => s.envName), ["dev"], "既定は develop だけ");
@@ -92,7 +92,7 @@ test("入力の検査(注入防止): 不正な値は拒否する。master の実
 
 // ---- 実行 ----
 
-test("develop: 4 サイトの dev のワークフローを develop で起動し、入力を渡す。サマリーに run の URL が出る", async () => {
+test("develop: 5 サイトの dev のワークフローを develop で起動し、入力を渡す。サマリーに run の URL が出る", async () => {
   const r = await go({ MAINTENANCE_MESSAGE_INPUT: "20:00 ごろ `更新`" });
   assert.equal(r.code, 0, r.out);
   const d = r.g.dispatches();
@@ -108,7 +108,7 @@ test("develop と master の両方: dev を全部起動・成功してから本�
   const r = await go({ ...master });
   assert.equal(r.code, 0, r.out);
   const d = r.g.dispatches();
-  assert.deepEqual(d.map((x) => x.ref), ["develop", "develop", "develop", "develop", "master", "master", "master", "master"]);
+  assert.deepEqual(d.map((x) => x.ref), ["develop", "develop", "develop", "develop", "develop", "master", "master", "master", "master"]);
   const idx = (pred) => r.g.calls.findIndex(pred);
   const lastDevWatch = r.g.calls.map((a, i) => (a[1] === "watch" ? i : -1)).filter((i) => i >= 0)[3];
   const firstMaster = idx((a) => a[0] === "workflow" && a.includes("master"));
@@ -128,7 +128,7 @@ test("master だけ: 各サイトの本番のワークフローを master で起
 test("対象ブランチのワークフローが入力を受け取れない版のサイトは、dispatch せずに飛ばし、サマリーに理由を出す", async () => {
   const r = await go({}, { contents: { [`${REPOS.avatar}@develop`]: "name: Deploy\non: push\n" } });
   assert.equal(r.code, 0, r.out);
-  assert.deepEqual(r.g.dispatches().map((x) => x.repo).sort(), [REPOS.bot, REPOS.pokemon, REPOS.portfolio].sort());
+  assert.deepEqual(r.g.dispatches().map((x) => x.repo).sort(), [REPOS.album, REPOS.bot, REPOS.pokemon, REPOS.portfolio].sort());
   assert.match(r.summary, /飛ばしたサイト\(警告\)/);
   assert.match(r.summary, /- avatar \/ dev: .*fara-avatar-modding-guide の develop の deploy\.yml に、入力 maintenance_mode がまだ無い/);
 });
@@ -145,10 +145,10 @@ test("すべて飛ばされたら失敗(何も反映されない)。dispatch は
 test("ワークフローのファイルが無い(404)は飛ばす。権限が無く確かめられない(403)ときは、従来どおり dispatch する", async () => {
   const r = await go({}, { contents: { [`${REPOS.avatar}@develop`]: 404 } });
   assert.equal(r.code, 0, r.out);
-  assert.equal(r.g.dispatches().length, 3, "avatar だけ飛ばす");
+  assert.equal(r.g.dispatches().length, 4, "avatar だけ飛ばす");
   const g = await go({}, { contents: Object.fromEntries(Object.values(REPOS).map((repo) => [`${repo}@develop`, 403])) });
   assert.equal(g.code, 0, g.out);
-  assert.equal(g.g.dispatches().length, 4);
+  assert.equal(g.g.dispatches().length, 5);
 });
 
 test("段階 dev: 本番(master)を選んでいても、本番は起動せず、本番で飛ばすサイトが計画としてサマリーに出る(承認画面より前)", async () => {
@@ -187,7 +187,7 @@ test("事前確認の URL は .github/workflows/ 以下(ファイル名だけだ
   const r = await go({});
   assert.equal(r.code, 0, r.out);
   const urls = r.g.calls.filter((a) => a[0] === "api" && a[1].includes("/contents/")).map((a) => a[1]);
-  assert.equal(urls.length, 8, "plan と実行で 4 サイトずつ");
+  assert.equal(urls.length, 10, "dev の 5 サイトを、plan と実行で 1 回ずつ");
   assert.ok(urls.every((u) => u.includes("/contents/.github/workflows/")), urls.join("\n"));
   assert.ok(urls.includes("repos/fara1991/fara-pokemon-battle-assistant/contents/.github/workflows/deploy-develop.yml?ref=develop"));
   assert.ok(urls.includes("repos/fara1991/fara-bot-moderator/contents/.github/workflows/site.yml?ref=develop"));
@@ -203,7 +203,7 @@ test("事前確認できず(403)dispatch が 422 Unexpected inputs で返った�
   assert.match(r.out, /\[警告\] 飛ばす: \[avatar\/dev\] .*HTTP 422 Unexpected inputs/);
   assert.match(r.summary, /飛ばしたサイト\(警告\)/);
   assert.match(r.summary, /- avatar \/ dev: .*Unexpected inputs/);
-  assert.equal(r.g.calls.filter((a) => a[1] === "watch").length, 3, "ほかの 3 サイトは続行して結果を待つ");
+  assert.equal(r.g.calls.filter((a) => a[1] === "watch").length, 4, "ほかの 4 サイトは続行して結果を待つ");
 });
 
 test("422 以外のエラー(認証・ワークフロー不在・その他)は従来どおり失敗で中断し、本番は起動しない", async () => {

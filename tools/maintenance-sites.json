@@ -1,5 +1,5 @@
 {
-  "_comment": "一括変更 CLI（tools/maintenance.mjs）の対象。repo は GitHub のリポジトリ、workflows は env（dev / production）ごとの deploy ワークフローのファイル名と ref（dev = develop ブランチ、production = master）。workers は status で読む Worker 名（各サイトの wrangler.jsonc / wrangler.toml の name と同じ）。",
+  "_comment": "一括変更 CLI（tools/maintenance.mjs）の対象。repo は GitHub のリポジトリ、workflows は env（dev / production）ごとの deploy ワークフローのファイル名と ref（dev = develop ブランチ、production = master）。workers は status で読む Worker 名（各サイトの wrangler.jsonc / wrangler.toml の name と同じ）。album は develop（確認用）だけを載せている: 本番（Worker fara-vrc-album）は初回公開がメンテナンス画面（MAINTENANCE_MODE=true）のままで、本番を含む一括切替が意図せず公開してしまうため。公開準備ができたら workflows.production（deploy.yml・master）と workers.production（fara-vrc-album）を足す（docs/maintenance-cli.md）。",
   "sites": [
     {
       "name": "pokemon",
@@ -36,6 +36,14 @@
         "production": { "file": "deploy.yml", "ref": "master" }
       },
       "workers": { "production": "fara-portfolio", "dev": "fara-portfolio-dev" }
+    },
+    {
+      "name": "album",
+      "repo": "fara1991/fara-vrc-photo-album",
+      "workflows": {
+        "dev": { "file": "deploy.yml", "ref": "develop" }
+      },
+      "workers": { "dev": "fara-vrc-album-dev" }
     }
   ]
 }
