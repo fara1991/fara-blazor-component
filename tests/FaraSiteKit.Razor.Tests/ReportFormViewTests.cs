@@ -220,4 +220,75 @@ public class ReportFormViewTests : SiteKitTestContext
         gate.SetResult(new HttpResponseMessage(HttpStatusCode.OK));
         cut.WaitForAssertion(() => Assert.Contains("送信しました", cut.Markup));
     }
+
+    [Fact]
+    public void TheContactIsOptionalByDefaultAndTheLabelSaysSo()
+    {
+        var cut = RenderForm();
+
+        Assert.Contains("連絡先（任意）", cut.Find("label[for=report-contact]").TextContent);
+        Assert.Contains("返信が欲しいときだけ", cut.Markup);
+        FillValid(cut.Instance);
+        cut.Find("button.mud-button-filled").Click();
+        cut.WaitForAssertion(() => Assert.Contains("送信しました", cut.Markup));
+    }
+
+    [Fact]
+    public void ARequiredContactUsesTheGivenLabelAndBlocksAnEmptyContact()
+    {
+        var cut = RenderForm(extra: p =>
+        {
+            p.Add(c => c.ContactRequired, true);
+            p.Add(c => c.ContactFormat, ReportContactFormat.XHandle);
+            p.Add(c => c.ContactLabel, "X のユーザー名（@○○）");
+            p.Add(c => c.ContactHint, "@ に続けて書いてください。");
+            p.Add(c => c.ContactPlaceholder, "@example");
+        });
+        Assert.Equal("X のユーザー名（@○○）（必須）", cut.Find("label[for=report-contact]").TextContent.Trim());
+        Assert.Contains("@ に続けて書いてください。", cut.Markup);
+        Assert.Contains("@example", cut.Markup);
+        FillValid(cut.Instance);
+
+        cut.Find("button.mud-button-filled").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("X のユーザー名（@○○）を入力してください", cut.Markup));
+        Assert.Empty(_handler.Sent);
+    }
+
+    [Fact]
+    public void AnInvalidXHandleIsRejectedAndAValidOneIsSent()
+    {
+        var cut = RenderForm(extra: p =>
+        {
+            p.Add(c => c.ContactRequired, true);
+            p.Add(c => c.ContactFormat, ReportContactFormat.XHandle);
+        });
+        FillValid(cut.Instance);
+        cut.Instance.Form.Contact = "game_fara";
+
+        cut.Find("button.mud-button-filled").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("1〜15 文字", cut.Markup));
+        Assert.Empty(_handler.Sent);
+
+        cut.Instance.Form.Contact = "@game_fara";
+        cut.Find("button.mud-button-filled").Click();
+        cut.WaitForAssertion(() => Assert.Contains("送信しました", cut.Markup));
+        using var json = JsonDocument.Parse(Assert.Single(_handler.Sent).Body);
+        Assert.Equal("@game_fara", json.RootElement.GetProperty("contact").GetString());
+    }
+
+    [Fact]
+    public void TheContactRulesSurviveStartingOver()
+    {
+        var cut = RenderForm(extra: p => p.Add(c => c.ContactRequired, true));
+        FillValid(cut.Instance);
+        cut.Instance.Form.Contact = "me@example.com";
+        cut.Find("button.mud-button-filled").Click();
+        cut.WaitForAssertion(() => Assert.Contains("送信しました", cut.Markup));
+
+        cut.Find("button.mud-button-outlined").Click();
+
+        Assert.True(cut.Instance.Form.ContactRequired);
+    }
 }
