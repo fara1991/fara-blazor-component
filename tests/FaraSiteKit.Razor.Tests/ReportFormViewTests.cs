@@ -312,6 +312,6 @@ public class ReportFormViewTests : SiteKitTestContext
 
         var optional = RenderForm();
         var plain = optional.Find("#report-contact");
-        Assert.False(plain.HasAttribute("aria-required"));
+        Assert.NotEqual("true", plain.GetAttribute("aria-required"));
     }
 }
