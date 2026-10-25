@@ -44,5 +44,6 @@ dotnet test tests/FaraSiteKit.Razor.Tests  # Razor 部品（bUnit）
 
 - 変更の流れ・ブランチ運用: `CLAUDE.md`
 - バージョン（タグ）と変更履歴: `docs/changelog.md`
+- 新しいサイトを追加するときの確認項目: `docs/new-site-checklist.md`
 
 ライセンス: MIT（LICENSE を参照）
