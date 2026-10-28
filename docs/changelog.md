@@ -2,6 +2,10 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 未リリース
+
+- `tools/maintenance-sites.json` から album を外し、一括変更の対象を 4 サイト（pokemon・avatar・bot・portfolio）に戻した。fara-vrc-photo-album は、リポジトリをパブリックにするため（2026-10-28）サイトの公開を GitHub Actions では行わなくなり、起動するワークフロー（deploy-develop.yml）が無くなったため。tests・docs・set-maintenance-all.yml の「5 サイト」も 4 に直した。
+
 ## 0.4.0
 
 2026-10-25。追加の API のみ（破壊的変更なし）。既存のサイトは、submodule をこのタグに上げるだけで、動作は変わらない。

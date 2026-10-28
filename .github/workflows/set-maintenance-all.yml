@@ -1,12 +1,12 @@
 name: Set maintenance (all sites)
 
-# 5 サイト(pokemon・avatar・bot・portfolio・album)のメンテナンス表示を、まとめて切り替える。
+# 4 サイト(pokemon・avatar・bot・portfolio)のメンテナンス表示を、まとめて切り替える。
 # 各サイトの deploy ワークフローを gh workflow run で起動し(tools/maintenance.mjs の set)、各サイトが wrangler deploy --var で反映する。
-# 反映先は、対象ブランチのチェックボックスで選ぶ(複数可)。サイトは常に 5 つすべて。
+# 反映先は、対象ブランチのチェックボックスで選ぶ(複数可)。サイトは常に 4 つすべて。
 #   develop = 各サイトの dev(確認用)、master = 各サイトの本番(そのブランチの最新のコードが公開される)
 # dev(develop)を先に全部起動し、全部成功したら、本番(master)を 1 サイトずつ起動する。
 #
-# 安全のしくみ(docs/maintenance-cli.md の「kit の Actions から 5 サイトまとめて切り替える」):
+# 安全のしくみ(docs/maintenance-cli.md の「kit の Actions から 4 サイトまとめて切り替える」):
 #   - トリガは workflow_dispatch だけ(PR・issue・コメントでは動かない。fork の PR にシークレットは渡らない)。実行できるのは書き込み権限のある人だけ
 #   - 実行元(Use workflow from)は master だけ。validate が ref を検査する。PAT(SITES_DISPATCH_TOKEN)は Environment のシークレットで、
 #     dev の job は develop-maintenance、本番の job は production-maintenance(必須レビュワー)。どちらも Deployment branches は master のみにする

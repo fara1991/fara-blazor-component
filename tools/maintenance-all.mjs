@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // kit のリポジトリの Actions「Set maintenance (all sites)」(.github/workflows/set-maintenance-all.yml) から呼ぶ。
-// 5 サイトの deploy ワークフローを、tools/maintenance.mjs の set で一括して起動する(dev 系を先に全部・全成功後に本番、失敗で中断、起動 run の特定、本番の確認は set のもの)。
+// 4 サイトの deploy ワークフローを、tools/maintenance.mjs の set で一括して起動する(dev 系を先に全部・全成功後に本番、失敗で中断、起動 run の特定、本番の確認は set のもの)。
 //
-// 反映先は、対象ブランチのチェックボックス(boolean 入力)で選ぶ。サイトは常に 5 つすべて。
+// 反映先は、対象ブランチのチェックボックス(boolean 入力)で選ぶ。サイトは常に 4 つすべて。
 //   develop        → 各サイトの dev(develop ブランチ)
 //   master         → 各サイトの本番(master ブランチ)
 //
