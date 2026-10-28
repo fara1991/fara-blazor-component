@@ -56,6 +56,32 @@ body {
     outline-offset: 2px;
 }
 
+/* ページ全体の既定のフォーカスの枠。MudBlazor の reset（a:focus-visible・.mud-nav-link:focus の outline: none）に負けない詳細度（html を足す）。
+   サイトのボタン・リンク・サイドバーの項目・カード内のリンクの枠を出す。入力欄（input・textarea・select）は MudBlazor が枠線の色で示すので対象外。
+   色は --fsk-focus（既定は暗い紫の上で見える淡い紫）。 */
+html a:focus-visible,
+html button:focus-visible,
+html [role="button"]:focus-visible,
+html [tabindex]:focus-visible,
+html .fsk-nav :is(a, button):focus-visible,
+html .mud-nav-link:focus-visible {
+    outline: 2px solid var(--fsk-focus, #e9d5ff);
+    outline-offset: 2px;
+}
+
+/* 報告の受付停止の文（MudAlert の警告）。白地で 4.5:1 以上になる色（既定の橙は 3:1 未満）。ダークは明るい橙 */
+:root {
+    --fsk-warning-text: #9a5b00;
+}
+
+:root[data-bs-theme="dark"] {
+    --fsk-warning-text: #ffb74d;
+}
+
+.fsk-report-unavailable.mud-alert {
+    color: var(--fsk-warning-text);
+}
+
 /* 「本文へ移動」（キーボードの利用者向け）。普段は画面の外に置き、Tab で出る */
 .fsk-skip-link {
     position: absolute;

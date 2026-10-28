@@ -206,6 +206,27 @@ async function captureErrors(fn) {
   return logs;
 }
 
+test("Discord・Turnstile への通信の例外は、名前と、URL・トークンを伏せたメッセージだけをログに残す（秘密を出さない）", async () => {
+  const webhook = "https://discord.example/api/webhooks/123456/SecretWebhookTokenAbcdefghijklmnop";
+  // Discord の送信が例外（メッセージに Webhook の URL を含む）
+  const discordFetch = async (url) => {
+    if (String(url).includes("turnstile")) return new Response(JSON.stringify({ success: true, hostname: "site.example" }), { status: 200 });
+    throw new TypeError(`failed to post to ${webhook} token=abc`);
+  };
+  let res;
+  const logs = await captureErrors(async () => { res = await handleReport(post(valid), ENV, "テストサイト", { fetch: discordFetch, now: () => new Date("2026-10-22T00:00:00Z") }); });
+  assert.equal(res.status, 502);
+  assert.equal(logs.length, 1);
+  assert.match(logs[0], /TypeError: failed to post to \[url\] token=\[redacted\]/);
+  assert.ok(!logs.join(" ").includes("SecretWebhookToken") && !logs.join(" ").includes("discord.example"), logs.join(" "));
+  // Turnstile への通信の例外（メッセージに秘密）
+  const turnstileFetch = async () => { throw new TypeError("connect ECONNRESET Bearer secret-bearer-value"); };
+  const logs2 = await captureErrors(async () => { res = await handleReport(post(valid), ENV, "テストサイト", { fetch: turnstileFetch, now: () => new Date("2026-10-22T00:00:00Z") }); });
+  assert.equal(res.status, 502);
+  assert.equal(logs2.length, 1);
+  assert.ok(!logs2.join(" ").includes("secret-bearer-value"), logs2.join(" "));
+});
+
 test("siteverify が 2xx 以外・読めない・秘密の不正のときは 503 にして、ログに残す（Discord には送らない）", async () => {
   const cases = [
     { turnstile: { status: 500, raw: "{}" } },

@@ -12,10 +12,12 @@
 // どれかが無いときは 503 を返す（報告ページには「いまは受け付けていません」と出る）。
 // シークレットと Webhook の URL は、ログ・エラーメッセージ・応答に出さない。サーバー側のログ（console.error）は、Turnstile を使えないとき
 // （siteverify の非 2xx・結果を読めない・シークレット不正）と、Discord への送信の失敗の、固定の文と状態コード・error-codes だけ。
+// 通信の例外（fetch が投げたもの）は errorSummary（error-summary.js）で、名前と URL・トークンを伏せたメッセージだけを出す。
 // Turnstile 側の問題（利用者の失敗ではない）は 503（いまは受け付けていません）にして、ログに残す。トークンの不正・期限切れは従来どおり 400。
 // 報告の本文は個人情報になりうるので、保存しない（Discord に送るだけ）。
 
 import { cleanText as clean } from "./text.js";
+import { errorSummary } from "./error-summary.js";
 
 /**
  * 本文のバイト数の上限（Content-Length の宣言も、実際に読んだ量も）。32 KB。
@@ -147,7 +149,7 @@ export async function handleReport(request, env, siteName, deps = {}) {
     if (!res.ok) return turnstileUnavailable(`siteverify status ${res.status}`);
     try { result = await res.json(); } catch { return turnstileUnavailable("siteverify response unreadable"); }
   } catch (error) {
-    console.error("report: turnstile siteverify request failed", error?.name ?? "error");
+    console.error("report: turnstile siteverify request failed", errorSummary(error));
     return json(502, { error: "verify_failed", message: "確認に失敗しました。もう一度お試しください" });
   }
   if (result === null || typeof result !== "object" || typeof result.success !== "boolean") return turnstileUnavailable("siteverify result unusable");
@@ -184,7 +186,7 @@ export async function handleReport(request, env, siteName, deps = {}) {
       return json(502, { error: "notify_failed", message: "送信に失敗しました。しばらくしてからもう一度お試しください" });
     }
   } catch (error) {
-    console.error("report: discord webhook request failed", error?.name ?? "error");
+    console.error("report: discord webhook request failed", errorSummary(error));
     return json(502, { error: "notify_failed", message: "送信に失敗しました。しばらくしてからもう一度お試しください" });
   }
   return json(200, { ok: true });

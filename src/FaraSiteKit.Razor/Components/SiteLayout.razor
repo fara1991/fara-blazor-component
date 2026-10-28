@@ -196,7 +196,7 @@
         if (!firstRender || checkedConfig) return;
         checkedConfig = true;
         try { await JS.InvokeVoidAsync("faraSiteKit.checkConfig", Site.StorageKey, Site.SidebarKey); }
-        catch { /* JS が使えないときは、確かめない */ }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、確かめない（回線が切れたときも同じ） */ }
     }
 
     [JSInvokable]
@@ -280,19 +280,19 @@
     private async Task SetSearchSheetAsync(bool open, bool focus)
     {
         try { await JS.InvokeVoidAsync("faraSiteKit.searchSheet", open, focus); }
-        catch { /* JS が使えないときは、反映しない */ }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、反映しない（回線が切れたときも同じ） */ }
     }
 
     private async Task ApplyDesktopStateAsync()
     {
         try { await JS.InvokeVoidAsync("faraSiteKit.sidebarChanged", !desktopOpen, Site.SidebarKey); }
-        catch { /* JS が使えないときは、反映しない */ }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、反映しない（回線が切れたときも同じ） */ }
     }
 
     private async Task FocusMain()
     {
         try { await JS.InvokeVoidAsync("faraSiteKit.focusMain"); }
-        catch { /* JS が使えないときは、リンクの移動（現在のページの #fsk-main）に任せる */ }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、リンクの移動（現在のページの #fsk-main）に任せる */ }
     }
 
     // 画面を移ったら、スマホのメニューと検索欄を閉じ、本文へフォーカスを移す（項目は <a href> のまま。SiteNavMenu の項目は、OnClick を持たない）

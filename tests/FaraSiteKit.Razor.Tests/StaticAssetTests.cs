@@ -67,6 +67,74 @@ public class StaticAssetTests
     }
 
     [Fact]
+    public void PageWideFocusRingCoversLinksButtonsAndTheSidebarWithoutFormFields()
+    {
+        var css = ReadRazorFile("wwwroot/css/fara-site-kit.css");
+
+        // ページ全体の既定（MudBlazor の reset に負けない詳細度で html を足す）。サイドバーの .mud-nav-link も含む
+        var rule = Between(css, "html a:focus-visible", "}");
+        Assert.Contains("html button:focus-visible", rule);
+        Assert.Contains("html [role=\"button\"]:focus-visible", rule);
+        Assert.Contains("html [tabindex]:focus-visible", rule);
+        Assert.Contains("html .mud-nav-link:focus-visible", rule);
+        Assert.Contains("html .fsk-nav :is(a, button):focus-visible", rule);
+        Assert.Contains("outline: 2px solid var(--fsk-focus, #e9d5ff)", rule);
+        Assert.Contains("outline-offset: 2px", rule);
+        // 入力欄は MudBlazor が枠線の色で示すので、二重の枠は出さない
+        Assert.DoesNotContain("input", rule);
+        Assert.DoesNotContain("textarea", rule);
+        Assert.DoesNotContain("select", rule);
+    }
+
+    [Fact]
+    public void UnavailableReportNoticeMeetsContrastOnBothThemes()
+    {
+        var css = ReadRazorFile("wwwroot/css/fara-site-kit.css");
+        var razor = ReadRazorFile("Components/ReportFormView.razor");
+
+        // 受付停止の文（MudAlert の警告）は、白地で 4.5:1 以上の文字色（既定の橙 #d68100 は 3:1 未満）
+        Assert.Contains("fsk-report-unavailable", razor);
+        Assert.Contains(".fsk-report-unavailable.mud-alert", css);
+        Assert.Contains("--fsk-warning-text: #9a5b00", css);
+        Assert.Contains(":root[data-bs-theme=\"dark\"]", css);
+        Assert.Contains("--fsk-warning-text: #ffb74d", css);
+        Assert.True(ContrastRatio("#9a5b00", "#ffffff") >= 4.5);
+        Assert.True(ContrastRatio("#9a5b00", "#f7f4fd") >= 4.5);
+        Assert.True(ContrastRatio("#ffb74d", "#1a1030") >= 4.5);
+    }
+
+    [Fact]
+    public void NoBareCatchBlocksAreLeftInTheRazorOrCoreSources()
+    {
+        // 空の catch { } は、JS の失敗（JSException・JSDisconnectedException）以外も黙って飲む。型を絞るか、理由のコメントつきで書く
+        var root = RepoRoot();
+        var files = Directory.EnumerateFiles(Path.Combine(root, "src"), "*.*", SearchOption.AllDirectories)
+            .Where(f => f.EndsWith(".razor", StringComparison.Ordinal) || f.EndsWith(".cs", StringComparison.Ordinal))
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"));
+        foreach (var file in files)
+        {
+            var text = File.ReadAllText(file);
+            Assert.False(System.Text.RegularExpressions.Regex.IsMatch(text, @"catch\s*\{"), $"{file} に型のない catch があります");
+        }
+    }
+
+    private static double ContrastRatio(string a, string b)
+    {
+        static double Luminance(string hex)
+        {
+            double Channel(int i)
+            {
+                var c = int.Parse(hex.Substring(1 + i * 2, 2), System.Globalization.NumberStyles.HexNumber) / 255.0;
+                return c <= 0.03928 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
+            }
+            return 0.2126 * Channel(0) + 0.7152 * Channel(1) + 0.0722 * Channel(2);
+        }
+        var la = Luminance(a);
+        var lb = Luminance(b);
+        return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
+    }
+
+    [Fact]
     public void PhoneFormControlsAreAtLeast44PxHigh()
     {
         var css = ReadRazorFile("wwwroot/css/fara-site-kit.css");
