@@ -2,10 +2,18 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 0.8.0
+
+2026-10-29。
+報告の受け口に、1 日の送信回数の制限を足す（opt-in）。**挙動が変わる点**: なし。`REPORT_LIMITER` のバインディングを置いたサイトだけが数える（置かないサイトは従来どおり）。
+
+- **報告の 1 日の送信回数の制限（opt-in）**: `worker/report-rate-limit.js`（Durable Object の `ReportRateLimiter`）を足し、`worker/report.js` が、バインディング `REPORT_LIMITER` があるサイトだけ、Turnstile を通った送信を送信元ごとに 1 日 3 回まで数える（超えたら 429・`Retry-After`）。送信元の識別子は、Turnstile の秘密鍵から導いた鍵による HMAC で、日付ごとに分ける。JST の 0 時に消す。Discord への送信が失敗したときは、数えた 1 回を戻す。バインディングが無いサイトは従来どおり（挙動は変わらない）。DO が使えないときは fail-open（送る）。**秘密鍵（TURNSTILE_SECRET）を変えると、計数はリセットされる。** **サイト側の作業**: `worker/index.js` で `ReportRateLimiter` を export し、`wrangler.jsonc` に `durable_objects`・`migrations`（本番と develop の両方）を書く。プライバシーポリシーに、送信元から作った識別子を当日の間だけ保存する旨を追記する（docs/usage.md の 2.2）。
+- ReportFormView: 429 のときの文を足した（Worker の message が無いときも、「1 日の送信の上限に達しました」と出す）。
+
 ## 0.7.0
 
 2026-10-29。
-> **【CI に影響する変更】** この版を上げるだけで、`menuEsc` を設定済みのサイトのうち、ドロワーがメニューボタンを覆うサイトは、layout-check の CI が落ちる（`menu-close-visible`）。マイナー変更だが、CI に影響する。移行: `layout-check.config.mjs` の `menuEsc` に `closeSelector: ".fsk-drawer-close"` を書く（閉じるボタンを指す）。または、そのルールだけ止める `rules: { "menu-close-visible": false }`（理由をコミットに書く）。手順は docs/layout-check.md の 6.
+> **【CI に影響する変更】** この版を上げるだけで、`menuEsc` を設定済みのサイトのうち、ドロワーがメニューボタンを覆うサイトは、layout-check の CI が落ちる（`menu-close-visible`）。マイナー変更だが、CI に影響する。移行: `layout-check.config.mjs` の `menuEsc` に `closeSelector: ".fsk-drawer-close"` を書く（閉じるボタンを指す）。または、そのルールだけ止める `rules: { "menu-close-visible": false }`（理由をコミットに書く）。手順は docs/layout-check.md の「5. 各サイトへの導入」の 6.
 
 - **スマホのフッター**（600px 未満・`fara-site-kit.css`）: 行の高さを 22px に固定し、行間を 22px にした（行の中心どうし 44px。tap-target の判定を保つ最小）。上下の余白も詰めた。kit 単体で 99px → 83px（360・390 で計測。portfolio の app.css の上書きを外した場合）。1 段にはできなかった（名前・問い合わせ・プライバシーポリシー・© と SNS の 4 つは、360px の内側 328px に、どう並べても収まらない）ため、2 段のまま。**サイト側**: `app.css` などでフッターの gap・line-height・padding を上書きしているサイトは、その上書きを外すまで高さは変わらない（kit の CSS より後に読まれるため）。
 - **スマホのメニュー**（`SiteLayout`）: ドロワーが画面の左上を覆い、開いたとき、ヘッダーのハンバーガーが押せなかった（閉じるのは背景タップと Esc だけ）。ドロワーの一番上に閉じるボタン（`.fsk-drawer-close`・44px・`aria-label` は「メニューを閉じる」）を置いた。押すと、Esc と同じく閉じて、フォーカスをメニューボタンに戻す。PC には出さない。`inert` と Esc は変えていない。ドロワーの中身は、閉じるボタンの分（56px）下がる。

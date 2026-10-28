@@ -15,9 +15,9 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 | `tools/` | `maintenance.mjs`（補助の CLI。`set` で複数サイトの deploy ワークフローを `gh` でまとめて実行して `MAINTENANCE_MODE` / `MAINTENANCE_MESSAGE` を切り替え、`status` で現在値を見る。Cloudflare API へは書き込まない）と対象の一覧。第一の手段は、各サイトの Actions の「Run workflow」画面で入力して実行する方法（`docs/maintenance-cli.md` の 1。Cloudflare のトークンも手元の環境変数も不要） | 0.3.0 |
 | `src/FaraSiteKit.Core/` | C#（UI と通信に依存しない共通コード）: `SiteLinks`（確認用ホストへの切り替え）・`MaintenanceInfo`（メンテナンス状態の読み取り）・`ReportForm`（報告の入力の検査） | K0-2 |
 | `tests/FaraSiteKit.Core.Tests/` | 上の C# の xUnit テスト（`dotnet test`） | K0-2 |
-| `.github/workflows/ci.yml` | `npm test`（Node 22、ubuntu）・`lint`（ESLint）・`layout-check`（ブラウザ）と `dotnet test`（global.json の SDK） | K0・v0.6.0（未リリース） |
-| `tools/layout-check/` | レイアウトの自動計測（ESM・playwright-core。幅ごとの崩れ・h1・フォーカス・当たり判定・文字の大きさ・メニューの Esc）。使い方は `docs/layout-check.md` | 未リリース |
-| `tools/lint/` | ESLint の共通設定（`eslint.config.shared.mjs`）と .NET のアナライザーの設定（`dotnet.editorconfig`。ラチェット）。使い方は `docs/lint.md` | 未リリース |
+| `.github/workflows/ci.yml` | `npm test`（Node 22、ubuntu）・`lint`（ESLint）・`layout-check`（ブラウザ）と `dotnet test`（global.json の SDK） | K0・v0.6.0 |
+| `tools/layout-check/` | レイアウトの自動計測（ESM・playwright-core。幅ごとの崩れ・h1・フォーカス・当たり判定・文字の大きさ・メニューの Esc）。使い方は `docs/layout-check.md` | 0.6.0 |
+| `tools/lint/` | ESLint の共通設定（`eslint.config.shared.mjs`）と .NET のアナライザーの設定（`dotnet.editorconfig`。ラチェット）。使い方は `docs/lint.md` | 0.6.0 |
 | `src/FaraSiteKit.Razor/` | Razor 部品（MudBlazor。SiteLayout・MudProviders・ThemeSwitch・SiteFooter・ReportFormView・NotFoundView など）と静的ファイル | K0-4・K0-5 |
 | `samples/MinimalSite/` | Razor 部品を使う最小のサイト（CI でビルドのみ。公開しない） | K0-4 |
 
