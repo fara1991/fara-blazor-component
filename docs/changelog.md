@@ -2,8 +2,9 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
-## 未リリース（次は 0.6.0 の予定）
+## 0.6.0
 
+2026-10-29。
 静的解析と、レイアウトの自動計測の共通化（CI で止める仕組み）。公開 API（部品・CSS・Worker の入出力）は変えない。**挙動が変わる点**: スマホ（600px 未満）のフッターの高さと行の間隔（下のフッターの項目）。それ以外はなし（コードの変更は、捕捉の書き方・コメントの除去・検査の追加だけ）。
 
 - レイアウトの自動計測（`tools/layout-check/`・docs/layout-check.md）: Node（ESM）と `playwright-core` で、配信中のサイトを幅ごとに開いて測る。ルールは no-horizontal-scroll・single-h1・focus-visible・no-offscreen-focus（閉じたドロワーの項目の Tab を兼ねる）・tap-target（44px・中心 ±21.5px の当たり判定。文中のリンクは除く）・min-font-size（12px）・menu-esc（Esc で閉じて aria-expanded が false・フォーカスが戻る）。除外は、セレクター・ルール名・理由が要る（理由の無い除外は設定エラー）。CLI は違反があれば終了コード 1、計測できなければ 2。判定（`rules.mjs`）は依存なしで `npm test` に入る。統合テストは `npm run test:layout-check`（fixtures の正しい例は 0 件、わざと崩した例は各ルールの違反）。静的ファイルの簡易サーバー（`serve-static.mjs`）を足した。
