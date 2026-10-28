@@ -92,8 +92,11 @@ function sandbox(extra = {}) {
         querySelector(sel) { return findAll(this.documentElement, sel)[0] || findAll(this.body, sel)[0] || null; },
         querySelectorAll(sel) { return [...findAll(this.documentElement, sel), ...findAll(this.body, sel)]; },
         createElement(tag) { return element(tag); },
-        addEventListener() {},
+        // 文書の keydown など（テストから発火させる）
+        addEventListener(type, fn) { (docListeners[type] ||= []).push(fn); },
+        removeEventListener(type, fn) { docListeners[type] = (docListeners[type] || []).filter((f) => f !== fn); },
     };
+    const docListeners = {};
     currentDoc = doc;
     const store = new Map(Object.entries(extra.storage || {}));
     const localStorage = {
@@ -128,7 +131,7 @@ function sandbox(extra = {}) {
         ...extra.globals,
     });
     win.window = win;
-    return { ctx, win, doc, localStorage, warnings };
+    return { ctx, win, doc, localStorage, warnings, docListeners };
 }
 
 // ---- theme-init.js ----
@@ -236,6 +239,64 @@ test("fara-site-kit: 送れなかった OnMobileChanged の Promise は、未処
     fire({ matches: true });
     // 未処理の拒否があれば、ここで node:test が失敗にする
     await new Promise((resolve) => setTimeout(resolve, 20));
+});
+
+test("fara-site-kit: watchMobile は Esc で ref.OnEscape を呼ぶ（Esc 以外のキーでは呼ばない）", () => {
+    const calls = [];
+    const s = runKit({ matchMedia: () => ({ matches: true, addEventListener() {} }) });
+    s.win.faraSiteKit.watchMobile({ invokeMethodAsync: (name) => { calls.push(name); return Promise.resolve(); } }, "k1");
+    // 「同じ key」以外の呼び方（key を渡さない古い呼び出し）は、Esc を監視しない（OnEscape を受けられない参照へ送らない）
+    const legacy = runKit({ matchMedia: () => ({ matches: false, addEventListener() {} }) });
+    legacy.win.faraSiteKit.watchMobile({ invokeMethodAsync: () => assert.fail("Esc では送らない") });
+    assert.equal(legacy.docListeners.keydown, undefined);
+    s.docListeners.keydown.forEach((fn) => fn({ key: "Enter" }));
+    assert.deepEqual(calls, []);
+    s.docListeners.keydown.forEach((fn) => fn({ key: "Escape" }));
+    assert.deepEqual(calls, ["OnEscape"]);
+});
+
+test("fara-site-kit: unwatchMobile は、登録した matchMedia の変化と Esc の監視を外す（画面を移るたびに増えない）", () => {
+    const removed = [];
+    let mediaFn = null;
+    const mq = {
+        matches: false,
+        addEventListener(_t, fn) { mediaFn = fn; },
+        removeEventListener(_t, fn) { removed.push(fn); },
+    };
+    const s = runKit({ matchMedia: () => mq });
+    const calls = [];
+    s.win.faraSiteKit.watchMobile({ invokeMethodAsync: (name) => { calls.push(name); return Promise.resolve(); } }, "k2");
+    assert.equal(s.docListeners.keydown.length, 1);
+    s.win.faraSiteKit.unwatchMobile("k2");
+    assert.deepEqual(removed, [mediaFn], "matchMedia の listener を外す");
+    assert.equal(s.docListeners.keydown.length, 0, "keydown を外す");
+    s.docListeners.keydown?.forEach((fn) => fn({ key: "Escape" }));
+    assert.deepEqual(calls, [], "外した後は、Esc でも送らない");
+});
+
+test("fara-site-kit: 同じ key で watchMobile を二重に呼んでも、監視は一つだけ残る", () => {
+    const s = runKit({ matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) });
+    const ref = { invokeMethodAsync() { return Promise.resolve(); } };
+    s.win.faraSiteKit.watchMobile(ref, "same");
+    s.win.faraSiteKit.watchMobile(ref, "same");
+    assert.equal(s.docListeners.keydown.length, 1);
+});
+
+test("fara-site-kit: OnEscape の送信が失敗しても、未処理の拒否は残らない", async () => {
+    const s = runKit({ matchMedia: () => ({ matches: false, addEventListener() {} }) });
+    const ref = { invokeMethodAsync() { return Promise.reject(new Error("回線が切れました")); } };
+    s.win.faraSiteKit.watchMobile(ref, "k3");
+    s.docListeners.keydown.forEach((fn) => fn({ key: "Escape" }));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+});
+
+test("fara-site-kit: focusMenu はメニューボタン（.fsk-menu-toggle）にフォーカスを戻す", () => {
+    const s = runKit();
+    const btn = element("button", { id: "" });
+    btn.classList.add("fsk-menu-toggle");
+    s.doc.body.appendChild(btn);
+    s.win.faraSiteKit.focusMenu();
+    assert.equal(s.doc.activeElement, btn);
 });
 
 test("fara-site-kit: checkConfig は、キーが一致すれば true、違えば警告を出す", () => {
