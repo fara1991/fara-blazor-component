@@ -291,6 +291,7 @@
     {
         if (!Mobile || !mobileOpen) return;
         mobileOpen = false;
+        StateHasChanged();
         _ = FocusMenuAsync();
     }
 

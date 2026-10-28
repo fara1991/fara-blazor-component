@@ -18,7 +18,7 @@
 | `tap-target` | 幅 600px 未満だけ。`a`・`button`・`[role=button]`・`input`・`select`・`summary` の押せる範囲が 44×44 以上。要素の中心から上下左右 ±20px が、自分（または子）に当たるかで判定する（`tapHalfOffset`。44px なら ±20。下の「判定の定義」）。文中のリンク（段落の中で、前後に他の文字がある inline のリンク）は除く。**無効な要素**（`disabled`・`aria-disabled="true"`・`pointer-events: none`）は数えない（`includeDisabled: true` で測る） | on |
 | `min-font-size` | 見えるテキストを持つ要素の文字の大きさが 12px 以上。装飾・アイコンフォントは `minFontSize.ignoreSelectors` か除外で外す | on |
 | `menu-esc` | `menuEsc.buttonSelector` を設定したときだけ（既定 off）。スマホ幅（既定 768px 未満）でメニューを開き、Esc で閉じると、メニューボタンの `aria-expanded` が `false` に戻り、フォーカスがメニューボタンに戻る | 設定時のみ |
-| `menu-close-visible` | `menuEsc` を設定したときだけ（既定 on）。スマホ幅でメニューを開いたあと、閉じる手段が押せる。閉じる手段は、`menuEsc.closeSelector`（ドロワーの中の閉じるボタン）があればそれ、無ければメニューボタン。中心の点が、どちらかに当たれば通る。ドロワーが覆って当たらなければ違反（覆っている要素を値に出す。kit のスマホの既定は、ドロワーが左上を覆うので、閉じるボタンを `closeSelector` で指す） | 設定時のみ |
+| `menu-close-visible` | `menuEsc` を設定したときだけ（既定 on）。スマホ幅でメニューを開いたあと、閉じる手段が押せる。判定する要素は、`menuEsc.closeSelector`（ドロワーの中の閉じるボタン）があればそれだけ。無ければメニューボタン。その要素の中心の点が、自分（または子）に当たれば通る。要素が無ければ「見つからない」の違反。当たらなければ違反で、覆っている要素を値に出す（閉じるボタンを指定したときは、閉じるボタンの中心で調べる）。kit のスマホのメニューは、ドロワーが左上を覆うので、閉じるボタンを `closeSelector` で指す | 設定時のみ |
 
 個別に止めるときは `rules: { "tap-target": false }` のように書く。
 

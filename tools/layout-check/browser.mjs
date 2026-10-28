@@ -374,24 +374,38 @@ async function checkMenu(page, config, push, enabled) {
   if (enabled["menu-esc"]) await checkEscClose(page, config, push);
 }
 
-/** 開いたあと、閉じる手段（closeSelector の閉じるボタン。無ければメニューボタン）の中心が、自分に当たる（押せる）まで待つ。当たらなければ違反。 */
+/**
+ * 開いたあと、閉じる手段が自分に当たる（押せる）まで待つ。当たらなければ違反。
+ * closeSelector があるときは、閉じるボタンだけで判定する（メニューボタンが空いていても通さない）。無いときは、従来どおりメニューボタンで判定する。
+ */
 async function checkCloseReachable(page, config, push) {
-  const candidates = [config.menuEsc.closeSelector, config.menuEsc.buttonSelector].filter(Boolean);
+  const { closeSelector, buttonSelector } = config.menuEsc;
+  const target = closeSelector ?? buttonSelector;
+  const label = closeSelector ? "閉じるボタン" : "メニューボタン";
   try {
-    await page.waitForFunction(reachableCloser, candidates, { timeout: 2000 });
+    await page.waitForFunction(reachableCloser, [target], { timeout: 2000 });
   } catch {
-    const covering = await page.evaluate((s) => {
+    const state = await page.evaluate((s) => {
       const b = document.querySelector(s);
-      if (!b) return "見つからない";
+      if (!b) return { found: false };
       const r = b.getBoundingClientRect();
       const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      return at ? window.__layoutCheck.describe(at) : "画面の外";
-    }, config.menuEsc.buttonSelector);
+      return { found: true, covering: at ? window.__layoutCheck.describe(at) : "画面の外" };
+    }, target);
+    if (!state.found) {
+      push(
+        "menu-close-visible",
+        target,
+        "見つからない",
+        `メニューを開いたあと、${label}（${target}）が無い。menuEsc.closeSelector の綴りと、ドロワーの中の要素を確かめる`,
+      );
+      return;
+    }
     push(
       "menu-close-visible",
-      config.menuEsc.buttonSelector,
-      `覆われている（${covering} が上に来ている）`,
-      "メニューを開いたあと、閉じる手段が押せない（ドロワーが覆う）。ドロワーの中に閉じるボタンを置き、menuEsc.closeSelector で書く",
+      target,
+      `覆われている（${state.covering} が上に来ている）`,
+      `メニューを開いたあと、${label}（${target}）が押せない（上に別の要素が来ている）。ドロワーが覆うか、閉じるボタンを隠しているものを直す`,
     );
   }
 }

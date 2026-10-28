@@ -118,6 +118,25 @@ test("開いたメニューを、ドロワーが覆う例: 閉じる手段が押
   assert.deepEqual(closable.violations.map(formatViolation), []);
 });
 
+test("closeSelector の綴りが違う（ハンバーガーは覆われていない）→ 「見つからない」の違反", { timeout: TIMEOUT }, async () => {
+  const only = { "single-h1": false, "no-horizontal-scroll": false, "tap-target": false, "focus-visible": false, "no-offscreen-focus": false, "min-font-size": false, "menu-esc": false };
+  const { violations } = await runLayoutCheck(config("good", { viewports: [360], rules: only, menuEsc: { buttonSelector: "#menu", closeSelector: "#drawer-clos" } }));
+  const found = violations.find((v) => v.rule === "menu-close-visible");
+  assert.ok(found, `見つからない違反が出ていない: ${violations.map(formatViolation).join("\n")}`);
+  assert.equal(found.value, "見つからない");
+  assert.match(found.message, /#drawer-clos/);
+});
+
+test("閉じるボタンだけが覆われ、メニューボタンは空いている → 違反。メッセージは閉じるボタンを指す（メニューボタンで判定しない）", { timeout: TIMEOUT }, async () => {
+  const only = { "single-h1": false, "no-horizontal-scroll": false, "tap-target": false, "focus-visible": false, "no-offscreen-focus": false, "min-font-size": false, "menu-esc": false };
+  const { violations } = await runLayoutCheck(config("close-covered", { viewports: [360], rules: only, menuEsc: { buttonSelector: "#menu", closeSelector: "#drawer-close" } }));
+  const found = violations.find((v) => v.rule === "menu-close-visible");
+  assert.ok(found, `閉じるボタンの覆われが出ていない: ${violations.map(formatViolation).join("\n")}`);
+  assert.match(found.message, /閉じるボタン（#drawer-close）/);
+  assert.match(found.value, /cover/);
+  assert.equal(violations.length, 1, violations.map(formatViolation).join("\n"));
+});
+
 test("ブラウザを起動できないときは、明確な文の LayoutCheckRunError（CLI は終了コード 2）", { timeout: TIMEOUT }, async () => {
   await assert.rejects(
     runLayoutCheck(config("good", { browser: { channel: "no-such-browser-channel" } })),
