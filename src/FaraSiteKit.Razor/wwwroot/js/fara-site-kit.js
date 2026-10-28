@@ -15,8 +15,10 @@
     // 登録中の監視（key → 外すための情報）
     var watchers = {};
 
+    // key を渡したときだけ、Esc の監視を登録する（unwatchMobile(key) で外せる）。key を渡さない古い呼び出し（watchMobile(ref)）は、
+    // 従来どおり matchMedia の変化だけを送る（OnEscape を、受けられない参照へ送らない）
     api.watchMobile = function (ref, key) {
-        if (watchers[key]) api.unwatchMobile(key);
+        if (key && watchers[key]) api.unwatchMobile(key);
         var mq = window.matchMedia(MOBILE_QUERY);
         var onMedia = function (e) {
             // 回線が切れた後は、送れない（拒否された Promise が残らないように受ける）。画面は再読み込みで戻る
@@ -24,15 +26,17 @@
                 console.warn("[fara-site-kit] OnMobileChanged を送れませんでした。", err);
             });
         };
-        var onKey = function (e) {
-            if (e.key !== "Escape" && e.key !== "Esc") return;
-            Promise.resolve(ref.invokeMethodAsync("OnEscape")).catch(function (err) {
-                console.warn("[fara-site-kit] OnEscape を送れませんでした。", err);
-            });
-        };
         if (mq.addEventListener) mq.addEventListener("change", onMedia); else if (mq.addListener) mq.addListener(onMedia);
-        document.addEventListener("keydown", onKey, false);
-        watchers[key] = { mq: mq, onMedia: onMedia, onKey: onKey };
+        if (key) {
+            var onKey = function (e) {
+                if (e.key !== "Escape" && e.key !== "Esc") return;
+                Promise.resolve(ref.invokeMethodAsync("OnEscape")).catch(function (err) {
+                    console.warn("[fara-site-kit] OnEscape を送れませんでした。", err);
+                });
+            };
+            document.addEventListener("keydown", onKey, false);
+            watchers[key] = { mq: mq, onMedia: onMedia, onKey: onKey };
+        }
         return mq.matches;
     };
 

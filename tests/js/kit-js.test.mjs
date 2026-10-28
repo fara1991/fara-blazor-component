@@ -245,6 +245,10 @@ test("fara-site-kit: watchMobile は Esc で ref.OnEscape を呼ぶ（Esc 以外
     const calls = [];
     const s = runKit({ matchMedia: () => ({ matches: true, addEventListener() {} }) });
     s.win.faraSiteKit.watchMobile({ invokeMethodAsync: (name) => { calls.push(name); return Promise.resolve(); } }, "k1");
+    // 「同じ key」以外の呼び方（key を渡さない古い呼び出し）は、Esc を監視しない（OnEscape を受けられない参照へ送らない）
+    const legacy = runKit({ matchMedia: () => ({ matches: false, addEventListener() {} }) });
+    legacy.win.faraSiteKit.watchMobile({ invokeMethodAsync: () => assert.fail("Esc では送らない") });
+    assert.equal(legacy.docListeners.keydown, undefined);
     s.docListeners.keydown.forEach((fn) => fn({ key: "Enter" }));
     assert.deepEqual(calls, []);
     s.docListeners.keydown.forEach((fn) => fn({ key: "Escape" }));
