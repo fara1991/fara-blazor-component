@@ -5,6 +5,7 @@ using Bunit;
 using FaraSiteKit.Core;
 using FaraSiteKit.Razor.Components;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -113,6 +114,21 @@ public class ReportFormViewTests : SiteKitTestContext
         cut.Find("button.mud-button-filled").Click();
 
         cut.WaitForAssertion(() => Assert.Contains("2000 文字までにしてください", cut.Markup));
+        Assert.Empty(_handler.Sent);
+    }
+
+    [Fact]
+    public void AFailedTokenWaitSaysTheConfirmationCouldNotBeLoadedAndSendsNothing()
+    {
+        // 確認の部品の待ち合わせが例外（JS の失敗）のとき、「確認が終わっていません」ではなく、部品が使えなかったことを案内する
+        JSInterop.Setup<string>("faraSiteKit.report.waitToken", _ => true).SetException(new JSException("確認の部品が無い"));
+        var cut = RenderForm(from: "/damage-calculator");
+        FillValid(cut.Instance);
+
+        cut.Find("button.mud-button-filled").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("確認の部品を読み込めませんでした", cut.Markup));
+        Assert.DoesNotContain("確認が終わっていません", cut.Markup);
         Assert.Empty(_handler.Sent);
     }
 

@@ -4,6 +4,7 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 
 ## 未リリース
 
+- 例外の処理（レビュー指摘）: 空の `catch` を、JS の失敗（`JSException`・`JSDisconnectedException`）だけを受ける形に絞った（`SiteLayout`・`SiteThemeState`・`ReportFormView`）。`ReportFormView` は、確認の待ち合わせ（`waitToken`）が失敗したとき「確認が終わっていません」ではなく、確認の部品を読み込めなかったことを案内する。JS の `fara-site-kit.js`・`theme-init.js` は、捨てる例外に console.warn を出す。`OnLocationChanged` は例外を外に出さない。`OnMobileChanged` の Promise の拒否を受ける（回線が切れた後に未処理の拒否を残さない）。`scroll-progress.js` は、外側の候補の一覧を、画面の大きさ・DOM が変わったときだけ作り直す（スクロールのたびに作らない。挙動は同じ）。
 - `tools/maintenance-sites.json` から album を外し、一括変更の対象を 4 サイト（pokemon・avatar・bot・portfolio）に戻した。fara-vrc-photo-album は、リポジトリをパブリックにするため（2026-10-28）サイトの公開を GitHub Actions では行わなくなり、起動するワークフロー（deploy-develop.yml）が無くなったため。tests・docs・set-maintenance-all.yml の「5 サイト」も 4 に直した。
 
 ## 0.4.0

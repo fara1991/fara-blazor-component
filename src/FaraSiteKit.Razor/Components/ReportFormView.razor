@@ -157,7 +157,7 @@
                 StateHasChanged();
             }
         }
-        catch
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
         {
             // JS が使えない・確認の部品を読み込めないとき。mounted は戻さない（戻すと、描画のたびに読み込みを繰り返してしまう）
             disabled = true;
@@ -182,11 +182,17 @@
         try
         {
             // 確認のトークンは、読み込み直後や、送信に失敗して作り直した直後は、数秒かかることがある。待ってから送る
+            string? tokenProblem = null;
             try { Form.TurnstileToken = await JS.InvokeAsync<string>("faraSiteKit.report.waitToken", 5000) ?? ""; }
-            catch { Form.TurnstileToken = ""; }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+            {
+                // 確認の部品が使えない（読み込みの失敗・回線が切れた）。「確認が済んでいない」とは分けて案内する
+                Form.TurnstileToken = "";
+                tokenProblem = "確認の部品を読み込めませんでした。ページを再読み込みしてから、もう一度お試しください";
+            }
             if (Form.Validate() is { } notChecked)
             {
-                error = notChecked;
+                error = tokenProblem ?? notChecked;
                 return;
             }
             using var cts = new CancellationTokenSource(Timeout);
@@ -226,7 +232,7 @@
     private async Task SafeJsAsync(string identifier)
     {
         try { await JS.InvokeVoidAsync(identifier); }
-        catch { /* 確認の部品が無いとき（JS が使えない）は、何もしない */ }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* 確認の部品が無いとき（JS が使えない）・回線が切れたときは、何もしない（送信の結果は画面に出している） */ }
     }
 
     private void StartOver()

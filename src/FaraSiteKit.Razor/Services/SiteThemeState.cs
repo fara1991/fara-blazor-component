@@ -78,16 +78,17 @@ public sealed class SiteThemeState
             var existing = await _js.InvokeAsync<string?>("localStorage.getItem", _options.StorageKey);
             await _js.InvokeVoidAsync("localStorage.setItem", _options.StorageKey, WriteTheme(existing, Current));
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
         {
-            // 保存できなくても、このページの表示は変える
+            // 保存できなくても、このページの表示は変える（保存の失敗は、次の読み込みでテーマが戻るだけ）
         }
         try
         {
             await _js.InvokeVoidAsync("document.documentElement.setAttribute", "data-bs-theme", Current);
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
         {
+            // JS が使えない・回線が切れたときは、html の属性は変えられない（テーマの保存は上で済んでいる）
         }
         if (Changed is not null) await Changed.Invoke();
     }
