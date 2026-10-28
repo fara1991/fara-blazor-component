@@ -715,6 +715,41 @@ a.fsk-footer-social:focus-visible {
     }
 }
 
+/* スマホ（600px 未満）のフッターの当たり判定（44px）。文字リンクは ::after で 44px の判定の箱を持つので、文字の幅・高さに関係なく 44px 以上になる（作者名が短くても）。
+   上の全幅の規則（padding-block・負の margin）は、ここで打ち消す（二重に重ねない）。
+   行と行の中心どうしは 44px 以上離す（上の行の判定が下の行に重ならない）。見た目の変化は、行の間隔と上下の余白、SNS の間隔だけ */
+@media (max-width: 599.98px) {
+    .fsk-footer {
+        padding-top: 0.75rem;
+        padding-bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .fsk-footer-line {
+        row-gap: 28px;
+    }
+
+    .fsk-footer a:not(.fsk-footer-social) {
+        position: relative;
+        padding-block: 0;
+        margin-block: 0;
+    }
+
+    .fsk-footer a:not(.fsk-footer-social)::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: max(100%, 44px);
+        height: 44px;
+        transform: translate(-50%, -50%);
+    }
+
+    /* 作者名の判定（幅が 44px に届かないと広がる）が、右の SNS の判定に重ならないよう、間隔を少し足す */
+    .fsk-footer-socials {
+        margin-left: 0.5rem;
+    }
+}
+
 /* ---- メンテナンス ---- */
 
 /* 「更新予定」のお知らせの帯。ヘッダーの真下に固定する（ヘッダーの高さは --mud-appbar-height） */

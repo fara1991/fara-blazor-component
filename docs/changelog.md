@@ -4,7 +4,7 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 
 ## 未リリース（次は 0.6.0 の予定）
 
-静的解析と、レイアウトの自動計測の共通化（CI で止める仕組み）。公開 API（部品・CSS・Worker の入出力）は変えない。**挙動が変わる点**: なし（コードの変更は、捕捉の書き方・コメントの除去・検査の追加だけ）。
+静的解析と、レイアウトの自動計測の共通化（CI で止める仕組み）。公開 API（部品・CSS・Worker の入出力）は変えない。**挙動が変わる点**: スマホ（600px 未満）のフッターの高さと行の間隔（下のフッターの項目）。それ以外はなし（コードの変更は、捕捉の書き方・コメントの除去・検査の追加だけ）。
 
 - レイアウトの自動計測（`tools/layout-check/`・docs/layout-check.md）: Node（ESM）と `playwright-core` で、配信中のサイトを幅ごとに開いて測る。ルールは no-horizontal-scroll・single-h1・focus-visible・no-offscreen-focus（閉じたドロワーの項目の Tab を兼ねる）・tap-target（44px・中心 ±21.5px の当たり判定。文中のリンクは除く）・min-font-size（12px）・menu-esc（Esc で閉じて aria-expanded が false・フォーカスが戻る）。除外は、セレクター・ルール名・理由が要る（理由の無い除外は設定エラー）。CLI は違反があれば終了コード 1、計測できなければ 2。判定（`rules.mjs`）は依存なしで `npm test` に入る。統合テストは `npm run test:layout-check`（fixtures の正しい例は 0 件、わざと崩した例は各ルールの違反）。静的ファイルの簡易サーバー（`serve-static.mjs`）を足した。
 - ESLint の共通設定（`tools/lint/eslint.config.shared.mjs`・docs/lint.md）: no-empty（空の catch を止める。コメントだけは許す）・no-unused-vars・no-undef・eqeqeq・no-constant-condition・no-fallthrough・no-prototype-builtins・no-useless-catch。kit の JS（worker・tools・build・tests・画面の JS・layout-check）に当てて、違反を直した。`npm run lint`（CI の `lint` job）。devDependency は `eslint` 10.13.0・`globals` 17.13.0・`playwright-core` 1.64.1（版を固定。`package-lock.json` を置いた）。
@@ -13,6 +13,7 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 - 整理（違反を直した箇所）: 型の無い catch を `catch {`（変数なし）に（`report.js`・`theme-init.js`）。`worker/maintenance.js`・`worker/text.js`・`tools/maintenance.mjs` の、使われていない `eslint-disable` のコメントを除いた（`HTMLRewriter` は、`worker/` の eslint 設定の extraGlobals で扱う）。テストの未使用の引数を除いた（`tests/js/`）。
 - CI（`.github/workflows/ci.yml`）: `lint`（`npm ci`・`npm run lint`）と `layout-check`（ubuntu・chromium を入れて `npm run test:layout-check`）の job を足した。`test` の job は `npm test`（判定のテストを含む）のまま。
 - サイトへの取り込み（各サイトのやること）: 1）submodule を上げる。2）layout-check は、サイトに `playwright-core` と `layout-check.config.mjs` を置く（docs/layout-check.md の 5）。3）lint は、サイトに `eslint` と `globals` を入れて、`eslint.config.mjs` を書く（docs/lint.md の 1）。4）C# は、サイトの `Directory.Build.props` に kit と同じ設定を入れる（docs/lint.md の 2）。違反は直してから入れる。
+- フッターのタップの大きさ（スマホ・layout-check の tap-target）: `samples/MinimalSite` の `/` で、360px・390px の `tap-target` が 4 件出ていた（問い合わせ 62×44・作者名の文字リンク 41×44。判定が隣の行・隣の要素に重なっていた）。600px 未満だけ直した。文字リンク（`.fsk-footer a:not(.fsk-footer-social)`）は `::after` で 44px 四方の判定を持つ（文字の幅に関係なく 44px 以上）。上の全幅の規則（padding・負の margin）は、600px 未満で打ち消して二重にしない。行の間隔（`.fsk-footer-line` の `row-gap`）は 28px（上下の 44px の判定が重ならない高さ）、フッターの上の余白は 0.75rem（判定が上の本文に出ない）、SNS の前の間隔は 0.5rem（作者名の判定が SNS に重ならない）。**見た目の変化**: スマホ（360・390px）のフッターは、約 62px から約 94px になる（行の間隔と上下の余白）。600px 以上は変えていない（geometry を 600・768・1024・1440 で比べて同じ）。CI の `layout-check` job に、`samples/MinimalSite`（`dotnet publish` → 配信 → 計測。既定の 5 幅・全規則）を足した（`samples/MinimalSite/layout-check.config.mjs`）。
 
 ## 0.5.2
 
