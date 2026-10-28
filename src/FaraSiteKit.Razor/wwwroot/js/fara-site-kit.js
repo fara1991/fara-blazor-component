@@ -1,5 +1,7 @@
 // Fara のサイト共通の振る舞い（SiteLayout.razor が使う）。名前は window.faraSiteKit の下にまとめる（サイトの他の JS と重ならないように）。
-// - watchMobile(ref): 768px 未満（スマホ）かどうかを返し、変わったら ref.OnMobileChanged(matches) を呼ぶ
+// - watchMobile(ref, key): 768px 未満（スマホ）かどうかを返す。変わったら ref.OnMobileChanged(matches) を呼ぶ。Esc キーで ref.OnEscape() を呼ぶ。key は呼び出し側の一意の文字列
+// - unwatchMobile(key): watchMobile の登録（matchMedia の変化と Esc）を外す。Dispose で呼ぶ（外さないと、画面を移るたびに古い参照へ送り続ける）
+// - focusMenu(): スマホのメニューボタン（.fsk-menu-toggle）にフォーカスを戻す（メニューを Esc で閉じたとき）
 // - sidebarChanged(hidden, key): PC のサイドバーの開閉を html のクラス（fsk-sidebar-hidden）と localStorage（key）に反映する
 // - searchSheet(open, focus): スマホの検索欄の開閉（html の fsk-search-open クラス）。閉じるときは、フォーカスを検索ボタンへ移す
 // - focusMain(): 「本文へ移動」（スキップリンク）の先の main にフォーカスを移す
@@ -10,17 +12,41 @@
     "use strict";
     var MOBILE_QUERY = "(max-width: 767.98px)";
     var api = window.faraSiteKit = window.faraSiteKit || {};
+    // 登録中の監視（key → 外すための情報）
+    var watchers = {};
 
-    api.watchMobile = function (ref) {
+    api.watchMobile = function (ref, key) {
+        if (watchers[key]) api.unwatchMobile(key);
         var mq = window.matchMedia(MOBILE_QUERY);
-        var handler = function (e) {
+        var onMedia = function (e) {
             // 回線が切れた後は、送れない（拒否された Promise が残らないように受ける）。画面は再読み込みで戻る
             Promise.resolve(ref.invokeMethodAsync("OnMobileChanged", e.matches)).catch(function (err) {
                 console.warn("[fara-site-kit] OnMobileChanged を送れませんでした。", err);
             });
         };
-        if (mq.addEventListener) mq.addEventListener("change", handler); else if (mq.addListener) mq.addListener(handler);
+        var onKey = function (e) {
+            if (e.key !== "Escape" && e.key !== "Esc") return;
+            Promise.resolve(ref.invokeMethodAsync("OnEscape")).catch(function (err) {
+                console.warn("[fara-site-kit] OnEscape を送れませんでした。", err);
+            });
+        };
+        if (mq.addEventListener) mq.addEventListener("change", onMedia); else if (mq.addListener) mq.addListener(onMedia);
+        document.addEventListener("keydown", onKey, false);
+        watchers[key] = { mq: mq, onMedia: onMedia, onKey: onKey };
         return mq.matches;
+    };
+
+    api.unwatchMobile = function (key) {
+        var w = watchers[key];
+        if (!w) return;
+        delete watchers[key];
+        if (w.mq.removeEventListener) w.mq.removeEventListener("change", w.onMedia); else if (w.mq.removeListener) w.mq.removeListener(w.onMedia);
+        document.removeEventListener("keydown", w.onKey, false);
+    };
+
+    api.focusMenu = function () {
+        var btn = document.querySelector(".fsk-menu-toggle");
+        if (btn) btn.focus();
     };
 
     api.sidebarChanged = function (hidden, key) {
