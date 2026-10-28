@@ -23,7 +23,7 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 
 ## 共有ファイルのルール
 
-- `worker/maintenance.js`・`worker/report.js` と、そのテストは、develop 時点で同一内容（pokemon・avatar・bot の site/worker・portfolio。sha256 で確認）。直すときは kit で直し、各サイトは submodule を上げて取り込む。各サイトに同じファイルを残さない
+- `worker/maintenance.js`・`worker/report.js`・`worker/text.js`（両方が使う文字列の整え方）と、そのテストは、develop 時点で同一内容（pokemon・avatar・bot の site/worker・portfolio。sha256 で確認）。直すときは kit で直し、各サイトは submodule を上げて取り込む。各サイトに同じファイルを残さない（`text.js` は、`report.js`・`maintenance.js` から相対 import されるので、submodule の `worker/` ごと読めば足りる）
 - サイト固有の変更は、サイトのリポジトリに置く（kit に入れない）
 - 公開される API（関数名・ファイル名・戻り値の形）を変えるときは、利用中のサイトが壊れないか確認してから。破壊的変更はメジャーを上げる
 - 変更のたびにテストを付ける（`npm test`）

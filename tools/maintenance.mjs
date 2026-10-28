@@ -290,22 +290,35 @@ async function watch(t, run, { gh }) {
 
 /**
  * YAML（ワークフローのファイル）から、on.workflow_dispatch.inputs のキー（入力の名前）を取り出す。
- * 依存を増やさないための小さな行の解析: インデントで親子を追い、on → workflow_dispatch → inputs の直下のキーだけを数える。
- * コメントや run の中の文字列（「maintenance_mode」と書いてあるだけ）は数えない。
+ * 依存を増やさないための小さな行の解析（YAML の全部は読まない）:
+ * - インデントで親子を追い、on → workflow_dispatch → inputs の直下のキーだけを数える。リストの項目の「- 」の後ろのキー（- run: ...）も、その桁で数える
+ * - 値を同じ行に持つキー（`run: |`・`key: 値` の続き行）の下の、深い行は値の続きなので、キーとして見ない（ブロックスカラーや複数行の文字列の中の「maintenance_mode:」を数えない）
+ * - コメントの行と空行は飛ばす
  * @returns {string[]}
  */
 export function dispatchInputNames(yamlText) {
-  const stack = []; // { indent, key }: いまの位置までの親のキー
+  const stack = []; // { indent, key }: いまの位置までの親のキー（indent は、キーの桁）
   const names = [];
+  let valueIndent = null; // 値を同じ行に持つキーの桁。この桁より深い行は、その値の続き
   for (const raw of String(yamlText).split(/\r?\n/)) {
-    if (/^\s*(#.*)?$/.test(raw)) continue;
-    const m = /^(\s*)([^\s#'"-][^:]*?|'[^']*'|"[^"]*"):(\s|$)/.exec(raw);
-    if (!m) continue; // リストの項目など、キーでない行
-    const indent = m[1].length;
-    const key = m[2].replace(/^['"]|['"]$/g, "").trim();
+    if (/^\s*$/.test(raw)) continue;
+    const lead = raw.length - raw.trimStart().length;
+    if (valueIndent !== null) {
+      if (lead > valueIndent) continue;
+      valueIndent = null;
+    }
+    if (/^\s*#/.test(raw)) continue;
+    // 先頭の「- 」（リストの項目。複数段も可）を読み飛ばし、キーの桁は「- 」の後ろ
+    const m = /^(\s*)((?:-\s+)*)('[^']*'|"[^"]*"|[^\s#'"-][^:]*?):(?:\s+(.*))?$/.exec(raw);
+    if (!m) continue;
+    const indent = m[1].length + m[2].length;
+    const key = m[3].replace(/^['"]|['"]$/g, "").trim();
     while (stack.length > 0 && stack[stack.length - 1].indent >= indent) stack.pop();
     const path = stack.map((s) => s.key);
     stack.push({ indent, key });
+    // 値（コメントだけ・アンカー・タグだけは、子を持つ書き方なので値とは数えない）
+    const value = (m[4] ?? "").trim();
+    if (value !== "" && !value.startsWith("#") && !/^[&!]\S*$/.test(value)) valueIndent = indent;
     if (path.length === 3 && path[0] === "on" && path[1] === "workflow_dispatch" && path[2] === "inputs") names.push(key);
   }
   return names;

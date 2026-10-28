@@ -7,25 +7,16 @@
 // 0.3.0 で変数名を MAINTENANCE から MAINTENANCE_MODE に変えた。旧名 MAINTENANCE は読まない（残っていても何も起きない）。
 // GitHub の自動デプロイで変数が消えないよう、wrangler の設定に keep_vars = true を入れている。
 
+import { cleanText } from "./text.js";
+
 const MAX_MESSAGE = 200;
 const TWITTER_URL = "https://twitter.com/game_fara";
 
 export const escapeHtml = (text) =>
   String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-/** 制御文字を取り、前後の空白を取り、長さを切る（文字単位）。文字列でなければ空。 */
-function cleanMessage(value) {
-  if (typeof value !== "string") return "";
-  // eslint-disable-next-line no-control-regex
-  // 対になっていないサロゲートも取る（UTF-16 のまま切ると絵文字が割れる）。report.js の clean と同じ規則
-  const text = value
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
-    .replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, "")
-    .trim();
-  const chars = Array.from(text);
-  return chars.length > MAX_MESSAGE ? chars.slice(0, MAX_MESSAGE).join("").trim() : text;
-}
+/** メンテナンスの文の整え方（報告の本文と同じ規則。text.js の cleanText）。 */
+const cleanMessage = (value) => cleanText(value, MAX_MESSAGE);
 
 /**
  * 変数から、いまの状態を読む。
