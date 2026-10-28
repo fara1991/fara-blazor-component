@@ -101,26 +101,26 @@ test("maintenanceResponse: HEAD は本文なし", async () => {
 test("noticeHtml: 文が無いときの既定の文、HTML は無害化", () => {
   assert.match(noticeHtml(""), /まもなくメンテナンスを行います/);
   assert.match(noticeHtml("<i>x</i>"), /&lt;i&gt;x&lt;\/i&gt;/);
-  assert.match(noticeHtml("x"), /class="fsk-notice" role="status"/);
+  assert.match(noticeHtml("x"), /class="fbc-notice" role="status"/);
   assert.ok(!/style=/.test(noticeHtml("x")), "CSP のため、インラインの style は使わない");
 });
 
 test("noticeHtml: 1 行目に見出し「【お知らせ】」、本文は次の要素（2 行目以降に出す）", () => {
   const html = noticeHtml("2026年10月25日（日）20:00〜21:00頃、サイトの更新を行います。");
-  assert.match(html, /<strong class="fsk-notice-title">【お知らせ】<\/strong>/);
-  assert.match(html, /<span class="fsk-notice-text">2026年10月25日（日）20:00〜21:00頃、サイトの更新を行います。<\/span>/);
+  assert.match(html, /<strong class="fbc-notice-title">【お知らせ】<\/strong>/);
+  assert.match(html, /<span class="fbc-notice-text">2026年10月25日（日）20:00〜21:00頃、サイトの更新を行います。<\/span>/);
   assert.ok(html.indexOf("【お知らせ】") < html.indexOf("2026年10月25日"), "見出しが先");
 });
 
-test("noticeHtml: class は Razor の MaintenanceBanner と同じ fsk-notice（旧 maintenance-notice は使わない）", () => {
+test("noticeHtml: class は Razor の MaintenanceBanner と同じ fbc-notice（旧 maintenance-notice は使わない）", () => {
   const html = noticeHtml("x");
-  assert.match(html, /^<div class="fsk-notice" role="status">/);
+  assert.match(html, /^<div class="fbc-notice" role="status">/);
   assert.ok(!/maintenance-notice/.test(html));
 });
 
 test("noticeHtml: 本文は見出しとは別の要素で、本文の HTML も無害化", () => {
   const html = noticeHtml("<b>x</b>");
-  assert.match(html, /<span class="fsk-notice-text">&lt;b&gt;x&lt;\/b&gt;<\/span>/);
+  assert.match(html, /<span class="fbc-notice-text">&lt;b&gt;x&lt;\/b&gt;<\/span>/);
   assert.equal((html.match(/【お知らせ】/g) ?? []).length, 1);
 });
 
@@ -130,7 +130,7 @@ const html = (body = "<main>x</main>", type = "text/html; charset=utf-8") => new
 
 test("withNotice: notice のときだけ、HTML にバナーを足す", async () => {
   const noticed = withNotice(html(), { state: "notice", message: "20:00ごろ" }, rewrite);
-  assert.match(await noticed.text(), /fsk-notice/);
+  assert.match(await noticed.text(), /fbc-notice/);
   for (const state of ["off", "on"]) {
     const untouched = withNotice(html(), { state, message: "x" }, rewrite);
     assert.equal(await untouched.text(), "<main>x</main>", state);

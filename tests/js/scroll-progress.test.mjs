@@ -1,4 +1,4 @@
-// 出所: fara-pokemon-battle-assistant の tests/js/scroll-progress.test.mjs（e68d150）を移植（クラス名を fsk- に、対戦画面の 0 のテストは外した。kit の JS は対戦画面を知らない）。
+// 出所: fara-pokemon-battle-assistant の tests/js/scroll-progress.test.mjs（e68d150）を移植（クラス名を fbc- に、対戦画面の 0 のテストは外した。kit の JS は対戦画面を知らない）。
 // js/scroll-progress.js の動き（どの要素を測るか・0〜1 の値・画面の切り替え）を、最小限のスタブで確かめる。
 // 実行: node --test tests/js/scroll-progress.test.mjs
 import { test } from "node:test";
@@ -9,9 +9,9 @@ import { dirname, join } from "node:path";
 import vm from "node:vm";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(join(here, "../../src/FaraSiteKit.Razor/wwwroot/js/scroll-progress.js"), "utf8");
-const MAIN = "main > article.fsk-content";
-const PANE = MAIN + " .fsk-pane-scroll";
+const source = readFileSync(join(here, "../../src/FaraBlazorComponent.Razor/wwwroot/js/scroll-progress.js"), "utf8");
+const MAIN = "main > article.fbc-content";
+const PANE = MAIN + " .fbc-pane-scroll";
 
 // 要素の見本。sel は、その要素が一致するセレクタ。children は本文の中の要素
 function node({ sel = [], scrollTop = 0, scrollHeight, clientHeight, children = [] }) {
@@ -23,7 +23,7 @@ function node({ sel = [], scrollTop = 0, scrollHeight, clientHeight, children = 
     return self;
 }
 
-// 画面（PC: 本文の中の .fsk-content か .fsk-pane-scroll が動く / スマホ: window が動く / 対戦画面）を組み立てる
+// 画面（PC: 本文の中の .fbc-content か .fbc-pane-scroll が動く / スマホ: window が動く / 対戦画面）を組み立てる
 function makeEnv({ main = null, windowPage = null } = {}) {
     const styles = {};
     let writes = 0;
@@ -41,11 +41,11 @@ function makeEnv({ main = null, windowPage = null } = {}) {
         hidden: false,
         getElementById: (id) => (id === "app" ? { id: "app" } : null),
         querySelector: (sel) => {
-            if (sel === ".fsk-scroll-progress") return bar;
+            if (sel === ".fbc-scroll-progress") return bar;
             if (sel === MAIN) return main;
             return null;
         },
-        // 本文の中の候補（.fsk-content 自身と .fsk-pane-scroll）。画面の作り直し後は、いま本文にあるものだけ
+        // 本文の中の候補（.fbc-content 自身と .fbc-pane-scroll）。画面の作り直し後は、いま本文にあるものだけ
         querySelectorAll: () => {
             qsaCount += 1;
             const list = [];
@@ -79,7 +79,7 @@ function makeEnv({ main = null, windowPage = null } = {}) {
     };
 }
 
-test("PC: .fsk-content 自体が動いているときは、その中のスクロール量で決まる", () => {
+test("PC: .fbc-content 自体が動いているときは、その中のスクロール量で決まる", () => {
     const main = node({ sel: [MAIN], scrollHeight: 2000, clientHeight: 1000 });
     const env = makeEnv({ main });
     env.flush();
@@ -96,7 +96,7 @@ test("PC: .fsk-content 自体が動いているときは、その中のスクロ
     assert.equal(env.styles["--scroll-progress"], "1.0000");
 });
 
-test("PC: 本文の中の大きな .fsk-pane-scroll が動くページ（Home・一覧など）でも、その動きで線が伸びる", () => {
+test("PC: 本文の中の大きな .fbc-pane-scroll が動くページ（Home・一覧など）でも、その動きで線が伸びる", () => {
     const pane = node({ sel: [PANE], scrollHeight: 3000, clientHeight: 800 });
     const main = node({ sel: [MAIN], scrollHeight: 800, clientHeight: 800, children: [pane] });
     const env = makeEnv({ main });

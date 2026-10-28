@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 静的ファイルを簡易に配る（レイアウト計測の CI 用。Node だけで動く）。
-//   node external/fara-site-kit/tools/layout-check/serve-static.mjs publish/wwwroot 8820 [--not-found 404.html] [--spa]
+//   node external/fara-blazor-component/tools/layout-check/serve-static.mjs publish/wwwroot 8820 [--not-found 404.html] [--spa]
 // 引数: 配る元のフォルダ・開始ポート（既定 8820。使われていれば次のポート）。起動したら「配信中: <URL>」を出し、止めるまで動く。
 // 解決の順（Cloudflare の静的アセットと同じ形）:
 //   1. パスがファイルならそれ（末尾が / のときは、この手順を飛ばしてフォルダを先に見る）

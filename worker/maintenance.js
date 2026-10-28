@@ -1,4 +1,4 @@
-// メンテナンス表示（kit の共有ファイル）。各サイトの Worker は、kit の worker/ を submodule（external/fara-site-kit/worker/）から読む（コピーを持つサイトもある）。直すときは kit で直し、各サイトは submodule を上げて取り込む。
+// メンテナンス表示（kit の共有ファイル）。各サイトの Worker は、kit の worker/ を submodule（external/fara-blazor-component/worker/）から読む（コピーを持つサイトもある）。直すときは kit で直し、各サイトは submodule を上げて取り込む。
 //
 // Cloudflare のダッシュボード（Worker の「変数とシークレット」）の変数で切り替える。デプロイ（変数の保存）の数秒〜1 分後に反映される。
 //   MAINTENANCE_MODE     "false"（または未設定）= 通常 / "notice" = 通常のページの上に「更新予定」のお知らせを出す / "true" = メンテナンス画面（503）
@@ -40,11 +40,11 @@ export function maintenancePageHtml(siteName, message) {
 
 /**
  * お知らせのバナー。1 行目に見出し「【お知らせ】」、2 行目以降に本文（CSS で見出し・本文をそれぞれ次の行に置く）。
- * 見た目は各サイトの CSS の .fsk-notice で付ける。CSP のため、インラインの style は使わない。
+ * 見た目は各サイトの CSS の .fbc-notice で付ける。CSP のため、インラインの style は使わない。
  */
 export function noticeHtml(message) {
   const text = message || "まもなくメンテナンスを行います。";
-  return `<div class="fsk-notice" role="status"><strong class="fsk-notice-title">【お知らせ】</strong><span class="fsk-notice-text">${escapeHtml(text)}</span></div>`;
+  return `<div class="fbc-notice" role="status"><strong class="fbc-notice-title">【お知らせ】</strong><span class="fbc-notice-text">${escapeHtml(text)}</span></div>`;
 }
 
 /**

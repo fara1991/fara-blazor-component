@@ -1,7 +1,7 @@
 // Fara のサイト共通の ESLint 設定（flat config）。kit の tools/lint/ にあり、各サイトが submodule 越しに読む。
 //
 // 使い方（各サイトのルートの eslint.config.mjs）:
-//   import shared, { createSharedConfig } from "./external/fara-site-kit/tools/lint/eslint.config.shared.mjs";
+//   import shared, { createSharedConfig } from "./external/fara-blazor-component/tools/lint/eslint.config.shared.mjs";
 //   export default [
 //     ...shared,                                   // Node の JS（**/*.{js,mjs,cjs}）
 //     ...createSharedConfig({                      // ブラウザの JS を足す場合
