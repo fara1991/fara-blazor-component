@@ -6,7 +6,7 @@
 
 @if (AsButton)
 {
-    <MudButton Variant="Variant.Outlined" Color="Color.Inherit" Size="Size.Small" FullWidth="true" Class="@Class" OnClick="ToggleAsync">
+    <MudButton Variant="Variant.Outlined" Color="Color.Inherit" Size="Size.Small" FullWidth="true" Class="@($"fsk-theme-button {Class}")" OnClick="ToggleAsync">
         @(ThemeState.IsDark ? LightLabel : DarkLabel)
     </MudButton>
 }
