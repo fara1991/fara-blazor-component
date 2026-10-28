@@ -38,6 +38,41 @@ public class SiteLayoutTests : SiteKitTestContext
     }
 
     [Fact]
+    public async Task EscapeClosesThePhoneMenuAndReturnsFocusToTheMenuButton()
+    {
+        var cut = RenderLayout(mobile: true);
+        cut.Find(".fsk-menu-toggle").Click();
+        Assert.Equal("true", cut.Find(".fsk-menu-toggle").GetAttribute("aria-expanded"));
+
+        // JS の文書の keydown（Escape）から呼ばれる入口
+        await cut.InvokeAsync(() => cut.Instance.OnEscape());
+
+        Assert.Equal("false", cut.Find(".fsk-menu-toggle").GetAttribute("aria-expanded"));
+        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.focusMenu");
+    }
+
+    [Fact]
+    public void EscapeDoesNothingWhenThePhoneMenuIsClosed()
+    {
+        var cut = RenderLayout(mobile: true);
+
+        cut.InvokeAsync(() => cut.Instance.OnEscape()).Wait();
+
+        Assert.DoesNotContain(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.focusMenu");
+    }
+
+    [Fact]
+    public void DisposingTheLayoutRemovesTheMobileWatchWithTheSameKey()
+    {
+        var cut = RenderLayout(mobile: false);
+        var key = JSInterop.Invocations.Single(i => i.Identifier == "faraSiteKit.watchMobile").Arguments[1];
+
+        ((IDisposable)cut.Instance).Dispose();
+
+        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.unwatchMobile" && Equals(i.Arguments[0], key));
+    }
+
+    [Fact]
     public void MobilePageScrollAddsTheClassAndKeepsTheOthers()
     {
         JSInterop.Setup<bool>("faraSiteKit.watchMobile", _ => true).SetResult(true);

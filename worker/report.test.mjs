@@ -192,12 +192,12 @@ test("Turnstile が返した hostname が、このサイトと違えば断る（
   assert.equal((await run(post(valid), ENV, wrongType)).status, 400);
 });
 
-/** console.error を記録して、終わったら戻す。 */
 test("clean: 対になっていないサロゲートを取り、絵文字は割らない（長さは文字単位）", () => {
   assert.equal(clean("a\uD83Db😀", 10), "ab😀");
   assert.equal(clean("😀".repeat(5), 3), "😀😀😀");
 });
 
+/** console.error を記録して、終わったら戻す。 */
 async function captureErrors(fn) {
   const logs = [];
   const original = console.error;
