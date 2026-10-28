@@ -156,6 +156,10 @@
 
     private DotNetObjectReference<SiteLayout>? self;
 
+    // JS の監視（matchMedia と Esc）の登録の名前。Dispose で同じ名前を渡して外す
+    private readonly string watchKey = Guid.NewGuid().ToString("N");
+    private bool watching;
+
     private EventCallback CloseOnNavigate => EventCallback.Factory.Create(this, CloseOnMobile);
     private EventCallback CloseSearchEvent => EventCallback.Factory.Create(this, CloseSearch);
 
@@ -177,7 +181,8 @@
             try
             {
                 self = DotNetObjectReference.Create(this);
-                mobile = sync.Invoke<bool>("faraSiteKit.watchMobile", self);
+                mobile = sync.Invoke<bool>("faraSiteKit.watchMobile", self, watchKey);
+                watching = true;
             }
             catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは PC として扱う */ }
         }
@@ -246,6 +251,25 @@
         if (e.Key == "Escape") CloseSearch();
     }
 
+    /// <summary>
+    /// Esc が押されたとき（文書全体で、JS（faraSiteKit.watchMobile）が知らせる）。スマホで開いているメニューを閉じ、フォーカスをメニューボタンに戻す。
+    /// MudDrawer は Esc では閉じないため、ここで閉じる。検索欄の Esc は OnSheetKeyDown が受けるので、ここでは何もしない。
+    /// </summary>
+    [JSInvokable]
+    public void OnEscape()
+    {
+        if (!Mobile || !mobileOpen) return;
+        mobileOpen = false;
+        StateHasChanged();
+        _ = FocusMenuAsync();
+    }
+
+    private async Task FocusMenuAsync()
+    {
+        try { await JS.InvokeVoidAsync("faraSiteKit.focusMenu"); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、フォーカスを動かさない（メニューは閉じている） */ }
+    }
+
     private void HideSearch(bool focusButton)
     {
         if (!searchOpen) return;
@@ -292,6 +316,15 @@
     public void Dispose()
     {
         Nav.LocationChanged -= OnLocationChanged;
+        // 登録を外す（外さないと、画面を移るたびに古い参照へ送り続けて、警告が増える）。JS が切れていれば何もしない
+        if (watching) _ = UnwatchAsync();
+        watching = false;
         self?.Dispose();
+    }
+
+    private async Task UnwatchAsync()
+    {
+        try { await JS.InvokeVoidAsync("faraSiteKit.unwatchMobile", watchKey); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* 回線が切れた後・JS が無いときは、外す先が無い */ }
     }
 }

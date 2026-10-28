@@ -52,3 +52,78 @@ test("dispatchInputNames: 入力が無いワークフローは空（run の中�
     const yaml = "name: x\non: push\njobs:\n  a:\n    steps:\n      - run: echo maintenance_mode\n";
     assert.deepEqual(dispatchInputNames(yaml), []);
 });
+
+test("dispatchInputNames: ブロックスカラー（run: |）の中の maintenance_mode: は入力と判定しない", () => {
+    const yaml = [
+        "on:",
+        "  workflow_dispatch:",
+        "    inputs:",
+        "      maintenance_message:",
+        "        type: string",
+        "jobs:",
+        "  deploy:",
+        "    steps:",
+        "      - name: x",
+        "        run: |",
+        "          maintenance_mode: \"true\"",
+        "          maintenance_message:",
+        "      - run: |",
+        "          echo ok",
+        "",
+    ].join("\n");
+    assert.deepEqual(dispatchInputNames(yaml), ["maintenance_message"]);
+});
+
+test("dispatchInputNames: inputs の値がブロックスカラーなら、その中のキーは入力と数えない", () => {
+    const yaml = [
+        "on:",
+        "  workflow_dispatch:",
+        "    inputs: |",
+        "      maintenance_mode:",
+        "        type: choice",
+        "jobs: {}",
+        "",
+    ].join("\n");
+    assert.deepEqual(dispatchInputNames(yaml), []);
+});
+
+test("dispatchInputNames: 複数行の文字列の続き行は、キーと数えない（入力の description の中）", () => {
+    const yaml = [
+        "on:",
+        "  workflow_dispatch:",
+        "    inputs:",
+        "      maintenance_mode:",
+        '        description: "一行目',
+        "          maintenance_message: 続き",
+        '          二行目"',
+        "        type: choice",
+        "      maintenance_message:",
+        "        type: string",
+        "",
+    ].join("\n");
+    assert.deepEqual(dispatchInputNames(yaml), ["maintenance_mode", "maintenance_message"]);
+});
+
+test("dispatchInputNames: インデントの違う（2 空白・4 空白）書き方でも、同じ入力名を数える", () => {
+    const yaml = [
+        "on:",
+        "    workflow_dispatch:",
+        "        inputs:",
+        "            maintenance_mode:",
+        "                type: choice",
+        "",
+    ].join("\n");
+    assert.deepEqual(dispatchInputNames(yaml), ["maintenance_mode"]);
+});
+
+test("ALLOW_MISSING_WORKER の説明（docs）は、1 と true（大文字小文字を区別しない）で書く", () => {
+    for (const file of ["docs/maintenance-cli.md", "docs/new-site-checklist.md"]) {
+        const lines = read(file).split("\n").filter((line) => line.includes("ALLOW_MISSING_WORKER"));
+        assert.ok(lines.length > 0, `${file} に ALLOW_MISSING_WORKER の説明がある`);
+        for (const line of lines) {
+            assert.match(line, /`1`/, `${file}: 1 と書く`);
+            assert.match(line, /`true`/, `${file}: true と書く`);
+            assert.match(line, /大文字小文字を区別しない/, `${file}: 大文字小文字の扱いを書く`);
+        }
+    }
+});

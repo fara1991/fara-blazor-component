@@ -16,15 +16,7 @@
 
 <div class="fsk-page-header fsk-page-column">
     @* 題名の見出し。既定は h1（このページの題名）。サイト側が既に h1 を持つときは HeadingLevel を 2 以上にする *@
-    @switch (HeadingLevel)
-    {
-        case 2: <h2 class="fsk-page-title">@Title</h2> break;
-        case 3: <h3 class="fsk-page-title">@Title</h3> break;
-        case 4: <h4 class="fsk-page-title">@Title</h4> break;
-        case 5: <h5 class="fsk-page-title">@Title</h5> break;
-        case 6: <h6 class="fsk-page-title">@Title</h6> break;
-        default: <h1 class="fsk-page-title">@Title</h1> break;
-    }
+    @TitleHeading
     <p class="fsk-muted fsk-mb-0">@Lead</p>
 </div>
 
@@ -72,7 +64,7 @@
             {
                 <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" NoIcon="true" Class="fsk-mb-3" role="alert">@error</MudAlert>
             }
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SendAsync" Disabled="@(sending || disabled)">@(sending ? "送信中…" : "送信する")</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SendAsync" Disabled="@(sending || disabled)" Class="fsk-report-submit">@(sending ? "送信中…" : "送信する")</MudButton>
             <p class="fsk-small fsk-muted fsk-mt-3 fsk-mb-0">送信すると、<a href="@Site.PrivacyPath">プライバシーポリシー</a>に書いたとおり、内容が作者に通知されます。個人情報（パスワード・アクセスキーなど）は書かないでください。</p>
         }
     </MudCardContent>
@@ -123,6 +115,16 @@
     private const int TokenWaitMs = 5000;
 
     private const string TurnstileId = "fsk-report-turnstile";
+
+    /// <summary>題名の見出し。HeadingLevel が 2〜6 ならその h、それ以外（1 や範囲外）は h1。</summary>
+    private RenderFragment TitleHeading => builder =>
+    {
+        var tag = HeadingLevel is >= 2 and <= 6 ? "h" + HeadingLevel : "h1";
+        builder.OpenElement(0, tag);
+        builder.AddAttribute(1, "class", "fsk-page-title");
+        builder.AddContent(2, Title);
+        builder.CloseElement();
+    };
 
     /// <summary>入力の内容（テストからも見る）。</summary>
     internal ReportForm Form { get; set; } = new();

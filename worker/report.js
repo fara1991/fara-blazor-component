@@ -15,6 +15,8 @@
 // Turnstile 側の問題（利用者の失敗ではない）は 503（いまは受け付けていません）にして、ログに残す。トークンの不正・期限切れは従来どおり 400。
 // 報告の本文は個人情報になりうるので、保存しない（Discord に送るだけ）。
 
+import { cleanText as clean } from "./text.js";
+
 /**
  * 本文のバイト数の上限（Content-Length の宣言も、実際に読んだ量も）。32 KB。
  * JSON が非 ASCII を \uXXXX（6 文字。絵文字は 12 文字）にする送り手でも通る大きさ:
@@ -38,20 +40,8 @@ const CATEGORIES = { bug: "不具合", request: "要望・提案", other: "そ�
 const json = (status, body, headers = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers } });
 
-/**
- * 制御文字（改行・タブ以外）と、対になっていないサロゲートを取り、前後の空白を取り、長さ（文字数。絵文字は 1 文字）を切る。
- * 文字列でなければ空。（UTF-16 のまま切ると絵文字が割れて、Discord が受け付けないことがあるため、文字単位で数える。）
- */
-export function clean(value, max) {
-  if (typeof value !== "string") return "";
-  const text = value
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
-    .replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, "")
-    .trim();
-  const chars = Array.from(text);
-  return chars.length > max ? chars.slice(0, max).join("").trim() : text;
-}
+/** 文字列の整え方（制御文字・対になっていないサロゲートを取り、長さを文字数で切る）。maintenance.js と共有する（text.js）。 */
+export { clean };
 
 /** 報告のきっかけのページ（パスだけ）。フッターのリンク・report.js と同じ条件。そうでなければ空。 */
 export function cleanPage(value) {

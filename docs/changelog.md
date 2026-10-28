@@ -2,6 +2,19 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 0.5.1
+
+2026-10-28。
+0.5.0 の 2 回目のレビュー指摘の修正。公開 API（部品のパラメータ・CSS のクラス名・Worker の入出力）は変えない。**挙動が変わる点**: (1) スマホ（768px 未満）のメニューが Esc で閉じ、フォーカスがメニューボタンに戻る。(2) 報告フォームの送信ボタンと入力欄が、600px 未満で 44px になる（見た目の幅・色は同じ）。(3) `worker/text.js` を足した（`worker/report.js`・`worker/maintenance.js` が使う）。submodule で `worker/*.js` を import しているサイトは、上げるだけでよい。ファイルを**コピーして**持っているサイトは、`worker/text.js` も一緒に入れる。
+
+- レイアウト（レビュー指摘）: 報告フォームの送信ボタン（`.fsk-report-submit`）と入力欄（`.fsk-select input`・`.fsk-field input`・`#report-category`・`#report-contact`）を、600px 未満で高さ 44px にした。フッターの文字リンク・本文中の小さなリンク（`.fsk-small a`）の当たり判定を、1024px 以下で 44px 近くに広げた（padding と負の margin。見た目の大きさは変えない）。SNS アイコンは、当たり判定（44px）が隣と重ならないよう、1024px 以下で間隔を 22px にした。
+- Esc（レビュー指摘）: スマホのメニューが開いているとき、Esc で閉じ、フォーカスをメニューボタン（`.fsk-menu-toggle`）に戻す（`SiteLayout.OnEscape`。JS の `watchMobile` が文書の keydown を知らせる）。MudDrawer は Esc で閉じないため、kit が閉じる。
+- JS・Razor（レビュー指摘）: `faraSiteKit.watchMobile(ref, key)` は、登録の名前（key）を受け取る（戻り値は今の幅のまま）。`faraSiteKit.unwatchMobile(key)` を足した。`SiteLayout` は Dispose で外す（外さないと、画面を移るたびに古い参照へ送り続けて警告が増えていた）。`ReportFormView` の題名の見出しは 1 か所（`TitleHeading`）にまとめた（見た目・レベルは変えない）。
+- Worker（レビュー指摘）: 対になっていないサロゲートを取る文字列の整えを `worker/text.js`（`cleanText`）に 1 か所にまとめた。`report.js` の `clean` はそのまま（`cleanText` の別名で export）。`maintenance.js` の文は同じ規則。`worker/text.test.mjs` が両方を同じ入力で確かめる。
+- ツール（レビュー指摘）: `tools/maintenance.mjs` の `dispatchInputNames` は、`run: |` などのブロックスカラーと、複数行の文字列の続き行を、キーとして数えない。リストの項目（`- run: ...`）の桁も数える。依存は増やしていない。
+- docs: `ALLOW_MISSING_WORKER` の判定は `1` か `true`（大文字小文字を区別しない）と統一して書いた（各サイトの `require-maintenance.mjs` の判定が違う場合は、サイト側を合わせる。album は `1` のみ）。
+- テスト: スマホの入力・送信ボタンの高さ、1024px 以下の当たり判定、Esc（JS・bUnit）、unwatch の登録と解除、`dispatchInputNames` のブロックスカラー・複数行・インデントの違い、`worker/text.test.mjs`、docs の表記。
+
 ## 0.5.0
 
 2026-10-28。レビュー指摘の修正。**挙動が変わる点**: (1) `ReportFormView` の題名が h1 になった（従来は h3。サイトが既にページの h1 を持つ場合は `HeadingLevel="2"` 以上を指定する）。(2) `worker/report.js` の最小文字数の判定が、絵文字を 1 文字として数えるようになった（クライアントの数え方と同じ）。(3) `worker/maintenance.js` のメッセージの除去規則が `report.js` と同じになった。各サイトの `worker/` のコピーも同じ内容に揃える。
