@@ -2,7 +2,7 @@
 //
 //   GET  /api/report/config → 200 {"enabled": bool, "siteKey": "Turnstile のサイトキー" | null}
 //   POST /api/report        ← {"category": "bug" | "request" | "other", "message": "...", "contact"?: "...", "page"?: "...", "turnstileToken": "...", "website": ""}
-//                           → 200 {"ok": true} / 400 / 403 / 413 / 415 / 502 / 503
+//                           → 200 {"ok": true} / 400 / 403 / 413 / 415 / 429 / 502 / 503
 //
 // 流れ: 同じサイトのページからか確認 → 本文の検証（長さ・種類） → Turnstile（Cloudflare のボット判定）の確認 → Discord の Webhook に送る。
 // 設定（Cloudflare のダッシュボードの Worker の「変数とシークレット」。docs/report-and-maintenance.md）:
@@ -15,9 +15,15 @@
 // 通信の例外（fetch が投げたもの）は errorSummary（error-summary.js）で、名前と URL・トークンを伏せたメッセージだけを出す。
 // Turnstile 側の問題（利用者の失敗ではない）は 503（いまは受け付けていません）にして、ログに残す。トークンの不正・期限切れは従来どおり 400。
 // 報告の本文は個人情報になりうるので、保存しない（Discord に送るだけ）。
+// 1 日の回数の制限（REPORT_LIMITER のバインディングがあるサイトだけ。report-rate-limit.js）: Turnstile を通った送信の試みを、送信元（CF-Connecting-IP）ごとに
+// 1 日 3 回まで数える。超えたら 429（Retry-After は次の JST 0 時まで）。数えるのは、短縮ハッシュと回数だけ（IP は保存しない）。
+// Discord への送信が失敗したときは、数えた 1 回を戻す（届いていない分で枠を使い切らない）。戻しの失敗は応答を変えない（ログだけ）。
+// 鍵は TURNSTILE_SECRET から用途ラベル付きで導く（HMAC）。秘密鍵を変えると、識別子が変わって計数はリセットされる。
+// 数えられない（IP・秘密鍵が無い、DO の例外）ときは制限せず送る（fail-open。Turnstile が残っている）。
 
 import { cleanText as clean } from "./text.js";
 import { errorSummary } from "./error-summary.js";
+import { REPORT_DAILY_LIMIT, clientHash, hitReportLimiter, jstDay, releaseReportLimiter, secondsUntilNextJstMidnight } from "./report-rate-limit.js";
 
 /**
  * 本文のバイト数の上限（Content-Length の宣言も、実際に読んだ量も）。32 KB。
@@ -38,6 +44,7 @@ const TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify
 const TURNSTILE_SERVER_ERRORS = new Set(["missing-input-secret", "invalid-input-secret", "internal-error"]);
 const TURNSTILE_FAILED_MESSAGE = "「ロボットではありません」の確認に失敗しました。もう一度お試しください";
 const CATEGORIES = { bug: "不具合", request: "要望・提案", other: "その他" };
+const RATE_LIMITED_MESSAGE = `1 日の送信上限（${REPORT_DAILY_LIMIT} 回）に達しました。明日もう一度お試しください。`;
 
 const json = (status, body, headers = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers } });
@@ -89,6 +96,49 @@ function turnstileUnavailable(reason) {
 /** 報告の受け口が使える設定か（3 つの値がそろっているか）。 */
 export function isConfigured(env) {
   return Boolean(env.TURNSTILE_SITE_KEY && env.TURNSTILE_SECRET && env.DISCORD_WEBHOOK_URL);
+}
+
+const NO_LIMIT = { response: null, release: null };
+
+/**
+ * 送信元の 1 日の回数を数える（Turnstile を通った送信の試みだけ）。戻り値 { response, release }。
+ * - 上限に達している: response に 429 を入れる（release は null）。
+ * - 数えた: response は null。release は、Discord への送信が失敗したときに呼ぶ戻し（失敗しても例外を投げない）。
+ * - 数えられない（IP や秘密鍵が無い・DO の例外）: どちらも null（fail-open）。
+ * ログには IP・ハッシュ・秘密鍵・DO の内部の値を出さない（errorSummary の要約だけ）。
+ * @param {Request} request
+ * @param {Record<string, any>} env
+ * @param {Date} now
+ * @returns {Promise<{ response: Response | null, release: (() => Promise<void>) | null }>}
+ */
+async function checkDailyLimit(request, env, now) {
+  const ip = request.headers.get("CF-Connecting-IP");
+  if (!ip) {
+    console.warn("report: daily limit skipped, no CF-Connecting-IP");
+    return NO_LIMIT;
+  }
+  if (!env.TURNSTILE_SECRET) {
+    console.error("report: daily limit unavailable (no key), sending anyway");
+    return NO_LIMIT;
+  }
+  const day = jstDay(now);
+  let hash;
+  try {
+    hash = await clientHash(env.TURNSTILE_SECRET, ip, day);
+    const { allowed } = await hitReportLimiter(env.REPORT_LIMITER, { day, hash, limit: REPORT_DAILY_LIMIT });
+    if (!allowed) return { response: json(429, { error: "rate_limited", message: RATE_LIMITED_MESSAGE }, { "Retry-After": String(secondsUntilNextJstMidnight(now)) }), release: null };
+  } catch (error) {
+    console.error("report: daily limit unavailable, sending anyway", errorSummary(error));
+    return NO_LIMIT;
+  }
+  const release = async () => {
+    try {
+      await releaseReportLimiter(env.REPORT_LIMITER, { day, hash });
+    } catch (error) {
+      console.error("report: daily limit release failed", errorSummary(error));
+    }
+  };
+  return { response: null, release };
 }
 
 /**
@@ -162,6 +212,11 @@ export async function handleReport(request, env, siteName, deps = {}) {
   // 確認が通ったページが、いま送っているこのサイトのものか（別のサイトで取ったトークンを使い回されないように）。hostname が無いときも失敗扱い
   if (result.hostname !== url.hostname) return json(400, { error: "turnstile_failed", message: TURNSTILE_FAILED_MESSAGE });
 
+  const now = deps.now?.() ?? new Date();
+  // 1 日の回数（Turnstile を通った送信の試みだけを数える。REPORT_LIMITER が無いサイトでは何もしない）
+  const limit = env.REPORT_LIMITER ? await checkDailyLimit(request, env, now) : NO_LIMIT;
+  if (limit.response) return limit.response;
+
   // Discord へ。@everyone などのメンションは無効にする
   const fields = [{ name: "種類", value: CATEGORIES[category], inline: true }];
   if (contact) fields.push({ name: "連絡先", value: contact, inline: true });
@@ -176,17 +231,19 @@ export async function handleReport(request, env, siteName, deps = {}) {
       description: message,
       color: category === "bug" ? 0xdc3545 : category === "request" ? 0x7c3aed : 0x6b5f8a,
       fields,
-      timestamp: (deps.now?.() ?? new Date()).toISOString(),
+      timestamp: now.toISOString(),
     }],
   };
   try {
     const res = await doFetch(env.DISCORD_WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!res.ok) {
       console.error("report: discord webhook failed, status", res.status);
+      await limit.release?.();
       return json(502, { error: "notify_failed", message: "送信に失敗しました。しばらくしてからもう一度お試しください" });
     }
   } catch (error) {
     console.error("report: discord webhook request failed", errorSummary(error));
+    await limit.release?.();
     return json(502, { error: "notify_failed", message: "送信に失敗しました。しばらくしてからもう一度お試しください" });
   }
   return json(200, { ok: true });

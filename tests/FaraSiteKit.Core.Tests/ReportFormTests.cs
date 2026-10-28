@@ -247,7 +247,8 @@ public class ReportFormTests
 
     [Theory]
     [InlineData(413, "", "長すぎ")]
-    [InlineData(429, "<html>Too Many Requests</html>", "入力を確かめて")]   // Worker は 429 を返さない。専用の文は無く、既定の文になる
+    [InlineData(429, "<html>Too Many Requests</html>", "明日もう一度")]     // 本文が読めないときは、既定の文（1 日の上限）
+    [InlineData(429, "{\"error\":\"rate_limited\",\"message\":\"1 日の送信上限（3 回）に達しました。明日もう一度お試しください。\"}", "1 日の送信上限（3 回）")]
     [InlineData(503, "not json", "受け付けていません")]
     [InlineData(502, null, "失敗")]
     [InlineData(500, "{\"message\":\"\"}", "失敗")]            // 空の文は使わない

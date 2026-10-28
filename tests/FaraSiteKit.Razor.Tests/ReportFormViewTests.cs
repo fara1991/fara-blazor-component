@@ -201,6 +201,37 @@ public class ReportFormViewTests : SiteKitTestContext
     }
 
     [Fact]
+    public void ADailyLimitShowsTheWorkersMessageAndNotAGenericFailure()
+    {
+        _handler.Respond = (_, _) => Task.FromResult(new HttpResponseMessage((HttpStatusCode)429)
+        {
+            Content = new StringContent("{\"error\":\"rate_limited\",\"message\":\"1 日の送信上限（3 回）に達しました。明日もう一度お試しください。\"}"),
+        });
+        var cut = RenderForm();
+        FillValid(cut.Instance);
+
+        cut.Find("button.mud-button-filled").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("1 日の送信上限（3 回）に達しました", cut.Markup));
+        Assert.DoesNotContain("送信に失敗しました", cut.Markup);
+    }
+
+    [Fact]
+    public void ADailyLimitWithoutAReadableMessageShowsTheDailyLimitText()
+    {
+        _handler.Respond = (_, _) => Task.FromResult(new HttpResponseMessage((HttpStatusCode)429)
+        {
+            Content = new StringContent("<html>Too Many Requests</html>"),
+        });
+        var cut = RenderForm();
+        FillValid(cut.Instance);
+
+        cut.Find("button.mud-button-filled").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("1 日の送信上限（3 回）に達しました。明日もう一度お試しください。", cut.Markup));
+    }
+
+    [Fact]
     public void TimeoutShowsTheTimeoutMessageInsteadOfFailing()
     {
         _handler.Respond = async (_, ct) =>
