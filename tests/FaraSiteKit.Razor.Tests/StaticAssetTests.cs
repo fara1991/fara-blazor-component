@@ -74,8 +74,22 @@ public class StaticAssetTests
         // 報告フォームの送信ボタン（既定の 37px）と入力欄（input 40px）を、スマホで 44px にする
         var phone = Between(css, "@media (max-width: 599.98px)", "/* タブレット");
         Assert.Contains(".fsk-report-submit", phone);
-        Assert.Contains("#report-contact", phone);
+        Assert.Contains(".fsk-report-card #report-contact", phone);
         Assert.Contains("min-height: 44px", phone);
+        // ドロワーの文字のボタン（テーマ切替）も 44px（見た目は変えない）
+        Assert.Contains(".fsk-theme-button", phone);
+    }
+
+    [Fact]
+    public void HeaderSearchInputGetsAKeyboardFocusRingWithoutChangingTheFieldFrame()
+    {
+        var css = ReadRazorFile("wwwroot/css/fara-site-kit.css");
+
+        // 検索入力（サイトが SearchBox に置く）にも、ボタンと同じ淡い紫の枠。欄の枠線（.mud-focused）は変えない
+        Assert.Contains(".fsk-header :is(input, textarea):focus-visible", css);
+        var rule = Between(css, ".fsk-header :is(input, textarea):focus-visible", "}");
+        Assert.Contains("outline: 2px solid var(--fsk-focus, #e9d5ff)", rule);
+        Assert.DoesNotContain("border", rule);
     }
 
     [Fact]
