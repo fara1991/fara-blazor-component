@@ -60,11 +60,11 @@
         // 確認は 1 回で使い切りなので、送信に失敗したあとなどに作り直す
         reset: function () {
             token = "";
-            if (window.turnstile && widgetId !== null) { try { window.turnstile.reset(widgetId); } catch (e) { /* すでに無いとき */ } }
+            if (window.turnstile && widgetId !== null) { try { window.turnstile.reset(widgetId); } catch { /* すでに無いとき */ } }
         },
         dispose: function () {
             token = "";
-            if (window.turnstile && widgetId !== null) { try { window.turnstile.remove(widgetId); } catch (e) { /* すでに無いとき */ } }
+            if (window.turnstile && widgetId !== null) { try { window.turnstile.remove(widgetId); } catch { /* すでに無いとき */ } }
             widgetId = null;
         },
     };

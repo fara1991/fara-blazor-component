@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>layout-check: わざと崩した例</title>
+<style>
+  body { margin: 0; font-family: sans-serif; font-size: 16px; line-height: 1.6; background: #1a1030; color: #f5f5f5; }
+  /* 見えるフォーカスを消す（違反にする） */
+  a, a:focus { outline: none; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 0 16px; min-height: 56px; }
+  /* 44px 未満のボタン（違反にする） */
+  #small-button { width: 20px; height: 20px; padding: 0; border: 0; }
+  #menu { min-width: 20px; min-height: 20px; padding: 0; border: 0; }
+  /* 閉じたドロワーの中の項目が Tab で止まる（inert が無い。違反にする） */
+  .drawer { position: fixed; top: 56px; left: 0; bottom: 0; width: 260px; background: #2a1d45; transform: translateX(-100%); }
+  .drawer.open { transform: none; }
+  .drawer a { display: block; min-height: 44px; line-height: 44px; padding: 0 16px; color: #f5f5f5; }
+  main { padding: 16px; }
+  .tiny { font-size: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <span>Fara</span>
+  <button id="menu" type="button" aria-expanded="false" aria-controls="drawer">メニュー</button>
+</header>
+<nav id="drawer" class="drawer" aria-label="サイト">
+  <a href="#works">作品</a>
+  <a href="#updates">更新履歴</a>
+</nav>
+<main>
+  <h1>不良の例 1</h1>
+  <h1 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">不良の例 2</h1>
+  <p>本文の <a href="#inline">リンク</a> の続き。</p>
+  <p class="tiny">10px の文字（違反にする）</p>
+  <button id="small-button" type="button">小</button>
+  <div style="width:520px;background:#333">はみ出す幅（横スクロールの違反にする）</div>
+</main>
+<footer><a href="#privacy">プライバシー</a></footer>
+<script>
+  // Esc で閉じない（違反にする）。
+  const menu = document.getElementById('menu');
+  const drawer = document.getElementById('drawer');
+  menu.addEventListener('click', () => {
+    const open = menu.getAttribute('aria-expanded') !== 'true';
+    menu.setAttribute('aria-expanded', String(open));
+    drawer.classList.toggle('open', open);
+  });
+</script>
+</body>
+</html>

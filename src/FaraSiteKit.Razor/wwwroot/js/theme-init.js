@@ -20,7 +20,7 @@
             });
         }
         root.setAttribute("data-bs-theme", theme);
-    } catch (e) {
+    } catch {
         root.setAttribute("data-bs-theme", "light");
     }
 

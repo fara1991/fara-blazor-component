@@ -96,6 +96,5 @@ export function withNotice(response, info, rewrite = rewriteWithHtmlRewriter) {
 }
 
 function rewriteWithHtmlRewriter(response, html) {
-  // eslint-disable-next-line no-undef
   return new HTMLRewriter().on("main", { element(el) { el.prepend(html, { html: true }); } }).transform(response);
 }

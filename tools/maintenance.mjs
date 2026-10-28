@@ -74,7 +74,6 @@ export function parseArgs(argv) {
 }
 
 export function validateMessage(message) {
-  // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u001f\u007f]/.test(message)) throw new UsageError("--message に制御文字（改行を含む）は使えません");
   if (message.length === 0) throw new UsageError("--message が空です（空の文面は渡せません。文面を変えないなら指定しない）");
   if (Array.from(message).length > MAX_MESSAGE) throw new UsageError(`--message は ${MAX_MESSAGE} 文字までです（Worker が切り捨てるため）`);
@@ -129,7 +128,6 @@ export function selectTargets(sites, { env, sites: names }, { needWorkflow = fal
 // ---- 表示用 ----
 
 /** 端末の制御シーケンスの注入を避けるため、制御文字を外して JSON 文字列にする。 */
-// eslint-disable-next-line no-control-regex
 export const printable = (v) => (v === null ? "(未設定)" : JSON.stringify(String(v).replace(/[\u0000-\u001f\u007f]/g, " ")));
 
 function makeIo({ env, log, error }) {
@@ -223,7 +221,6 @@ export function dispatchArgs(t, opts) {
 
 /** 表示用: 実行するコマンドを 1 行にする（空白・引用符を含む引数は " で囲む）。 */
 export function displayCommand(args) {
-  // eslint-disable-next-line no-control-regex
   return ["gh", ...args].map((a) => (/^[\w./:=@,-]+$/.test(a) ? a : JSON.stringify(a.replace(/[\u0000-\u001f\u007f]/g, " ")))).join(" ");
 }
 

@@ -24,7 +24,7 @@ function node({ sel = [], scrollTop = 0, scrollHeight, clientHeight, children = 
 }
 
 // 画面（PC: 本文の中の .fsk-content か .fsk-pane-scroll が動く / スマホ: window が動く / 対戦画面）を組み立てる
-function makeEnv({ main = null, windowPage = null, battle = false } = {}) {
+function makeEnv({ main = null, windowPage = null } = {}) {
     const styles = {};
     let writes = 0;
     const bar = {

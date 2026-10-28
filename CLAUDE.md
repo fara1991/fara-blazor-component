@@ -46,7 +46,10 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 - `tools/maintenance.mjs`（補助）: サイトの Worker の `MAINTENANCE_MODE` / `MAINTENANCE_MESSAGE` をまとめて扱う CLI。`status` は Cloudflare API の GET だけ（Read 権限）。`set` は Cloudflare API に書き込まず、各サイトの deploy ワークフローを `gh workflow run` で手動実行して（入力 `maintenance_mode` / `maintenance_message`）`wrangler deploy --var` で反映する。dev を先に流し、失敗で中断。対象は `tools/maintenance-sites.json`（repo・workflow・ref・Worker 名）。ワークフローの雛形は `docs/maintenance-cli.md`（テストが雛形の入力名を検査）。実 gh・実 API のテストはしない（`tests/tools/`、差し替え）。Worker の変数名は `MAINTENANCE_MODE`（0.3.0 で変更。旧名は読まない）
 - `src/FaraSiteKit.Core/`: C#（`SiteLinks`・`MaintenanceInfo`・`ReportForm`）。UI と通信に依存しない純粋なコードだけを置く（Razor・MudBlazor は K0-4 で別のプロジェクトに）
 - `tests/FaraSiteKit.Core.Tests/`: C# のテスト（xUnit）。`global.json` の SDK（10.0.x）で実行する
-- `.github/workflows/ci.yml`: `npm test`（Node 22）と `dotnet test` を、ubuntu と windows の matrix で並列に実行
+- `.github/workflows/ci.yml`: `npm test`（Node 22）と `dotnet test` を、ubuntu と windows の matrix で並列に実行。`lint`（`npm run lint`）と `layout-check`（ubuntu・chromium で `npm run test:layout-check`）の job も動く
+- `tools/layout-check/`: レイアウトの自動計測（ESM・`playwright-core`）。判定は `rules.mjs`（依存なし）、計測は `browser.mjs`、CLI は `cli.mjs`、静的ファイルの簡易サーバーは `serve-static.mjs`。使い方は `docs/layout-check.md`
+- `tools/lint/`: ESLint の共通設定（`eslint.config.shared.mjs`）と .NET のアナライザーの設定（`dotnet.editorconfig`。`Directory.Build.props` が読む）。ラチェット（違反 0 件のルールだけ error）。使い方は `docs/lint.md`。`eslint.config.mjs` は kit 自身の JS に当てる
+- `Directory.Build.props`（kit のルート）: kit の C# プロジェクトだけに効く。サイトのプロジェクトには、サイトの props で同じ設定を入れる（docs/lint.md）
 - `.claude/hooks/session-start.sh`（`.claude/settings.json` で登録）: Claude Code のクラウドセッション開始時に .NET SDK 10.0 を packages.microsoft.com の apt から入れ、`dotnet restore` する（dot.net のインストールスクリプトはネットワークの制限で取れない）。ローカルでは何もしない
 
 ## 変更の流れ
@@ -58,8 +61,13 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 
 ```bash
 npm test
+npm run lint
+npm run test:layout-check   # ブラウザを使う（ローカルで Edge は LAYOUT_CHECK_CHANNEL=msedge）
 dotnet test tests/FaraSiteKit.Core.Tests
+dotnet test tests/FaraSiteKit.Razor.Tests
 ```
+
+- lint の error を増やすときは、先に違反を入れたコードで、そのルールが実際に報告されるかを確かめる（docs/lint.md）。報告されないルールを error にすると「0 件」が誤りになる
 
 - C# の名前空間は `FaraSiteKit.Core`（`SiteLinks`・`MaintenanceInfo`・`MaintenanceState`・`ReportForm` すべて）。利用するサイトは `using FaraSiteKit.Core;` を書く。名前空間を変えると、利用中のサイトが壊れる（破壊的変更）
 - `tests/FaraSiteKit.Core.Tests` のテストが正。pokemon の `tests/FaraPokemonBattleAssistant.Web.Tests`（MaintenanceInfoTests・ReportFormTests）は kit の複製で、サイトの組み込みの確認として残す。pokemon 側は組み込みの確認で、内容が同一である必要はない。kit のテストを変えたら、pokemon 側が壊れていないか（pokemon の Web.Tests が通るか）を確認する

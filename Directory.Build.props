@@ -1,0 +1,24 @@
+<Project>
+
+  <!--
+    kit の C# の静的解析（ラチェット）。ルールの中身と理由は tools/lint/dotnet.editorconfig と docs/lint.md。
+    この props は kit の中のプロジェクトだけに効く（サイトのプロジェクトは、サイト自身の Directory.Build.props を使う）。
+    サイトが同じルールを使うときは、docs/lint.md の「各サイトへの取り込み」を見る。
+  -->
+
+  <PropertyGroup>
+    <!-- IDE の規則（IDE0059 など）を dotnet build でも検査する -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)tools/lint/dotnet.editorconfig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 非同期の誤用（async void・同期の待ち）を見る。PrivateAssets=all なので、kit を参照するプロジェクトには流れない -->
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.15" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>
