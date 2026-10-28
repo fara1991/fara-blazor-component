@@ -12,7 +12,7 @@ export default [
   }),
   // 画面の JS（HTML の <script> で読む古い形の script。import も module もしない）。ブラウザのグローバルを使う。
   ...createSharedConfig({
-    files: ["src/FaraSiteKit.Razor/wwwroot/js/**/*.js"],
+    files: ["src/FaraBlazorComponent.Razor/wwwroot/js/**/*.js"],
     environments: ["browser"],
     sourceType: "script",
   }),

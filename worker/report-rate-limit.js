@@ -1,7 +1,7 @@
 // 報告の受け口（report.js）の 1 日の送信回数の制限（kit の共有ファイル。各サイトは submodule で読む）。
 //
 // 使い方（サイトの worker/index.js）:
-//   export { ReportRateLimiter } from "../external/fara-site-kit/worker/report-rate-limit.js";
+//   export { ReportRateLimiter } from "../external/fara-blazor-component/worker/report-rate-limit.js";
 // そして wrangler の設定に、バインディング REPORT_LIMITER（class_name は ReportRateLimiter）と migrations を書く（docs/usage.md の 2.2）。
 // バインディングが無いサイトでは、この制限は働かない（従来どおり）。
 //
@@ -13,7 +13,7 @@
 /** 1 日に送れる回数（送信元ごと）。Turnstile を通ったあとの送信の試み（Discord へ送る前に数え、送信が失敗したら戻す）。 */
 export const REPORT_DAILY_LIMIT = 3;
 /** 鍵の導出に使うラベル（秘密ではない。鍵そのものは Turnstile の秘密鍵から作る）。 */
-export const KEY_LABEL = "fara-site-kit/report-limit/v1";
+export const KEY_LABEL = "fara-blazor-component/report-limit/v1";
 /** DO の固定名（インスタンスは 1 つ。名前に IP などは入れない）。 */
 export const LIMITER_NAME = "report-rate-limit";
 

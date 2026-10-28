@@ -3,7 +3,7 @@
 ## 1. サブモジュールとして取り込む
 
 ```bash
-git submodule add https://github.com/fara1991/fara-site-kit.git external/fara-site-kit
+git submodule add https://github.com/fara1991/fara-blazor-component.git external/fara-blazor-component
 git submodule update --init --recursive
 ```
 
@@ -15,20 +15,20 @@ git submodule update --init --recursive
 `worker/index.js` の import を、kit の中の同じファイルに向ける。
 
 ```js
-import { handleReport } from "../external/fara-site-kit/worker/report.js";
-import { getMaintenance, maintenanceResponse } from "../external/fara-site-kit/worker/maintenance.js";
+import { handleReport } from "../external/fara-blazor-component/worker/report.js";
+import { getMaintenance, maintenanceResponse } from "../external/fara-blazor-component/worker/maintenance.js";
 ```
 
 例外をログに出すときは、kit の `error-summary.js` の `errorSummary` を使う（サイトごとのコピーは持たない。報告と同じ規則）。名前とメッセージを出し、URL（Webhook の URL を含む）・Bearer・`token=`／`token:`・24 字以上の英数字の連続を伏せ、200 字で切る。Error 以外の値も文字列にして同じ規則に通す。
 
 ```js
-import { errorSummary } from "../external/fara-site-kit/worker/error-summary.js";
+import { errorSummary } from "../external/fara-blazor-component/worker/error-summary.js";
 
 console.error(`報告の受け口で例外: ${errorSummary(error)}`);
 ```
 
 - wrangler は、サブモジュールの中のファイルもバンドルする（`wrangler deploy --dry-run` で確認する）。
-- サイトの `package.json` のテストは、kit のテストファイルを指す（例: `node --test external/fara-site-kit/worker/report.test.mjs`）。
+- サイトの `package.json` のテストは、kit のテストファイルを指す（例: `node --test external/fara-blazor-component/worker/report.test.mjs`）。
 
 ### 2.1 メンテナンスの変数（0.3.0 で名前を変更）
 
@@ -51,7 +51,7 @@ Worker の変数（ダッシュボードの「変数とシークレット」、�
 
 1. `worker/index.js` で、クラスを公開する（kit の `report-rate-limit.js` にある Durable Object）。
 ```js
-export { ReportRateLimiter } from "../external/fara-site-kit/worker/report-rate-limit.js";
+export { ReportRateLimiter } from "../external/fara-blazor-component/worker/report-rate-limit.js";
 ```
 2. `wrangler.jsonc` に、バインディングと migrations を書く。`durable_objects` と `migrations` は環境（`env.develop`）を継承しないので、**本番と develop の両方に**書く。SQLite の DO（`new_sqlite_classes`）を使う（新しい DO はこの形で作る。プランごとの対応は Cloudflare の DO の docs で確かめる）。
 ```jsonc
@@ -71,7 +71,7 @@ export { ReportRateLimiter } from "../external/fara-site-kit/worker/report-rate-
   - 公式 docs の確認: `storage.transaction()`・`alarm`・`list`・`delete`（128 件まで）は、Storage API の docs で確認した。input gate（storage 操作の間に他のイベントが入らない仕組み）の記載は、確認したページに見つからなかったため、要照合。並行性は transaction に頼っている。
 
 **数え方と保存（プライバシー）**:
-- 保存するのは、**送信元の識別子と回数だけ**。識別子は、Turnstile の秘密鍵（`TURNSTILE_SECRET`）から用途ラベル（`fara-site-kit/report-limit/v1`）付きの HMAC で導いた鍵で、`HMAC(鍵, IP + "
+- 保存するのは、**送信元の識別子と回数だけ**。識別子は、Turnstile の秘密鍵（`TURNSTILE_SECRET`）から用途ラベル（`fara-blazor-component/report-limit/v1`）付きの HMAC で導いた鍵で、`HMAC(鍵, IP + "
 " + JST の日付)` の先頭 128 ビット（32 桁の hex）。鍵が無いと同じ値は作れない（公開のソルトだけなら、IPv4 の全探索で逆算できてしまうため）。IP そのものは保存しない・ログに出さない。
 - 日付（JST の暦日）ごとにキーを分ける。同じ IP でも日付が変われば別の識別子になる。
 - **保存期間**: その日（JST）の分。JST の次の 0 時に、Durable Object の alarm で前の日のキーを消す。alarm が取りこぼされても、次の日の最初のリクエストで掃除する（日付が変わってから、次の掃除まで残る）。
@@ -91,14 +91,14 @@ export { ReportRateLimiter } from "../external/fara-site-kit/worker/report-rate-
 
 **報告画面（ReportFormView）**: 429 のときは、Worker の `message`（「1 日の送信上限（3 回）に達しました。明日もう一度お試しください。」）をそのまま出す。本文が読めないときも同じ文を出す（汎用の失敗の文にはしない）。
 
-## 3. C# の共通コードを使う（`src/FaraSiteKit.Core`）
+## 3. C# の共通コードを使う（`src/FaraBlazorComponent.Core`）
 
 ```xml
-<ProjectReference Include="..\..\external\fara-site-kit\src\FaraSiteKit.Core\FaraSiteKit.Core.csproj" />
+<ProjectReference Include="..\..\external\fara-blazor-component\src\FaraBlazorComponent.Core\FaraBlazorComponent.Core.csproj" />
 ```
 
 - 対象は net10.0（.NET 8 のサイトからは参照できない）。`IsPackable` は false（NuGet では配らない）。
-- 名前空間は `FaraSiteKit.Core`（`SiteLinks`・`MaintenanceInfo`・`MaintenanceState`・`ReportForm`）。利用するサイトは `using FaraSiteKit.Core;` を書く。
+- 名前空間は `FaraBlazorComponent.Core`（`SiteLinks`・`MaintenanceInfo`・`MaintenanceState`・`ReportForm`）。利用するサイトは `using FaraBlazorComponent.Core;` を書く。
 - 起動時に `SiteLinks.DevelopHost` へ、そのサイトの確認用ホスト名（例: `pokemon-dev.fara-labs.com`）を設定する。空のままなら、リンクは切り替えない。
 - サブモジュールの中の csproj を参照するため、CI のチェックアウトは `submodules: true`（ネストした submodule がある場合は `--recursive`）。
 
@@ -112,7 +112,7 @@ export { ReportRateLimiter } from "../external/fara-site-kit/worker/report-rate-
 
 1. kit で変更を PR → develop にマージ → タグ（`vX.Y.Z`）
 2. 各サイトで、サブモジュールをそのタグのコミットに上げる PR（develop 向け）
-   - `cd external/fara-site-kit && git fetch --tags && git checkout vX.Y.Z && cd ../.. && git add external/fara-site-kit`
+   - `cd external/fara-blazor-component && git fetch --tags && git checkout vX.Y.Z && cd ../.. && git add external/fara-blazor-component`
 3. 確認用サイトで確認 → master への反映はユーザーが判断
 
 ## 6. 静的ファイルを作る（`build/`）
@@ -120,7 +120,7 @@ export { ReportRateLimiter } from "../external/fara-site-kit/worker/report-rate-
 `dotnet publish` などが出したテンプレート（`index.html`）に、ページごとの head（title・description・canonical・OGP・Twitter カード・robots）と本文を差し込み、`robots.txt`・`sitemap.xml`・`404.html`・`_headers`・`_redirects` を書き出す。本文の HTML は呼び出し側（サイトの C# など）が作る。このツールは本文を作らない。
 
 ```bash
-node external/fara-site-kit/build/build-pages.mjs \
+node external/fara-blazor-component/build/build-pages.mjs \
   --site site.json --pages pages.json --template artifacts/template/index.html \
   --out publish/wwwroot --env production
 ```
@@ -128,7 +128,7 @@ node external/fara-site-kit/build/build-pages.mjs \
 テンプレート（`dotnet publish` の出力の `index.html`）は、出力先（`publish/wwwroot`）とは別のフォルダに置く。テンプレートを出力先で上書きする設定は、書き出す前にエラーにする（2 回目の実行が壊れるため）。同じ入力を 2 回実行すると同じ結果になる（テンプレートは変わらない）。
 
 - `--env production|develop`（確認用は `develop`）。`--site` `--pages` `--template` `--out` は必須。
-- モジュールとしても使える: `import { buildPages, writeFiles } from "../external/fara-site-kit/build/build-pages.mjs";`。`buildPages({ site, pages, redirects, template, env })` は、ファイル名 → 内容 の Map を返す（書き込みはしない）。
+- モジュールとしても使える: `import { buildPages, writeFiles } from "../external/fara-blazor-component/build/build-pages.mjs";`。`buildPages({ site, pages, redirects, template, env })` は、ファイル名 → 内容 の Map を返す（書き込みはしない）。
 
 ### テンプレート
 
@@ -210,7 +210,7 @@ node external/fara-site-kit/build/build-pages.mjs \
 `csp/render-headers.mjs` の `renderHeaders(options)` が `_headers` の本文を作る。テンプレート（`csp/_headers.template`）の形は、pokemon の `_headers` と同じ（テストで同じ CSP になることを確かめている）。
 
 ```js
-import { renderHeaders } from "../external/fara-site-kit/csp/render-headers.mjs";
+import { renderHeaders } from "../external/fara-blazor-component/csp/render-headers.mjs";
 
 renderHeaders({
     scriptSrc: ["https://challenges.cloudflare.com"],
@@ -231,20 +231,20 @@ renderHeaders({
 - `cacheRules`（`[{ "path": "/_framework/*", "value": "public, max-age=31536000, immutable" }]`）は既定では付けない。pokemon の `_headers` にはキャッシュの規則が無いため。`immutable` は、ファイル名にハッシュが付いていないファイルには使わない（デプロイ後に古いファイルが残るため）。
 - `build-pages` の `site.json` の `csp` にこの引数を書けば、`_headers` も一緒に作られる。Worker の `/api/*` には付かない（Cloudflare の静的アセットだけ）。
 
-## 8. Razor の部品（`src/FaraSiteKit.Razor`）
+## 8. Razor の部品（`src/FaraBlazorComponent.Razor`）
 
-MudBlazor 9.11.0 と、`FaraSiteKit.Core` を使う Razor クラスライブラリ（net10.0）。参照は `ProjectReference`（3 と同じ）。
+MudBlazor 9.11.0 と、`FaraBlazorComponent.Core` を使う Razor クラスライブラリ（net10.0）。参照は `ProjectReference`（3 と同じ）。
 
 ```xml
-<ProjectReference Include="..\..\external\fara-site-kit\src\FaraSiteKit.Razor\FaraSiteKit.Razor.csproj" />
+<ProjectReference Include="..\..\external\fara-blazor-component\src\FaraBlazorComponent.Razor\FaraBlazorComponent.Razor.csproj" />
 ```
 
 ### 8.1 最小の構成
 
-**Program.cs**（`AddFaraSiteKit` が、SiteOptions・テーマの状態・MudBlazor を登録する）
+**Program.cs**（`AddFaraBlazorComponent` が、SiteOptions・テーマの状態・MudBlazor を登録する）
 
 ```csharp
-builder.Services.AddFaraSiteKit(options =>
+builder.Services.AddFaraBlazorComponent(options =>
 {
     options.Name = "サイト名";
     options.Author = "作者";
@@ -262,9 +262,9 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
 **_Imports.razor**
 
 ```razor
-@using FaraSiteKit.Core
-@using FaraSiteKit.Razor
-@using FaraSiteKit.Razor.Components
+@using FaraBlazorComponent.Core
+@using FaraBlazorComponent.Razor
+@using FaraBlazorComponent.Razor.Components
 @using MudBlazor
 ```
 
@@ -304,7 +304,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
 - `MobilePageScroll`（既定 false）: true にすると、スマホ（767.98px 以下）でページ全体（window）がスクロールする。既定は、スマホでもページ全体を画面の高さに収め、本文の中だけをスクロールさせる。PC には影響しない。
 - `MudProviders` は SiteLayout の中に置かれる（テーマは `CustomTheme` で替えられる。省略は紫系の既定）。
 
-**App.razor**: `Router` の `DefaultLayout` を上の MainLayout にし、`<NotFound>` で `NotFoundView` を出す。ページが移ったときは、SiteLayout が本文（`#fsk-main`）へフォーカスを移す（最初の読み込みでは動かさない）。`FocusOnNavigate` は使わない。
+**App.razor**: `Router` の `DefaultLayout` を上の MainLayout にし、`<NotFound>` で `NotFoundView` を出す。ページが移ったときは、SiteLayout が本文（`#fbc-main`）へフォーカスを移す（最初の読み込みでは動かさない）。`FocusOnNavigate` は使わない。
 
 ```razor
 <Router AppAssembly="@typeof(App).Assembly">
@@ -361,7 +361,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
 
 - 報告の送信先は `SiteOptions.ReportApiPath`（既定 `api/report`）・確認の設定は `ReportConfigPath`（既定 `api/report/config`）。Worker（`worker/report.js`）と同じ形。
 - 報告の文字数は、コードポイント単位（絵文字も 1 文字。worker/report.js と同じ数え方）。UTF-16 の長さとは違う。
-- 長文のページ（プライバシーポリシーなど）は `fsk-page-column fsk-page-column--wide`（PC で横幅 72rem）。入力のページ（問い合わせなど）は `fsk-page-column`（46rem）。
+- 長文のページ（プライバシーポリシーなど）は `fbc-page-column fbc-page-column--wide`（PC で横幅 72rem）。入力のページ（問い合わせなど）は `fbc-page-column`（46rem）。
 
 ### 8.3 上部ナビだけの構成（サイドバーなし）
 
@@ -370,8 +370,8 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
 ```razor
 <SiteLayout Body="@Body" ShowDrawer="false" CollapseTopNavOnMobile="true">
     <TopNav>
-        <a class="fsk-topnav-link" href="top">ホーム</a>
-        <a class="fsk-topnav-link" href="top/works">作品</a>
+        <a class="fbc-topnav-link" href="top">ホーム</a>
+        <a class="fbc-topnav-link" href="top/works">作品</a>
     </TopNav>
     <HeaderEnd><ThemeSwitch /></HeaderEnd>
 </SiteLayout>
@@ -414,15 +414,15 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
 
 | 項目 | kit の既定（新しいサイト） | 例: pokemon（既存のキー） |
 | --- | --- | --- |
-| `SiteOptions.StorageKey` と `data-storage-key` | `fara-site-kit.settings` | `fara-pokemon-battle-assistant.settings` |
-| `SiteOptions.SidebarKey` と `data-sidebar-key` | `fara-site-kit.sidebar-hidden` | `fara-pokemon-battle-assistant.sidebar-hidden` |
+| `SiteOptions.StorageKey` と `data-storage-key` | `fara-blazor-component.settings` | `fara-pokemon-battle-assistant.settings` |
+| `SiteOptions.SidebarKey` と `data-sidebar-key` | `fara-blazor-component.sidebar-hidden` | `fara-pokemon-battle-assistant.sidebar-hidden` |
 
 - 保存の形式は、JSON の `Theme`（`"light"` か `"dark"`）と、サイドバー（`"1"` で隠す）。pokemon の既存の値と同じ形なので、**値のコピーは要らない**。キーを同じにすれば、既存のユーザーの設定（ダーク・サイドバー・他の項目）はそのまま読める。テーマの保存は、同じ JSON の他の項目（`DataSetKey`・`Format` など）を消さない。
 - 移行の手順（既存のサイトを kit の部品に替えるとき）:
   1. `SiteOptions.StorageKey` と `SidebarKey` に、既存のキーをそのまま入れる（例: 上の pokemon の値）。
   2. index.html の `theme-init.js` の `data-storage-key` と `data-sidebar-key` に、同じ値を入れる。
   3. 旧い名前のキーを消す処理（pokemon の `fara-pokemon-assistance.*` の削除など）は、サイトの index.html に残す（kit の関わることではない）。
-  4. 確認: 既存のブラウザ（ダークで保存したもの）で開き、ダークのまま表示されること。コンソールに `[fara-site-kit]` の警告が出ないこと。
+  4. 確認: 既存のブラウザ（ダークで保存したもの）で開き、ダークのまま表示されること。コンソールに `[fara-blazor-component]` の警告が出ないこと。
 - kit の既定のキーから別のキーへ移すときも、同じ手順（両方を同じ値にする）。保存された値は自動では引き継がれない。必要なら、サイトが一度だけ旧いキーから読み直す。
 
 ### 8.7 index.html
@@ -431,14 +431,14 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
 
 - `theme-init.js` の `data-storage-key` と `data-sidebar-key` は、`SiteOptions` と同じ値（8.6）。
 - 読み込み表示（`#boot-indicator`）と `inert` の対象（`.entry-static`）は、断片のとおり。CSP は 8.8。
-- 起動の後に、`faraSiteKit.checkConfig` が、data 属性と SiteOptions が違えば警告する（theme-init.js が無い場合も）。
+- 起動の後に、`faraBlazorComponent.checkConfig` が、data 属性と SiteOptions が違えば警告する（theme-init.js が無い場合も）。
 
 ### 8.8 CSP（Turnstile・Google Fonts）
 
 Blazor WebAssembly（`'wasm-unsafe-eval'`）と MudBlazor（`style-src 'unsafe-inline'`）は、`csp/render-headers.mjs` が常に入れる。外部のサービスは、サイトが使うものだけ足す。`csp/render-headers.mjs` の `presets` を展開して渡す:
 
 ```js
-import { renderHeaders, presets } from "../external/fara-site-kit/csp/render-headers.mjs";
+import { renderHeaders, presets } from "../external/fara-blazor-component/csp/render-headers.mjs";
 const headers = renderHeaders({ ...presets.turnstile, ...presets.googleFonts });
 ```
 
@@ -451,44 +451,44 @@ const headers = renderHeaders({ ...presets.turnstile, ...presets.googleFonts });
 - `'unsafe-inline'` と `'unsafe-eval'` の script は、どの presets も入れない（拒否の規則は維持）。
 - presets の一覧に無い外部のサービスは、公式の要件を確かめてから、サイトの設定に直接書く。
 
-### 8.9 クラス名の移行（`fsk-` 接頭辞）
+### 8.9 クラス名の移行（`fbc-` 接頭辞）
 
-kit の部品のクラス名は、`fsk-` の接頭辞で統一した（pokemon などの CSS との重複を避けるため）。サイトが kit の CSS を使うときは、新しい名前で書く。
+kit の部品のクラス名は、`fbc-` の接頭辞で統一している（pokemon などの CSS との重複を避けるため）。1.0.0 で、旧い接頭辞 `fsk-` から `fbc-` に変わった（`fsk-` を使っている CSS の置き換えは `docs/migration-v1.0.0.md` の 1.4 と 2.2）。サイトが kit の CSS を使うときは、新しい名前で書く。
 
 | 旧 | 新 |
 | --- | --- |
-| `content` | `fsk-content` |
-| `page-header` | `fsk-page-header` |
-| `page-column` | `fsk-page-column`（長文は `fsk-page-column--wide`） |
-| `page-card` | `fsk-page-card` |
-| `page-pane` / `pane-scroll` | `fsk-page-pane` / `fsk-pane-scroll` |
-| `card` / `card-body` | `fsk-card` / `fsk-card-body` |
-| `nowrap` | `fsk-nowrap` |
-| `app-header` / `app-brand` | `fsk-header` / `fsk-brand` |
-| `sidebar` / `sidebar-toggle` / `side-nav` / `nav-section` | `fsk-sidebar` / `fsk-menu-toggle` / `fsk-nav` / `fsk-nav-section` |
-| `skip-link` / `scroll-progress` / `theme-switch` | `fsk-skip-link` / `fsk-scroll-progress` / `fsk-theme-switch` |
-| `site-footer*` | `fsk-footer*`（`fsk-footer-line`・`fsk-footer-socials` など） |
-| `maintenance-notice*` / `maintenance-screen` | `fsk-notice*` / `fsk-maintenance` |
-| `report-card` / `report-trap` | `fsk-report-card` / `fsk-report-trap` |
-| `app-field` / `app-select` | `fsk-field` / `fsk-select` |
-| `form-group` / `form-label` / `text-muted` | `fsk-form-group` / `fsk-form-label` / `fsk-muted` |
-| html の `sidebar-hidden` / `search-open` | `fsk-sidebar-hidden` / `fsk-search-open` |
-| `#site-sidebar` | `#fsk-sidebar` |
+| `content` | `fbc-content` |
+| `page-header` | `fbc-page-header` |
+| `page-column` | `fbc-page-column`（長文は `fbc-page-column--wide`） |
+| `page-card` | `fbc-page-card` |
+| `page-pane` / `pane-scroll` | `fbc-page-pane` / `fbc-pane-scroll` |
+| `card` / `card-body` | `fbc-card` / `fbc-card-body` |
+| `nowrap` | `fbc-nowrap` |
+| `app-header` / `app-brand` | `fbc-header` / `fbc-brand` |
+| `sidebar` / `sidebar-toggle` / `side-nav` / `nav-section` | `fbc-sidebar` / `fbc-menu-toggle` / `fbc-nav` / `fbc-nav-section` |
+| `skip-link` / `scroll-progress` / `theme-switch` | `fbc-skip-link` / `fbc-scroll-progress` / `fbc-theme-switch` |
+| `site-footer*` | `fbc-footer*`（`fbc-footer-line`・`fbc-footer-socials` など） |
+| `maintenance-notice*` / `maintenance-screen` | `fbc-notice*` / `fbc-maintenance` |
+| `report-card` / `report-trap` | `fbc-report-card` / `fbc-report-trap` |
+| `app-field` / `app-select` | `fbc-field` / `fbc-select` |
+| `form-group` / `form-label` / `text-muted` | `fbc-form-group` / `fbc-form-label` / `fbc-muted` |
+| html の `sidebar-hidden` / `search-open` | `fbc-sidebar-hidden` / `fbc-search-open` |
+| `#site-sidebar` | `#fbc-sidebar` |
 
-- 保存のキー（`fara-site-kit.sidebar-hidden` など）は、クラス名ではないので、この表の対象外（8.6）。
+- 保存のキー（`fara-blazor-component.sidebar-hidden` など）は、クラス名ではないので、この表の対象外（8.6）。
 
 ### 8.10 pokemon へ取り込むときの名前の衝突（メモ）
 
 pokemon の既存の型・ファイルと、kit の部品の名前が重なる。取り込むときは、pokemon 側を外してから kit を使う（別の作業）。
 
 - 型・部品: `SocialLinks`（pokemon の静的クラスと、kit の Razor 部品）・`SocialIcon`・`SiteFooter`・`MudProviders`・`MaintenanceBanner`。両方の名前空間を using すると、曖昧な参照（CS0104）になる。
-- `_Imports.razor`: kit の `@using FaraSiteKit.Razor.Components` を入れると、pokemon の同名の部品と衝突する。pokemon の部品を先に消すか、kit の部品を `FaraSiteKit.Razor.Components.SiteFooter` のように書く。
-- CSS: pokemon の `app.css` の `.site-footer`・`.page-column` などと、kit の CSS（`fsk-` の接頭辞）は名前が違うので重ならない。pokemon の CSS の共通の塊を消すときは、8.9 の表を見る。
+- `_Imports.razor`: kit の `@using FaraBlazorComponent.Razor.Components` を入れると、pokemon の同名の部品と衝突する。pokemon の部品を先に消すか、kit の部品を `FaraBlazorComponent.Razor.Components.SiteFooter` のように書く。
+- CSS: pokemon の `app.css` の `.site-footer`・`.page-column` などと、kit の CSS（`fbc-` の接頭辞）は名前が違うので重ならない。pokemon の CSS の共通の塊を消すときは、8.9 の表を見る。
 - `index.html`: pokemon の `theme-init.js` と、kit の `theme-init.js` を両方読まない。
 
 ### 8.11 確認
 
-- `dotnet test tests/FaraSiteKit.Razor.Tests`（bUnit）・`dotnet test tests/FaraSiteKit.Core.Tests`
+- `dotnet test tests/FaraBlazorComponent.Razor.Tests`（bUnit）・`dotnet test tests/FaraBlazorComponent.Core.Tests`
 - `npm test`（worker・build・csp と、JS の `tests/js/kit-js.test.mjs`。JS だけは `npm run test:js`）
 - `samples/MinimalSite` は、同じ構成の最小の例（上部ナビの構成のページ `/top` を含む）。`dotnet build samples/MinimalSite` が CI で通ること。公開はしない。
 
@@ -496,19 +496,19 @@ pokemon の既存の型・ファイルと、kit の部品の名前が重なる�
 
 静的 SSR のサイトを WASM に移すときの最短の流れ。詳しい説明は 8.1〜8.9。
 
-1. **submodule を追加**: `git submodule add https://github.com/fara1991/fara-site-kit.git external/fara-site-kit` のあと、使うタグに固定する（`cd external/fara-site-kit && git checkout vX.Y.Z`）。CI のチェックアウトは `submodules: true`。
-2. **参照を足す**: Web プロジェクトの csproj に `FaraSiteKit.Razor` の `ProjectReference`（8 の冒頭）。`_Imports.razor` に `FaraSiteKit.Core`・`FaraSiteKit.Razor`・`FaraSiteKit.Razor.Components`・`MudBlazor` の using。
-3. **`SiteOptions`**: `Program.cs` で `AddFaraSiteKit(options => ...)`。最低限 `Name`・`Author`・`PublishedYear`・`AuthorHomeUrl`・`DevelopHost`（確認用ホスト。空なら切り替えない）。`Social` は URL が空のものは出ない。`StorageKey`・`SidebarKey` は、既存の保存を引き継ぐ場合だけ旧い値に合わせる（8.6）。`HeadOutlet` と `MaintenanceInfo` の登録も 8.1 のとおり。
+1. **submodule を追加**: `git submodule add https://github.com/fara1991/fara-blazor-component.git external/fara-blazor-component` のあと、使うタグに固定する（`cd external/fara-blazor-component && git checkout vX.Y.Z`）。CI のチェックアウトは `submodules: true`。
+2. **参照を足す**: Web プロジェクトの csproj に `FaraBlazorComponent.Razor` の `ProjectReference`（8 の冒頭）。`_Imports.razor` に `FaraBlazorComponent.Core`・`FaraBlazorComponent.Razor`・`FaraBlazorComponent.Razor.Components`・`MudBlazor` の using。
+3. **`SiteOptions`**: `Program.cs` で `AddFaraBlazorComponent(options => ...)`。最低限 `Name`・`Author`・`PublishedYear`・`AuthorHomeUrl`・`DevelopHost`（確認用ホスト。空なら切り替えない）。`Social` は URL が空のものは出ない。`StorageKey`・`SidebarKey` は、既存の保存を引き継ぐ場合だけ旧い値に合わせる（8.6）。`HeadOutlet` と `MaintenanceInfo` の登録も 8.1 のとおり。
 4. **レイアウト**: `MainLayout.razor` は `SiteLayout` に `Body`・`Maintenance` を渡す。ナビは `ShowDrawer="false"` と `TopNav`（8.3）か、`DrawerContent` に `SiteNavMenu`。スマホでページ全体をスクロールさせたいサイトは `MobilePageScroll="true"`（既定の false は、本文の中だけがスクロールする）。
-5. **`index.html`**: `docs/index-template.html` の断片に合わせる。必須の data 属性は `theme-init.js` の `data-storage-key`・`data-sidebar-key`（`SiteOptions.StorageKey`・`SidebarKey` と同じ値。違うと起動時にコンソールへ警告）。`#boot-indicator`・`<div id="app">`・静的な本文の `class="entry-static"` と、body 末尾のスクリプトの順番（boot-indicator.js → fara-site-kit.js → scroll-progress.js → report.js → blazor.webassembly.js）も断片のとおり。
+5. **`index.html`**: `docs/index-template.html` の断片に合わせる。必須の data 属性は `theme-init.js` の `data-storage-key`・`data-sidebar-key`（`SiteOptions.StorageKey`・`SidebarKey` と同じ値。違うと起動時にコンソールへ警告）。`#boot-indicator`・`<div id="app">`・静的な本文の `class="entry-static"` と、body 末尾のスクリプトの順番（boot-indicator.js → fara-blazor-component.js → scroll-progress.js → report.js → blazor.webassembly.js）も断片のとおり。
 6. **静的ファイル（`build-pages`）**: ページごとの title・description・本文を `pages.json` に、サイト名・ホストを `site.json` に書き、`dotnet publish` の出力の `index.html`（本文が空のもの）を `--template` にして実行する（6 の「使い方」）。
 
    ```bash
-   node external/fara-site-kit/build/build-pages.mjs      --site site.json --pages pages.json --template artifacts/template/index.html      --out publish/wwwroot --env production   # 確認用は --env develop
+   node external/fara-blazor-component/build/build-pages.mjs      --site site.json --pages pages.json --template artifacts/template/index.html      --out publish/wwwroot --env production   # 確認用は --env develop
    ```
 
    `site.json` の `bodyRootClass` は `entry-static`（読み込み表示の JS が使う）。`--out` はテンプレートと別のフォルダにする。
-7. **Worker**: `worker/index.js` から kit の `report.js`・`maintenance.js` を import する（2）。お知らせの帯は `fsk-notice`（Razor の `MaintenanceBanner` と同じ class）。
+7. **Worker**: `worker/index.js` から kit の `report.js`・`maintenance.js` を import する（2）。お知らせの帯は `fbc-notice`（Razor の `MaintenanceBanner` と同じ class）。
 8. **確認**: `wrangler deploy --dry-run`（本番・確認用）、`dotnet test`、`npm test`。確認用で、起動の表示・ダーク・メンテナンス・404 を見る。
 
 ## 9. 静的解析・レイアウトの自動計測（v0.6.0 から）

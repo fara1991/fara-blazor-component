@@ -40,7 +40,7 @@ export default {
   readySelector: ".mud-layout",                      // 描画の後にだけある要素（Blazor など）。待ってから測る
   reducedMotion: true,                               // 既定 true。prefers-reduced-motion で測る（アニメーションを止める）
   includeDisabled: false,                            // 既定 false。true で、無効な要素も tap-target で測る
-  menuEsc: { buttonSelector: ".fsk-menu-toggle", closeSelector: ".fsk-drawer-close" }, // 省くと menu-esc・menu-close-visible は off。closeSelector は任意（ドロワーの中の閉じるボタン）
+  menuEsc: { buttonSelector: ".fbc-menu-toggle", closeSelector: ".fbc-drawer-close" }, // 省くと menu-esc・menu-close-visible は off。closeSelector は任意（ドロワーの中の閉じるボタン）
   rules: {
     "min-font-size": true,
   },
@@ -73,7 +73,7 @@ export default {
 既存の除外は、次を満たすものから外してよい。外すときは、外した状態で CLI が 0 件になることを確かめる（外して違反が出るなら、除外を残す）。
 
 - **tap-target の無効な要素**: `disabled`・`aria-disabled="true"`・`pointer-events: none` の要素（送信ボタンが入力の前に無効など）は、既定で数えないので外す。
-- **SNS のアイコン（`a.fsk-footer-social`）**: kit の判定は 44px の箱（`::after`）。隣との**すき間が 21px 以上**なら、±20 が自分に当たる（kit 既定の 22px のすき間で通ることを確かめた）。すき間を 20px 以下に詰めている場合（例: `gap: 6px`）は、除外を残すか、すき間を広げる。
+- **SNS のアイコン（`a.fbc-footer-social`）**: kit の判定は 44px の箱（`::after`）。隣との**すき間が 21px 以上**なら、±20 が自分に当たる（kit 既定の 22px のすき間で通ることを確かめた）。すき間を 20px 以下に詰めている場合（例: `gap: 6px`）は、除外を残すか、すき間を広げる。
 - **404 の画面**: `/404.html` を `pages` に書いて代用していたものは、存在しないパスを `allowStatus: [404]` つきで書き、`serve-static` の `--not-found 404.html` で本文を返す形に変える。
 - **文中のリンク**: 段落（`p`・`li` など）の中で、前後に他の文字があるリンクは元から外れる。表のセル（`td`・`th`）の中のリンクは、文字が横にあっても外れない（外して測る）。
 - **Tab の途中位置**（滑らかスクロールのサイト）: `reducedMotion`・Tab 後の待ちで測るので、「途中で測った」ための除外は外す。
@@ -113,16 +113,16 @@ node tools/layout-check/cli.mjs --config layout-check.config.mjs
 
 ## 5. 各サイトへの導入
 
-1. submodule を kit のタグに上げる（`external/fara-site-kit`）。
+1. submodule を kit のタグに上げる（`external/fara-blazor-component`）。
 2. サイトの devDependency に `playwright-core` を入れる（版は kit と同じに固定する: `npm install -D --save-exact playwright-core@1.64.1`）。
 3. `layout-check.config.mjs` を置く（上の例）。
 4. 静的ファイルを配るときは、kit の簡易サーバーを使える（Node だけ）:
 
    ```bash
-   node external/fara-site-kit/tools/layout-check/serve-static.mjs publish/wwwroot 8820
+   node external/fara-blazor-component/tools/layout-check/serve-static.mjs publish/wwwroot 8820
    # 404 の画面を本文つきで返す（ステータスは 404 のまま）・存在しないパスを index.html で返す（SPA）
-   node external/fara-site-kit/tools/layout-check/serve-static.mjs publish/wwwroot 8820 --not-found 404.html
-   node external/fara-site-kit/tools/layout-check/serve-static.mjs publish/wwwroot 8820 --spa
+   node external/fara-blazor-component/tools/layout-check/serve-static.mjs publish/wwwroot 8820 --not-found 404.html
+   node external/fara-blazor-component/tools/layout-check/serve-static.mjs publish/wwwroot 8820 --spa
    ```
 
    解決の順（`/` で終わるパスは、フォルダを先に見る）:
@@ -150,18 +150,18 @@ node tools/layout-check/cli.mjs --config layout-check.config.mjs
          run: dotnet publish -c Release -o publish
        - name: Serve
          run: |
-           node external/fara-site-kit/tools/layout-check/serve-static.mjs publish/wwwroot 8820 &
+           node external/fara-blazor-component/tools/layout-check/serve-static.mjs publish/wwwroot 8820 &
            for i in $(seq 1 30); do curl -sf http://127.0.0.1:8820/ > /dev/null && break; sleep 1; done
        - name: Install Chromium
          run: npx playwright-core install --with-deps chromium
        - name: Layout check
-         run: node external/fara-site-kit/tools/layout-check/cli.mjs --config layout-check.config.mjs
+         run: node external/fara-blazor-component/tools/layout-check/cli.mjs --config layout-check.config.mjs
    ```
 
    サイトのビルドの手順は、そのサイトの CI に合わせる（上の `dotnet publish` は例）。
 
-6. kit を上げたときの移行（`menuEsc` を設定済みのサイト）。kit の SiteLayout のスマホのメニューは、開くと左上の閉じるボタン（`.fsk-drawer-close`）を出す。ドロワーがメニューボタンを覆うため、`menuEsc` だけの設定では `menu-close-visible` が違反になる。次のどちらかを行う。
-   - **閉じるボタンを指す（推奨）**: `menuEsc: { buttonSelector: ".fsk-menu-toggle", closeSelector: ".fsk-drawer-close" }`。samples/MinimalSite の `layout-check.config.mjs` がこの書き方。
+6. kit を上げたときの移行（`menuEsc` を設定済みのサイト）。kit の SiteLayout のスマホのメニューは、開くと左上の閉じるボタン（`.fbc-drawer-close`）を出す。ドロワーがメニューボタンを覆うため、`menuEsc` だけの設定では `menu-close-visible` が違反になる。次のどちらかを行う。
+   - **閉じるボタンを指す（推奨）**: `menuEsc: { buttonSelector: ".fbc-menu-toggle", closeSelector: ".fbc-drawer-close" }`。samples/MinimalSite の `layout-check.config.mjs` がこの書き方。
    - **そのルールだけ止める**: `rules: { "menu-close-visible": false }`（理由をコミットに書く）。
    kit の SiteLayout を使わず、自前のドロワーでメニューボタンを覆うサイトは、閉じる手段を `closeSelector` で指すか、ドロワーを直す。
 
@@ -184,7 +184,7 @@ npm test                                        # 判定の純粋なテスト（
 このチェックは**レイアウトの数値の崩れ**だけを見る。次は保証しない。人・エージェントのレビューはここに絞る。
 
 - **見た目の良し悪し**（余白のリズム・揃え・情報の並び・画像の選び方）
-- **色のコントラスト**（色そのものは見ない。`--fsk-warning-text` のような色の決め方は、人が確かめる）
+- **色のコントラスト**（色そのものは見ない。`--fbc-warning-text` のような色の決め方は、人が確かめる）
 - **実機**（iOS Safari・Android Chrome の挙動、実際の指での押しやすさ、フォントの描画の差）。計測はヘッドレス chromium（または Edge）だけ
 - **CLS・描画の速さ**（レイアウトのずれは測らない。Lighthouse などで別に見る）
 - **画面の読み上げ・支援技術の実際の挙動**（aria の値は、この一部だけを見る。`menu-esc` の `aria-expanded` と、フォーカスの戻り先のみ）

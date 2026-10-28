@@ -1,5 +1,5 @@
 # Cloudflare の静的アセットに付けるヘッダー（Worker の /api/* には付かない）。
-# fara-site-kit の csp/render-headers.mjs が、サイトの設定（site.json の csp）から書き出す。直接は直さない。
+# fara-blazor-component の csp/render-headers.mjs が、サイトの設定（site.json の csp）から書き出す。直接は直さない。
 # 外部から読み込めるのは、サイトの設定に書いたものだけ。足さないとブロックされる。
 # script-src に 'unsafe-inline' と 'unsafe-eval' は使わない（importmap はハッシュで許可する）。
 /*

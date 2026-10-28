@@ -4,8 +4,8 @@
      CSP: インラインの script は使わない。インラインの style は、読み込み表示の CSS（起動の前に当てるため）だけ。 -->
 
 <!-- head の中。テーマは描画の前に反映する（data-storage-key・data-sidebar-key は SiteOptions.StorageKey・SidebarKey と同じ値にする） -->
-<script src="_content/FaraSiteKit.Razor/js/theme-init.js" data-storage-key="fara-site-kit.settings" data-sidebar-key="fara-site-kit.sidebar-hidden"></script>
-<link href="_content/FaraSiteKit.Razor/css/fara-site-kit.css" rel="stylesheet" />
+<script src="_content/FaraBlazorComponent.Razor/js/theme-init.js" data-storage-key="fara-blazor-component.settings" data-sidebar-key="fara-blazor-component.sidebar-hidden"></script>
+<link href="_content/FaraBlazorComponent.Razor/css/fara-blazor-component.css" rel="stylesheet" />
 
 <!-- head の中（読み込み表示の CSS。起動の前から当てる。60 秒の保険は、JS の RELEASE_MS と同じ秒数） -->
 <style>
@@ -50,8 +50,8 @@
 </div>
 
 <!-- body の末尾（この順番で読む） -->
-<script src="_content/FaraSiteKit.Razor/js/boot-indicator.js"></script>
-<script src="_content/FaraSiteKit.Razor/js/fara-site-kit.js"></script>
-<script src="_content/FaraSiteKit.Razor/js/scroll-progress.js"></script>
-<script src="_content/FaraSiteKit.Razor/js/report.js"></script>
+<script src="_content/FaraBlazorComponent.Razor/js/boot-indicator.js"></script>
+<script src="_content/FaraBlazorComponent.Razor/js/fara-blazor-component.js"></script>
+<script src="_content/FaraBlazorComponent.Razor/js/scroll-progress.js"></script>
+<script src="_content/FaraBlazorComponent.Razor/js/report.js"></script>
 <script src="_framework/blazor.webassembly.js"></script>

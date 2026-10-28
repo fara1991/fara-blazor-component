@@ -1,4 +1,4 @@
-// 作者への報告の受け口（POST /api/report）。fara-site-kit の共有ファイル（各サイトは submodule で読む。直すときは kit で直す）。
+// 作者への報告の受け口（POST /api/report）。fara-blazor-component の共有ファイル（各サイトは submodule で読む。直すときは kit で直す）。
 //
 //   GET  /api/report/config → 200 {"enabled": bool, "siteKey": "Turnstile のサイトキー" | null}
 //   POST /api/report        ← {"category": "bug" | "request" | "other", "message": "...", "contact"?: "...", "page"?: "...", "turnstileToken": "...", "website": ""}

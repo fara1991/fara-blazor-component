@@ -1,0 +1,361 @@
+@* サイトの共通のレイアウト（MudBlazor）。ヘッダー（名前・検索・設定・上部ナビ）、サイドバー（PC は Mini。隠すと細い列。スマホは一時的なメニュー）、本文、フッター。
+   サイドバーを使わない構成（ShowDrawer=false。上部ナビだけのサイト）も選べる。その場合、スマホでメニューに畳むか（CollapseTopNavOnMobile）を選べる。
+   中身はサイトが決める（スロット）: 名前（Brand）、ヘッダーの中央・右（SearchBox・HeaderEnd・MobileHeaderActions）、上部ナビ（TopNav）、
+   スマホの検索欄（SearchSheet）、サイドバーの中身（DrawerContent）。
+   挙動（描画の前に保存の開閉とスマホの判定を同期で読む・検索欄の開閉と Esc・スキップリンク・フッターは本文の外）は、pokemon の MainLayout と同じ。 *@
+@inherits LayoutComponentBase
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Routing
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject SiteOptions Site
+
+@* 本文へ移動（キーボードの利用者向け）。先頭に置く。href は今のページの URL にする（<base> の下で "#..." だけだと、ホームへ移ってしまうため） *@
+<a class="fbc-skip-link" href="@SkipHref" @onclick="FocusMain" @onclick:preventDefault="true">本文へ移動</a>
+
+<MudProviders CustomTheme="CustomTheme" />
+
+<MudLayout Class="@PageClassName">
+    <MudAppBar Fixed="true" Elevation="0" Gutters="false" Class="fbc-header">
+        <ScrollProgress />
+        @if (HasMenu)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Class="fbc-menu-toggle" OnClick="ToggleDrawer"
+                           aria-label="メニューの表示・非表示" aria-controls="fbc-sidebar" aria-expanded="@(DrawerOpen ? "true" : "false")" title="メニューの表示・非表示" />
+        }
+        @if (Brand is not null)
+        {
+            @Brand
+        }
+        else
+        {
+            <a class="fbc-brand" href="@Site.HomeHref" title="ホームへ">@Site.Name</a>
+        }
+        @if (TopNavInHeader)
+        {
+            <div class="fbc-topnav-bar">@TopNav</div>
+        }
+        @if (Mobile)
+        {
+            @MobileHeaderActions
+            @if (SearchSheet is not null)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Inherit" Class="fbc-search-toggle" OnClick="OpenSearch"
+                               aria-label="検索" aria-controls="fbc-search-sheet" aria-expanded="@(searchOpen ? "true" : "false")" title="検索" />
+            }
+        }
+        else
+        {
+            @SearchBox
+            @HeaderEnd
+        }
+    </MudAppBar>
+
+    @if (HasMenu)
+    {
+        @* PC: 隠すと、アイコンだけの細い列になる。マウスを乗せている間は広がる（Mini）。スマホ: ハンバーガーで開く一時的なメニュー。
+           Breakpoint は Sm（既定の Md だと、768〜959px で Mini が画面の外に消えるため） *@
+        <MudDrawer Open="DrawerOpen" OpenChanged="OnDrawerOpenChanged" Variant="@(Mobile ? DrawerVariant.Temporary : DrawerVariant.Mini)" OpenMiniOnHover="true" Breakpoint="Breakpoint.Sm"
+                   ClipMode="@(Mobile ? DrawerClipMode.Never : DrawerClipMode.Always)" Elevation="0" Class="fbc-sidebar" UserAttributes="@DrawerAttributes">
+            @if (Mobile)
+            {
+                @* スマホ: ドロワーが画面の左上（ヘッダーのハンバーガーの位置）を覆うため、ハンバーガーは押せない。閉じる手段をドロワーの中に置く（Esc・背景タップと同じ後始末） *@
+                <div class="fbc-drawer-head">
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" Class="fbc-drawer-close" OnClick="CloseDrawerByButton"
+                                   aria-label="メニューを閉じる" aria-controls="fbc-sidebar" title="メニューを閉じる" />
+                </div>
+            }
+            @if (DrawerContent is not null)
+            {
+                @DrawerContent(CloseOnNavigate)
+            }
+            else if (!ShowDrawer && TopNav is not null)
+            {
+                <div class="fbc-topnav-drawer">@TopNav</div>
+            }
+        </MudDrawer>
+    }
+
+    @if (Mobile && SearchSheet is not null)
+    {
+        @* スマホの検索欄。ヘッダーの検索ボタンで、ヘッダーの下に開く（閉じているあいだは表示しない・CSS）。
+           Esc で閉じる（欄の中で押したキーが、ここに届く。サイトの検索部品が Esc を止めないこと。docs/usage.md の「検索の契約」） *@
+        <div id="fbc-search-sheet" class="fbc-search-sheet" @onkeydown="OnSheetKeyDown">
+            @SearchSheet(CloseSearchEvent)
+        </div>
+    }
+
+    <MudMainContent>
+        <main id="fbc-main" tabindex="-1">
+            <MaintenanceBanner Info="Maintenance" />
+            <article class="fbc-content">
+                @Body
+            </article>
+        </main>
+        <SiteFooter />
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    /// <summary>ヘッダーの名前の代わりに出す内容（省略すると、SiteOptions.Name のリンク）。</summary>
+    [Parameter] public RenderFragment? Brand { get; set; }
+
+    /// <summary>PC のヘッダーの中央（検索欄など）。スマホでは出さない。</summary>
+    [Parameter] public RenderFragment? SearchBox { get; set; }
+
+    /// <summary>PC のヘッダーの右（ゲーム・設定・テーマなど）。スマホでは出さない。</summary>
+    [Parameter] public RenderFragment? HeaderEnd { get; set; }
+
+    /// <summary>スマホのヘッダーに出す内容（対戦画面の切り替えなど）。</summary>
+    [Parameter] public RenderFragment? MobileHeaderActions { get; set; }
+
+    /// <summary>
+    /// 上部ナビ（横に並ぶ項目。例: ホーム・プロフィール・作品）。中身は &lt;a class="fbc-topnav-link"&gt; の並び。
+    /// ShowDrawer=false のとき、PC はヘッダーに出す。スマホは、CollapseTopNavOnMobile が true なら、ハンバーガーで開くメニューに入れる。
+    /// </summary>
+    [Parameter] public RenderFragment? TopNav { get; set; }
+
+    /// <summary>
+    /// サイドバー（ドロワー）を出すか。既定は出す。false にすると、サイドバーもハンバーガーも描かない（上部ナビだけの構成）。
+    /// ただし CollapseTopNavOnMobile が true なら、スマホだけはハンバーガーで開くメニュー（TopNav を縦に並べて入れる）を出す。
+    /// </summary>
+    [Parameter] public bool ShowDrawer { get; set; } = true;
+
+    /// <summary>ShowDrawer=false のとき、スマホでは上部ナビをハンバーガーのメニューに畳むか（既定は畳まない。ヘッダーに横スクロールで出す）。</summary>
+    [Parameter] public bool CollapseTopNavOnMobile { get; set; }
+
+    /// <summary>スマホの検索欄の中身。引数は「閉じる」（検索欄の × や、結果を開いたあとに呼ぶ）。省略すると、スマホに検索ボタンを出さない。</summary>
+    [Parameter] public RenderFragment<EventCallback>? SearchSheet { get; set; }
+
+    /// <summary>サイドバーの中身。引数は「項目を選んだら呼ぶ」（スマホでは、メニューを閉じる）。</summary>
+    [Parameter] public RenderFragment<EventCallback>? DrawerContent { get; set; }
+
+    /// <summary>サイト独自のテーマ（省略すると既定の紫系）。</summary>
+    [Parameter] public MudTheme? CustomTheme { get; set; }
+
+    /// <summary>メンテナンスの状態（「更新予定」のお知らせを出すため）。省略可。</summary>
+    [Parameter] public MaintenanceInfo? Maintenance { get; set; }
+
+    /// <summary>レイアウトの page クラスに足す追加のクラス（サイトの画面の状態に合わせる）。</summary>
+    [Parameter] public string? PageClass { get; set; }
+
+    /// <summary>
+    /// スマホ（767.98px 以下）で、ページ全体をスクロールさせるか。既定の false は、スマホでもページ全体を画面の高さに収め、本文の中だけをスクロールさせる（これまでと同じ）。
+    /// true にすると、ヘッダーは固定のまま、ページ全体（window）がスクロールし、フッターはページの最後に出る。PC には影響しない。
+    /// </summary>
+    [Parameter] public bool MobilePageScroll { get; set; }
+
+    private string PageClassName =>
+        "fbc-page" + (ShowDrawer ? "" : " fbc-no-drawer") + (MobilePageScroll ? " fbc-page-scroll" : "") + (string.IsNullOrWhiteSpace(PageClass) ? "" : " " + PageClass);
+
+    /// <summary>メニュー（ハンバーガーとドロワー）を出すか。サイドバーがあるか、スマホで上部ナビを畳むとき。</summary>
+    private bool HasMenu => ShowDrawer || (CollapseTopNavOnMobile && TopNav is not null && Mobile);
+
+    /// <summary>上部ナビをヘッダーに出すか（畳んでいるスマホでは、メニューの中に入る）。</summary>
+    private bool TopNavInHeader => TopNav is not null && !ShowDrawer && !(CollapseTopNavOnMobile && Mobile);
+
+    // 保存された PC の開閉（SiteOptions.SidebarKey が "1" なら隠す）
+    private bool desktopOpen = true;
+    private bool mobileOpen;
+    private bool mobile;
+    private bool searchOpen;
+    private bool checkedConfig;
+    private bool firstLocation = true;
+
+    private DotNetObjectReference<SiteLayout>? self;
+
+    // JS の監視（matchMedia と Esc）の登録の名前。Dispose で同じ名前を渡して外す
+    private readonly string watchKey = Guid.NewGuid().ToString("N");
+    private bool watching;
+
+    private EventCallback CloseOnNavigate => EventCallback.Factory.Create(this, CloseOnMobile);
+    private EventCallback CloseSearchEvent => EventCallback.Factory.Create(this, CloseSearch);
+
+    private string SkipHref => Nav.Uri.Split('#')[0] + "#fbc-main";
+
+    /// <summary>スマホかどうか（768px 未満）。スマホは、サイドバーを、ハンバーガーで開く一時的なメニューにする。</summary>
+    private bool Mobile => mobile;
+
+    private bool DrawerOpen => Mobile ? mobileOpen : desktopOpen;
+
+    /// <summary>
+    /// サイドバーの属性。スマホで閉じている間は inert（画面の外にある項目を Tab で通らず、支援技術からも外す。開くと外れる）。
+    /// PC（常に見える細い列）では付けない。MudDrawer の閉じた状態も DOM に残るため、属性で止める（版に依存しない）。
+    /// </summary>
+    private Dictionary<string, object> DrawerAttributes
+    {
+        get
+        {
+            var attributes = new Dictionary<string, object> { ["id"] = "fbc-sidebar" };
+            if (Mobile && !mobileOpen) attributes["inert"] = "";
+            return attributes;
+        }
+    }
+
+    /// <summary>最初の描画の前に、保存された PC の開閉と、スマホかどうかを同期で決める（非同期だと、開いた状態で一度描かれてから閉じて見える）。</summary>
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+        if (JS is IJSInProcessRuntime sync)
+        {
+            try { desktopOpen = sync.Invoke<string?>("localStorage.getItem", Site.SidebarKey) != "1"; }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* localStorage が使えないときは、開いたままにする */ }
+            try
+            {
+                self = DotNetObjectReference.Create(this);
+                mobile = sync.Invoke<bool>("faraBlazorComponent.watchMobile", self, watchKey);
+                watching = true;
+            }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは PC として扱う */ }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // 最初の描画の後は、画面の移動（LocationChanged）を「移動」として扱う（最初の読み込みでは、フォーカスを動かさない）
+        if (firstRender) firstLocation = false;
+        // 起動の後に一度だけ、index.html の theme-init.js の設定（キー）が SiteOptions と同じかを確かめる（違えば、コンソールに警告）
+        if (!firstRender || checkedConfig) return;
+        checkedConfig = true;
+        try { await JS.InvokeVoidAsync("faraBlazorComponent.checkConfig", Site.StorageKey, Site.SidebarKey); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、確かめない（回線が切れたときも同じ） */ }
+    }
+
+    [JSInvokable]
+    public void OnMobileChanged(bool matches)
+    {
+        if (mobile == matches) return;
+        mobile = matches;
+        mobileOpen = false;
+        // 表示が切り替わるので、検索欄は閉じる（JS の状態とずれても残さない）
+        searchOpen = false;
+        _ = SetSearchSheetAsync(false, true);
+        StateHasChanged();
+    }
+
+    private void ToggleDrawer()
+    {
+        // ハンバーガーを押したら、開いている検索欄は閉じる（欄とメニューを同時に開かない）
+        if (searchOpen) HideSearch(focusButton: false);
+        SetDrawerOpen(!DrawerOpen);
+    }
+
+    /// <summary>MudBlazor が知らせる開閉。PC の細い列に、マウスを乗せて広げたときも来るが、それは見た目だけなので、保存する状態は変えない。</summary>
+    private void OnDrawerOpenChanged(bool open)
+    {
+        if (Mobile) mobileOpen = open;
+    }
+
+    private void SetDrawerOpen(bool open)
+    {
+        if (Mobile) { mobileOpen = open; return; }
+        desktopOpen = open;
+        _ = ApplyDesktopStateAsync();
+    }
+
+    private void CloseOnMobile()
+    {
+        if (Mobile) mobileOpen = false;
+    }
+
+    /// <summary>スマホの検索ボタン。欄を開き、フォーカスは JS（faraBlazorComponent の click）が行う（iOS は、タップの流れの中でフォーカスしないとキーボードが出ない）。ここでは状態を合わせる。</summary>
+    private void OpenSearch()
+    {
+        searchOpen = true;
+        if (Mobile) mobileOpen = false;
+    }
+
+    private void CloseSearch() => HideSearch(focusButton: true);
+
+    /// <summary>検索の欄の中で Esc が押されたら閉じる（検索の契約。サイトの検索部品が Esc を先に使うときは、その部品が止める）。</summary>
+    private void OnSheetKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") CloseSearch();
+    }
+
+    /// <summary>
+    /// Esc が押されたとき（文書全体で、JS（faraBlazorComponent.watchMobile）が知らせる）。スマホで開いているメニューを閉じ、フォーカスをメニューボタンに戻す。
+    /// MudDrawer は Esc では閉じないため、ここで閉じる。検索欄の Esc は OnSheetKeyDown が受けるので、ここでは何もしない。
+    /// </summary>
+    [JSInvokable]
+    public void OnEscape()
+    {
+        if (!Mobile || !mobileOpen) return;
+        mobileOpen = false;
+        StateHasChanged();
+        _ = FocusMenuAsync();
+    }
+
+    /// <summary>スマホのドロワーの中の閉じるボタン。Esc と同じく閉じて、フォーカスをメニューボタンに戻す（閉じた後は inert で Tab から外れる）。</summary>
+    private void CloseDrawerByButton()
+    {
+        if (!Mobile || !mobileOpen) return;
+        mobileOpen = false;
+        StateHasChanged();
+        _ = FocusMenuAsync();
+    }
+
+    private async Task FocusMenuAsync()
+    {
+        try { await JS.InvokeVoidAsync("faraBlazorComponent.focusMenu"); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、フォーカスを動かさない（メニューは閉じている） */ }
+    }
+
+    private void HideSearch(bool focusButton)
+    {
+        if (!searchOpen) return;
+        searchOpen = false;
+        _ = SetSearchSheetAsync(false, focusButton);
+    }
+
+    private async Task SetSearchSheetAsync(bool open, bool focus)
+    {
+        try { await JS.InvokeVoidAsync("faraBlazorComponent.searchSheet", open, focus); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、反映しない（回線が切れたときも同じ） */ }
+    }
+
+    private async Task ApplyDesktopStateAsync()
+    {
+        try { await JS.InvokeVoidAsync("faraBlazorComponent.sidebarChanged", !desktopOpen, Site.SidebarKey); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、反映しない（回線が切れたときも同じ） */ }
+    }
+
+    private async Task FocusMain()
+    {
+        try { await JS.InvokeVoidAsync("faraBlazorComponent.focusMain"); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、リンクの移動（現在のページの #fbc-main）に任せる */ }
+    }
+
+    // 画面を移ったら、スマホのメニューと検索欄を閉じ、本文へフォーカスを移す（項目は <a href> のまま。SiteNavMenu の項目は、OnClick を持たない）
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // async void は、例外が出ると画面全体の処理を止める。JS の失敗（回線が切れた後など）だけ受け、それ以外は隠さない
+        try
+        {
+            CloseOnMobile();
+            if (searchOpen) HideSearch(focusButton: true);
+            StateHasChanged();
+            // ページが移ったら、本文（main）へフォーカスを移す（スクリーンリーダーに、新しいページだと伝わる）。最初の読み込みでは動かさない
+            if (!firstLocation) await FocusMain();
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+        {
+            // 画面の移動の後始末（フォーカスを移すだけ）。失敗しても、ページの表示は変わっている
+        }
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+        // 登録を外す（外さないと、画面を移るたびに古い参照へ送り続けて、警告が増える）。JS が切れていれば何もしない
+        if (watching) _ = UnwatchAsync();
+        watching = false;
+        self?.Dispose();
+    }
+
+    private async Task UnwatchAsync()
+    {
+        try { await JS.InvokeVoidAsync("faraBlazorComponent.unwatchMobile", watchKey); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* 回線が切れた後・JS が無いときは、外す先が無い */ }
+    }
+}

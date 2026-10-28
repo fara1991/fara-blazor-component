@@ -1,5 +1,5 @@
 // 例外のログ用の要約（kit の共有ファイル。各サイトは submodule で読む）。
-//   import { errorSummary } from "../external/fara-site-kit/worker/error-summary.js";
+//   import { errorSummary } from "../external/fara-blazor-component/worker/error-summary.js";
 // 報告（report.js）と、各サイトの Worker の例外ログで同じ規則を使う（サイトごとのコピーは持たない）。
 
 /** ログに出す文の長さ（これより長いものは切る）。 */

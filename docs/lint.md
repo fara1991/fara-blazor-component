@@ -28,7 +28,7 @@
 `eslint.config.mjs`（kit のルート）。
 
 - `worker/`: Node + `HTMLRewriter`（Cloudflare Workers の実行環境だけのグローバル）
-- `src/FaraSiteKit.Razor/wwwroot/js/`: ブラウザ・古い形の script（`sourceType: "script"`）
+- `src/FaraBlazorComponent.Razor/wwwroot/js/`: ブラウザ・古い形の script（`sourceType: "script"`）
 - `tools/layout-check/browser.mjs`: Node と browser（`page.evaluate` に渡す関数だけがブラウザで動く）
 - それ以外（`tools/`・`build/`・`tests/`・`csp/`）: Node（`**/*.{js,mjs,cjs}`）
 
@@ -42,7 +42,7 @@
 2. サイトのルートに `eslint.config.mjs`:
 
    ```js
-   import shared, { createSharedConfig } from "./external/fara-site-kit/tools/lint/eslint.config.shared.mjs";
+   import shared, { createSharedConfig } from "./external/fara-blazor-component/tools/lint/eslint.config.shared.mjs";
 
    export default [
      ...shared,                                              // Node の JS（**/*.{js,mjs,cjs}）
@@ -81,7 +81,7 @@ kit の `Directory.Build.props` は kit の中のプロジェクトだけに効�
 | `VSTHRD100` | **error** | 0 | `async void`（イベント以外） |
 | `CA1816` | **error** | 0 | Dispose で `GC.SuppressFinalize` を呼んでいない |
 | `IDE0059` | **error** | 0 | 不要な代入 |
-| `CA1031` | warning | 3 | 一般の例外の catch。`src/FaraSiteKit.Core/MaintenanceInfo.cs`（`LoadAsync`）・`src/FaraSiteKit.Razor/Services/SiteThemeState.cs`（`TryLoadSync`・`InitializeAsync`）。一般の例外を受けて、起動や描画を止めない場所（意図した握りつぶし） |
+| `CA1031` | warning | 3 | 一般の例外の catch。`src/FaraBlazorComponent.Core/MaintenanceInfo.cs`（`LoadAsync`）・`src/FaraBlazorComponent.Razor/Services/SiteThemeState.cs`（`TryLoadSync`・`InitializeAsync`）。一般の例外を受けて、起動や描画を止めない場所（意図した握りつぶし） |
 | `CA2000` | warning | 24 | Dispose 漏れ。大半はテストの `HttpClient`・`FakeHandler`・`StringWriter`（テスト用の使い捨て）。ノイズが多いため warning |
 | `VSTHRD002`・`VSTHRD003`・`VSTHRD103` | warning（パッケージの既定） | 4 | 同期の待ち・開始していない Task の待ち・同期の書き込み。`SiteLayoutTests`・`ReportFormViewTests`・`MaintenanceInfo.cs`。error にしない |
 
@@ -105,7 +105,7 @@ kit の `Directory.Build.props` は kit の中のプロジェクトだけに効�
        <EnableNETAnalyzers>true</EnableNETAnalyzers>
      </PropertyGroup>
      <ItemGroup>
-       <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)external/fara-site-kit/tools/lint/dotnet.editorconfig" />
+       <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)external/fara-blazor-component/tools/lint/dotnet.editorconfig" />
      </ItemGroup>
      <ItemGroup>
        <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.15" PrivateAssets="all" />
