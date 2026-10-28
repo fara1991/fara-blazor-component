@@ -43,6 +43,43 @@ Worker の変数（ダッシュボードの「変数とシークレット」、�
 - 本番の公開前にお知らせを出す運用（`require-maintenance.mjs` 相当）や、公開と同時に `--var MAINTENANCE_MODE:true` を付けるワークフローも、新しい名前に合わせる。
 - 複数サイトの変数をまとめて見る・切り替えるには `tools/maintenance.mjs`（`status` は読み取り、`set` は deploy ワークフローを `gh` で実行。雛形と手順は `docs/maintenance-cli.md`）。
 
+### 2.2 報告の回数制限（1 日 3 回まで・送信元ごと）
+
+報告の受け口（`handleReport`）は、Turnstile を通った送信の試みを、送信元（Cloudflare の `CF-Connecting-IP`）ごとに **1 日 3 回まで** 数える。超えたら 429（`{"error":"rate_limited","message":"…"}`・`Retry-After` は次の JST 0 時までの秒）。数えるのは Discord へ送る直前の 1 回だけで、Turnstile の失敗・本文の不正・罠の欄で弾いたものは数えない。
+
+**有効化の手順（opt-in）**: 次の 2 つを、サイトの Worker に入れる。バインディングが無いサイトは、今までどおり（制限なし）。
+
+1. `worker/index.js` で、クラスを公開する（kit の `report-rate-limit.js` にある Durable Object）。
+```js
+export { ReportRateLimiter } from "../external/fara-site-kit/worker/report-rate-limit.js";
+```
+2. `wrangler.jsonc` に、バインディングと migrations を書く。`durable_objects` と `migrations` は環境（`env.develop`）を継承しないので、**本番とdevelop の両方に**書く。SQLite の DO（`new_sqlite_classes`）を使う（新しい DO はこの形で作る。プランごとの対応は Cloudflare の DO の docs で確かめる）。
+```jsonc
+{
+  "durable_objects": { "bindings": [{ "name": "REPORT_LIMITER", "class_name": "ReportRateLimiter" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ReportRateLimiter"] }],
+  "env": {
+    "develop": {
+      "durable_objects": { "bindings": [{ "name": "REPORT_LIMITER", "class_name": "ReportRateLimiter" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ReportRateLimiter"] }]
+    }
+  }
+}
+```
+  - 既に `migrations` があるサイトは、tag を重複させず、新しい tag（例: `v2`）で `new_sqlite_classes` を足す。
+  - 確認: `wrangler deploy --dry-run`（本番と develop）。`npm run preview` で、同じ IP から 4 回送って 4 回目が 429 になるかを見る。
+
+**数え方と保存（プライバシー）**:
+- 保存するのは、**短縮ハッシュと回数だけ**。ハッシュは `SHA-256(IP + 用途の文字列 + JST の日付)` の先頭 128 ビット（32 桁の hex）。IP そのものは保存しない・ログに出さない。
+- 日付（JST の暦日）ごとにキーを分ける。同じ IP でも日付が変われば別のハッシュになる。
+- **保存期間**: その日（JST）の分だけ。JST の次の 0 時に、Durable Object の alarm で前の日のキーを消す（日付が変わった時点で消える。alarm が遅れた分だけ、残る時間が延びる）。
+- **各サイトのプライバシーポリシーに追記が必要**: 「報告の送信の回数を制限するため、送信元の IP アドレスから作った短い識別子（ハッシュ）を、その日の間だけ保存し、日付が変わると消す」旨。IP アドレスそのものは保存しないこと。
+- 報告の本文は従来どおり保存しない（Discord に送るだけ）。
+
+**DO が使えないとき（fail-open）**: 回数を数えられないとき（DO の例外・非 2xx・IP ヘッダーが無い）は、**制限せず送る**。理由: 問い合わせを取りこぼさないため。ボット対策は Turnstile が残っているので、回数の制限が無くても最低限の防御は効いている。DO の例外は `report: daily limit unavailable, sending anyway` としてログに残し、IP ヘッダーが無いときは `report: daily limit skipped, no CF-Connecting-IP` を出す（どちらも IP・ハッシュは出さない）。
+
+**報告画面（ReportFormView）**: 429 のときは、Worker の `message`（「1 日の送信上限（3 回）に達しました。明日もう一度お試しください。」）をそのまま出す。本文が読めないときも「1 日の送信の上限に達しました。明日もう一度お試しください」を出す（汎用の失敗の文にはしない）。
+
 ## 3. C# の共通コードを使う（`src/FaraSiteKit.Core`）
 
 ```xml
