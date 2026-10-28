@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>layout-check: 正しい例</title>
+<style>
+  body { margin: 0; font-family: sans-serif; font-size: 16px; line-height: 1.6; background: #1a1030; color: #f5f5f5; }
+  a:focus-visible, button:focus-visible { outline: 2px solid #ffd54f; outline-offset: 2px; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 0 16px; min-height: 56px; }
+  #menu { min-width: 44px; min-height: 44px; font-size: 16px; }
+  .drawer { position: fixed; top: 56px; left: 0; bottom: 0; width: 260px; background: #2a1d45; transform: translateX(-100%); }
+  .drawer.open { transform: none; }
+  .drawer a { display: block; min-height: 44px; line-height: 44px; padding: 0 16px; color: #f5f5f5; }
+  main { padding: 16px; }
+  main p { font-size: 14px; }
+  .action { min-width: 44px; min-height: 44px; font-size: 16px; }
+  footer { padding: 16px; }
+  footer a { display: inline-block; min-height: 44px; line-height: 44px; padding: 0 8px; color: #f5f5f5; }
+</style>
+</head>
+<body>
+<header>
+  <span>Fara</span>
+  <button id="menu" type="button" aria-expanded="false" aria-controls="drawer">メニュー</button>
+</header>
+<nav id="drawer" class="drawer" aria-label="サイト">
+  <a href="#works">作品</a>
+  <a href="#updates">更新履歴</a>
+</nav>
+<main>
+  <h1>正しい例</h1>
+  <p>本文の <a href="#inline">リンク</a> の続き（文中のリンクは、押せる範囲の判定から外す）。</p>
+  <button class="action" type="button">送信</button>
+</main>
+<footer><a href="#privacy">プライバシー</a></footer>
+<script>
+  // 閉じたドロワーは inert にして Tab で止まらないようにする。Esc で閉じて、フォーカスをメニューボタンへ戻す。
+  const menu = document.getElementById('menu');
+  const drawer = document.getElementById('drawer');
+  function setOpen(open) {
+    menu.setAttribute('aria-expanded', String(open));
+    drawer.classList.toggle('open', open);
+    drawer.inert = !open;
+  }
+  menu.addEventListener('click', () => setOpen(menu.getAttribute('aria-expanded') !== 'true'));
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && menu.getAttribute('aria-expanded') === 'true') {
+      setOpen(false);
+      menu.focus();
+    }
+  });
+  setOpen(false);
+</script>
+</body>
+</html>

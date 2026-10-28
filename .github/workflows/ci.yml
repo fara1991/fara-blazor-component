@@ -1,8 +1,10 @@
 name: CI
 
 # 共有部品のテスト。push と PR で実行する。ubuntu と windows の 2 つで並列に動かす（matrix）。
-#   - test: worker/・build/・csp/ の Node テスト（共有 JS・静的ファイルの生成・CSP）
-#   - dotnet: src/ の C# 共通コードの xUnit テスト、Razor 部品の bUnit テスト、samples/MinimalSite のビルド
+#   - test: worker/・build/・csp/・tools/ の Node テスト（共有 JS・静的ファイルの生成・CSP・レイアウト計測の判定）
+#   - lint: ESLint（tools/lint/eslint.config.shared.mjs の共通設定。違反は止める）
+#   - layout-check: レイアウト計測の統合テスト（ブラウザ・ubuntu のみ。正しい例は 0 件、崩した例は違反が出ることを確かめる）。続けて samples/MinimalSite を公開して計測する（違反 0 件）
+#   - dotnet: src/ の C# 共通コードの xUnit テスト、Razor 部品の bUnit テスト、samples/MinimalSite のビルド（Directory.Build.props の静的解析も効く）
 on:
   push:
   pull_request:
@@ -25,8 +27,58 @@ jobs:
         with:
           node-version: 22
 
-      - name: Test (Worker の共有 JS・build・csp)
+      - name: Test (Worker の共有 JS・build・csp・レイアウト計測の判定)
         run: npm test
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install (devDependencies。版は package-lock.json のとおり)
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+  layout-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install (devDependencies)
+        run: npm ci
+
+      - name: Install Chromium (playwright-core の依存込み)
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Test (レイアウト計測の統合テスト)
+        run: npm run test:layout-check
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build (samples/MinimalSite を公開用の静的ファイルにする)
+        run: dotnet publish samples/MinimalSite/MinimalSite.csproj -c Release -o "$RUNNER_TEMP/minimal-site"
+
+      - name: Serve (公開用の静的ファイルを配る)
+        run: |
+          node tools/layout-check/serve-static.mjs "$RUNNER_TEMP/minimal-site/wwwroot" 8830 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8830/ > /dev/null && break; sleep 1; done
+
+      - name: Layout check (samples/MinimalSite の / を計測。タップの大きさ 0 件を含む)
+        run: node tools/layout-check/cli.mjs --config samples/MinimalSite/layout-check.config.mjs
 
   dotnet:
     strategy:

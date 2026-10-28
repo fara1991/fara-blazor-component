@@ -462,3 +462,10 @@ pokemon の既存の型・ファイルと、kit の部品の名前が重なる�
    `site.json` の `bodyRootClass` は `entry-static`（読み込み表示の JS が使う）。`--out` はテンプレートと別のフォルダにする。
 7. **Worker**: `worker/index.js` から kit の `report.js`・`maintenance.js` を import する（2）。お知らせの帯は `fsk-notice`（Razor の `MaintenanceBanner` と同じ class）。
 8. **確認**: `wrangler deploy --dry-run`（本番・確認用）、`dotnet test`、`npm test`。確認用で、起動の表示・ダーク・メンテナンス・404 を見る。
+
+## 9. 静的解析・レイアウトの自動計測（未リリース・v0.6.0 で入る）
+
+- ESLint の共通設定と、C# のアナライザーの取り込み: [lint.md](lint.md)
+- レイアウトの自動計測（幅ごとの崩れ・見えるフォーカス・押せる範囲・文字の大きさ・メニューの Esc）: [layout-check.md](layout-check.md)
+
+どちらも、違反が出る CI を各サイトに足すときの手順を書いてある。計測の限界（見た目・色・実機は見ない）は、各文書の最後を見る。

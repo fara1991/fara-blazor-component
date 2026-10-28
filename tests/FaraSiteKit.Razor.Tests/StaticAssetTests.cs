@@ -179,6 +179,30 @@ public class StaticAssetTests
         Assert.True(css.IndexOf("@media (max-width: 1024px) {\n    .fsk-small a", StringComparison.Ordinal) > css.IndexOf(".fsk-footer-socials {", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void PhoneFooterLinksGet44PxHitAreasWithoutStackingOnTheFullWidthPadding()
+    {
+        var css = ReadRazorFile("wwwroot/css/fara-site-kit.css");
+
+        // スマホ（600px 未満）: 文字リンクは ::after の 44px の判定を持つ（作者名が短くても 44px）。全幅の padding・負の margin は打ち消す
+        var phone = Between(css, "@media (max-width: 599.98px) {\n    .fsk-footer {", "/* ---- メンテナンス");
+        Assert.Contains(".fsk-footer a:not(.fsk-footer-social)::after", phone);
+        Assert.Contains("width: max(100%, 44px)", phone);
+        Assert.Contains("height: 44px", phone);
+        Assert.Contains("padding-block: 0", phone);
+        Assert.Contains("margin-block: 0", phone);
+        // 行と行の中心どうしを 44px 以上離す（上の行の判定が下の行の判定に重ならない）
+        Assert.Contains("row-gap: 28px", phone);
+        // 作者名の判定が右の SNS に重ならないよう、SNS の前の間隔を足す
+        Assert.Contains("margin-left: 0.5rem", phone);
+
+        // PC・タブレット（600px 以上）の規則は変えない（全幅の規則が残る）
+        var fullWidth = Between(css, ".fsk-footer a:not(.fsk-footer-social) {", "}");
+        Assert.Contains("padding-block: 13px", fullWidth);
+        Assert.Contains("margin-block: -13px", fullWidth);
+        Assert.DoesNotContain("padding-block: 0", Between(css, "@media (max-width: 1024px) {\n    .fsk-small a", "}\n}"));
+    }
+
     private static string Between(string text, string start, string end)
     {
         var from = text.IndexOf(start, StringComparison.Ordinal);

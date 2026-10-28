@@ -87,6 +87,18 @@ public class SiteFooterTests : SiteKitTestContext
     }
 
     [Fact]
+    public void EveryFooterTextLinkIsInTheLineThatThePhoneHitAreaRuleCovers()
+    {
+        // スマホの当たり判定（kit の CSS: .fsk-footer a:not(.fsk-footer-social)::after）は、.fsk-footer-line の中の文字リンクに掛ける。
+        // 問い合わせ・プライバシーポリシー・作者の 3 つが、すべてその中にある（外に出すと CSS の規則から外れる）
+        var cut = RenderAt("");
+
+        var textLinks = cut.FindAll(".fsk-footer a:not(.fsk-footer-social)");
+        Assert.Equal(3, textLinks.Count);
+        Assert.All(textLinks, link => Assert.NotNull(link.Closest(".fsk-footer-line")));
+    }
+
+    [Fact]
     public void AuthorWithoutAHomepageIsPlainText()
     {
         Services.GetRequiredService<SiteOptions>().AuthorHomeUrl = "";
