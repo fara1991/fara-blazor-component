@@ -291,12 +291,12 @@ export async function checkPageAtWidth({ context, config, pageInfo, width }) {
     await page.close();
   }
 
-  if (enabled["menu-esc"] && config.menuEsc && width < config.menuEsc.breakpoint) {
+  if ((enabled["menu-esc"] || enabled["menu-close-visible"]) && config.menuEsc && width < config.menuEsc.breakpoint) {
     const menuPage = await context.newPage();
     try {
       await menuPage.addInitScript(installHelpers);
       await load(menuPage, config, pageInfo, timeout);
-      await checkMenuEsc(menuPage, config, push);
+      await checkMenu(menuPage, config, push, enabled);
     } finally {
       await menuPage.close();
     }
@@ -351,21 +351,71 @@ async function walkTabStops(page, config, pageInfo, push, enabled) {
   }
 }
 
-/** スマホ幅でメニューを開き、Esc で閉じて、メニューボタンの aria-expanded が false に戻り、フォーカスが戻ることを確かめる。 */
-async function checkMenuEsc(page, config, push) {
+/**
+ * スマホ幅でメニューを開き、閉じる手段が見えて押せるか（menu-close-visible）と、Esc で閉じるか（menu-esc）を確かめる。
+ * 開けなかったときの違反は、有効なほうのルール名で出す（menu-esc が有効なら menu-esc）。
+ */
+async function checkMenu(page, config, push, enabled) {
   const selector = config.menuEsc.buttonSelector;
+  const openRule = enabled["menu-esc"] ? "menu-esc" : "menu-close-visible";
   const button = page.locator(selector).first();
   if ((await button.count()) === 0 || !(await button.isVisible())) {
-    push("menu-esc", selector, "見えない", "スマホ幅でメニューボタンが見えない（menuEsc.buttonSelector を確かめる）");
+    push(openRule, selector, "見えない", "スマホ幅でメニューボタンが見えない（menuEsc.buttonSelector を確かめる）");
     return;
   }
   await button.click();
   try {
     await page.waitForFunction((s) => document.querySelector(s)?.getAttribute("aria-expanded") === "true", selector, { timeout: 2000 });
   } catch {
-    push("menu-esc", selector, "aria-expanded が true にならない", "メニューが開かない（クリックで aria-expanded が true にならない）");
+    push(openRule, selector, "aria-expanded が true にならない", "メニューが開かない（クリックで aria-expanded が true にならない）");
     return;
   }
+  if (enabled["menu-close-visible"]) await checkCloseReachable(page, config, push);
+  if (enabled["menu-esc"]) await checkEscClose(page, config, push);
+}
+
+/** 開いたあと、閉じる手段（closeSelector の閉じるボタン。無ければメニューボタン）の中心が、自分に当たる（押せる）まで待つ。当たらなければ違反。 */
+async function checkCloseReachable(page, config, push) {
+  const candidates = [config.menuEsc.closeSelector, config.menuEsc.buttonSelector].filter(Boolean);
+  try {
+    await page.waitForFunction(reachableCloser, candidates, { timeout: 2000 });
+  } catch {
+    const covering = await page.evaluate((s) => {
+      const b = document.querySelector(s);
+      if (!b) return "見つからない";
+      const r = b.getBoundingClientRect();
+      const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return at ? window.__layoutCheck.describe(at) : "画面の外";
+    }, config.menuEsc.buttonSelector);
+    push(
+      "menu-close-visible",
+      config.menuEsc.buttonSelector,
+      `覆われている（${covering} が上に来ている）`,
+      "メニューを開いたあと、閉じる手段が押せない（ドロワーが覆う）。ドロワーの中に閉じるボタンを置き、menuEsc.closeSelector で書く",
+    );
+  }
+}
+
+/** ブラウザで動く判定（waitForFunction に渡す）。候補のどれかの中心が、画面の内側で自分（または子）に当たれば true。 */
+function reachableCloser(selectors) {
+  const width = document.documentElement.clientWidth;
+  const height = document.documentElement.clientHeight;
+  return selectors.some((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return false;
+    const x = (r.left + r.right) / 2;
+    const y = (r.top + r.bottom) / 2;
+    if (x < 0 || y < 0 || x >= width || y >= height) return false;
+    const at = document.elementFromPoint(x, y);
+    return !!at && el.contains(at);
+  });
+}
+
+/** Esc で閉じて、メニューボタンの aria-expanded が false に戻り、フォーカスが戻ることを確かめる（menu-esc）。 */
+async function checkEscClose(page, config, push) {
+  const selector = config.menuEsc.buttonSelector;
   await page.keyboard.press("Escape");
   try {
     await page.waitForFunction((s) => document.querySelector(s)?.getAttribute("aria-expanded") === "false", selector, { timeout: 2000 });

@@ -27,6 +27,7 @@ export const RULE_NAMES = Object.freeze([
   "tap-target",
   "min-font-size",
   "menu-esc",
+  "menu-close-visible",
 ]);
 
 export const DEFAULT_VIEWPORTS = Object.freeze([360, 390, 768, 1024, 1440]);
@@ -215,9 +216,9 @@ function normalizeRules(input, menuEsc) {
   }
   const result = {};
   for (const name of RULE_NAMES) {
-    if (name === "menu-esc") {
+    if (name === "menu-esc" || name === "menu-close-visible") {
       const wanted = rules[name] ?? (menuEsc !== null);
-      if (wanted && menuEsc === null) fail("menu-esc を使うには menuEsc.buttonSelector（メニューボタンのセレクター）が要る");
+      if (wanted && menuEsc === null) fail(`${name} を使うには menuEsc.buttonSelector（メニューボタンのセレクター）が要る`);
       result[name] = wanted;
     } else {
       result[name] = rules[name] ?? true;
@@ -231,8 +232,12 @@ function normalizeMenuEsc(menuEsc) {
   if (typeof menuEsc !== "object" || typeof menuEsc.buttonSelector !== "string" || menuEsc.buttonSelector.trim() === "") {
     fail("menuEsc は { buttonSelector, breakpoint? } で書く（buttonSelector はメニューボタンのセレクター）");
   }
+  if (menuEsc.closeSelector !== undefined && (typeof menuEsc.closeSelector !== "string" || menuEsc.closeSelector.trim() === "")) {
+    fail("menuEsc.closeSelector は、ドロワーの中の閉じるボタンのセレクター（文字列。省くとメニューボタンだけで判定する）");
+  }
   return {
     buttonSelector: menuEsc.buttonSelector.trim(),
+    closeSelector: menuEsc.closeSelector?.trim() || null,
     breakpoint: menuEsc.breakpoint ?? MENU_BREAKPOINT,
   };
 }
