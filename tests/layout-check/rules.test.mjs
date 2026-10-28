@@ -134,6 +134,17 @@ test("normalizeConfig: menuEsc を書けば menu-esc は on（既定の breakpoi
   assert.equal(config.menuEsc.breakpoint, MENU_BREAKPOINT);
 });
 
+test("normalizeConfig: menu-close-visible も menuEsc が無いと off・あると on。closeSelector は任意（空は設定エラー）", () => {
+  assert.equal(normalizeConfig(base).rules["menu-close-visible"], false);
+  const on = normalizeConfig({ ...base, menuEsc: { buttonSelector: "#menu" } });
+  assert.equal(on.rules["menu-close-visible"], true);
+  assert.equal(on.menuEsc.closeSelector, null);
+  const withClose = normalizeConfig({ ...base, menuEsc: { buttonSelector: "#menu", closeSelector: " #drawer-close " } });
+  assert.equal(withClose.menuEsc.closeSelector, "#drawer-close");
+  assert.throws(() => normalizeConfig({ ...base, rules: { "menu-close-visible": true } }), /buttonSelector/);
+  assert.throws(() => normalizeConfig({ ...base, menuEsc: { buttonSelector: "#menu", closeSelector: "" } }), /closeSelector/);
+});
+
 test("normalizeConfig: 不正な設定は LayoutCheckConfigError", () => {
   assert.throws(() => normalizeConfig(null), LayoutCheckConfigError);
   assert.throws(() => normalizeConfig({ pages: ["/"] }), /baseURL/);

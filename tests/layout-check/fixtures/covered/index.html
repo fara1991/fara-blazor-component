@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>layout-check: ドロワーがメニューボタンを覆う例</title>
+<style>
+  body { margin: 0; font-family: sans-serif; font-size: 16px; line-height: 1.6; background: #1a1030; color: #f5f5f5; }
+  a:focus-visible, button:focus-visible { outline: 2px solid #ffd54f; outline-offset: 2px; }
+  /* メニューボタンは左上（ドロワーが覆う位置）。kit のスマホと同じく、ドロワーは画面の上端から左を覆う */
+  header { display: flex; align-items: center; gap: 12px; padding: 0 16px; min-height: 56px; }
+  #menu { min-width: 44px; min-height: 44px; font-size: 16px; }
+  .drawer { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; z-index: 1200; background: #2a1d45; transform: translateX(-100%); }
+  .drawer.open { transform: none; }
+  .drawer a { display: block; min-height: 44px; line-height: 44px; padding: 0 16px; color: #f5f5f5; }
+  #drawer-close { display: block; width: 44px; height: 44px; margin: 6px 8px; padding: 0; border: 0; border-radius: 10px; color: #f5f5f5; background: #3d2c5e; }
+  main { padding: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <button id="menu" type="button" aria-expanded="false" aria-controls="drawer">メニュー</button>
+  <span>Fara</span>
+</header>
+<nav id="drawer" class="drawer" aria-label="サイト">
+  <button id="drawer-close" type="button" aria-label="メニューを閉じる">×</button>
+  <a href="#works">作品</a>
+  <a href="#updates">更新履歴</a>
+</nav>
+<main>
+  <h1>ドロワーが覆う例</h1>
+  <p>開くと、ドロワーがメニューボタンの上に来る（閉じる手段は、ドロワーの中の閉じるボタンだけ）。</p>
+</main>
+<script>
+  const menu = document.getElementById('menu');
+  const drawer = document.getElementById('drawer');
+  function setOpen(open) {
+    menu.setAttribute('aria-expanded', String(open));
+    drawer.classList.toggle('open', open);
+    drawer.inert = !open;
+  }
+  menu.addEventListener('click', () => setOpen(menu.getAttribute('aria-expanded') !== 'true'));
+  document.getElementById('drawer-close').addEventListener('click', () => { setOpen(false); menu.focus(); });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && menu.getAttribute('aria-expanded') === 'true') {
+      setOpen(false);
+      menu.focus();
+    }
+  });
+  setOpen(false);
+</script>
+</body>
+</html>

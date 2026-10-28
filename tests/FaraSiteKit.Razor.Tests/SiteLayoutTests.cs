@@ -278,6 +278,30 @@ public class SiteLayoutTests : SiteKitTestContext
     }
 
     [Fact]
+    public void ThePhoneDrawerHasACloseButtonThatClosesItAndReturnsFocusToTheMenuButton()
+    {
+        // ドロワーが左上（ハンバーガーの位置）を覆うため、閉じる手段はドロワーの中にある
+        var cut = RenderLayout(mobile: true);
+        cut.Find(".fsk-menu-toggle").Click();
+        var close = cut.Find("#fsk-sidebar .fsk-drawer-close");
+        Assert.Equal("メニューを閉じる", close.GetAttribute("aria-label"));
+
+        close.Click();
+
+        Assert.Equal("false", cut.Find(".fsk-menu-toggle").GetAttribute("aria-expanded"));
+        Assert.True(cut.Find("#fsk-sidebar").HasAttribute("inert"));
+        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.focusMenu");
+    }
+
+    [Fact]
+    public void ThePcDrawerHasNoCloseButton()
+    {
+        var cut = RenderLayout(mobile: false);
+
+        Assert.Empty(cut.FindAll(".fsk-drawer-close"));
+    }
+
+    [Fact]
     public void ThePcDrawerIsNeverInert()
     {
         var cut = RenderLayout(mobile: false);

@@ -57,6 +57,14 @@
            Breakpoint は Sm（既定の Md だと、768〜959px で Mini が画面の外に消えるため） *@
         <MudDrawer Open="DrawerOpen" OpenChanged="OnDrawerOpenChanged" Variant="@(Mobile ? DrawerVariant.Temporary : DrawerVariant.Mini)" OpenMiniOnHover="true" Breakpoint="Breakpoint.Sm"
                    ClipMode="@(Mobile ? DrawerClipMode.Never : DrawerClipMode.Always)" Elevation="0" Class="fsk-sidebar" UserAttributes="@DrawerAttributes">
+            @if (Mobile)
+            {
+                @* スマホ: ドロワーが画面の左上（ヘッダーのハンバーガーの位置）を覆うため、ハンバーガーは押せない。閉じる手段をドロワーの中に置く（Esc・背景タップと同じ後始末） *@
+                <div class="fsk-drawer-head">
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" Class="fsk-drawer-close" OnClick="CloseDrawerByButton"
+                                   aria-label="メニューを閉じる" aria-controls="fsk-sidebar" title="メニューを閉じる" />
+                </div>
+            }
             @if (DrawerContent is not null)
             {
                 @DrawerContent(CloseOnNavigate)
@@ -271,6 +279,15 @@
     /// </summary>
     [JSInvokable]
     public void OnEscape()
+    {
+        if (!Mobile || !mobileOpen) return;
+        mobileOpen = false;
+        StateHasChanged();
+        _ = FocusMenuAsync();
+    }
+
+    /// <summary>スマホのドロワーの中の閉じるボタン。Esc と同じく閉じて、フォーカスをメニューボタンに戻す（閉じた後は inert で Tab から外れる）。</summary>
+    private void CloseDrawerByButton()
     {
         if (!Mobile || !mobileOpen) return;
         mobileOpen = false;

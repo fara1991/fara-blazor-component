@@ -18,6 +18,7 @@
 | `tap-target` | 幅 600px 未満だけ。`a`・`button`・`[role=button]`・`input`・`select`・`summary` の押せる範囲が 44×44 以上。要素の中心から上下左右 ±20px が、自分（または子）に当たるかで判定する（`tapHalfOffset`。44px なら ±20。下の「判定の定義」）。文中のリンク（段落の中で、前後に他の文字がある inline のリンク）は除く。**無効な要素**（`disabled`・`aria-disabled="true"`・`pointer-events: none`）は数えない（`includeDisabled: true` で測る） | on |
 | `min-font-size` | 見えるテキストを持つ要素の文字の大きさが 12px 以上。装飾・アイコンフォントは `minFontSize.ignoreSelectors` か除外で外す | on |
 | `menu-esc` | `menuEsc.buttonSelector` を設定したときだけ（既定 off）。スマホ幅（既定 768px 未満）でメニューを開き、Esc で閉じると、メニューボタンの `aria-expanded` が `false` に戻り、フォーカスがメニューボタンに戻る | 設定時のみ |
+| `menu-close-visible` | `menuEsc` を設定したときだけ（既定 on）。スマホ幅でメニューを開いたあと、閉じる手段が押せる。判定する要素は、`menuEsc.closeSelector`（ドロワーの中の閉じるボタン）があればそれだけ。無ければメニューボタン。その要素の中心の点が、自分（または子）に当たれば通る。要素が無ければ「見つからない」の違反。当たらなければ違反で、覆っている要素を値に出す（閉じるボタンを指定したときは、閉じるボタンの中心で調べる）。kit のスマホのメニューは、ドロワーが左上を覆うので、閉じるボタンを `closeSelector` で指す | 設定時のみ |
 
 個別に止めるときは `rules: { "tap-target": false }` のように書く。
 
@@ -39,7 +40,7 @@ export default {
   readySelector: ".mud-layout",                      // 描画の後にだけある要素（Blazor など）。待ってから測る
   reducedMotion: true,                               // 既定 true。prefers-reduced-motion で測る（アニメーションを止める）
   includeDisabled: false,                            // 既定 false。true で、無効な要素も tap-target で測る
-  menuEsc: { buttonSelector: ".fsk-menu-toggle" },   // 省くと menu-esc は off
+  menuEsc: { buttonSelector: ".fsk-menu-toggle", closeSelector: ".fsk-drawer-close" }, // 省くと menu-esc・menu-close-visible は off。closeSelector は任意（ドロワーの中の閉じるボタン）
   rules: {
     "min-font-size": true,
   },
@@ -159,7 +160,12 @@ node tools/layout-check/cli.mjs --config layout-check.config.mjs
 
    サイトのビルドの手順は、そのサイトの CI に合わせる（上の `dotnet publish` は例）。
 
-6. 初めて入れるときは、違反を全部直すか、理由つきで除外してから必須にする（既存の違反で CI が落ちる状態にしない）。
+6. kit を上げたときの移行（`menuEsc` を設定済みのサイト）。kit の SiteLayout のスマホのメニューは、開くと左上の閉じるボタン（`.fsk-drawer-close`）を出す。ドロワーがメニューボタンを覆うため、`menuEsc` だけの設定では `menu-close-visible` が違反になる。次のどちらかを行う。
+   - **閉じるボタンを指す（推奨）**: `menuEsc: { buttonSelector: ".fsk-menu-toggle", closeSelector: ".fsk-drawer-close" }`。samples/MinimalSite の `layout-check.config.mjs` がこの書き方。
+   - **そのルールだけ止める**: `rules: { "menu-close-visible": false }`（理由をコミットに書く）。
+   kit の SiteLayout を使わず、自前のドロワーでメニューボタンを覆うサイトは、閉じる手段を `closeSelector` で指すか、ドロワーを直す。
+
+7. 初めて入れるときは、違反を全部直すか、理由つきで除外してから必須にする（既存の違反で CI が落ちる状態にしない）。
 
 ## 6. kit 自身の確認
 
@@ -169,7 +175,7 @@ LAYOUT_CHECK_CHANNEL=msedge npm run test:layout-check   # ローカルで Edge �
 npm test                                        # 判定の純粋なテスト（ブラウザなし。tests/layout-check/rules.test.mjs を含む）
 ```
 
-- 統合テストの fixture は `tests/layout-check/fixtures/good`（正しい例）と `bad`（わざと崩した例: h1 が 2 つ・20px のボタン・outline を消したリンク・閉じたドロワーの項目・10px の文字・横にはみ出す幅・Esc で閉じないメニュー・表のセルの中の文字の横にあるリンク）。`scroll`（下の項目・無条件の滑らかスクロール・無効な要素）と `serve`（serve-static の解決順・404 の本文。`tests/layout-check/serve-static.test.mjs` が使う）。
+- 統合テストの fixture は `tests/layout-check/fixtures/good`（正しい例）と `bad`（わざと崩した例: h1 が 2 つ・20px のボタン・outline を消したリンク・閉じたドロワーの項目・10px の文字・横にはみ出す幅・Esc で閉じないメニュー・表のセルの中の文字の横にあるリンク）。`scroll`（下の項目・無条件の滑らかスクロール・無効な要素）と `covered`（開いたドロワーがメニューボタンを覆う。閉じるボタンを `closeSelector` で指すと通る）と `serve`（serve-static の解決順・404 の本文。`tests/layout-check/serve-static.test.mjs` が使う）。
 - `tests/layout-check/serve-static.test.mjs`（ブラウザなし。`npm test` に入る）が、serve-static の解決順と 404・SPA の返し方を確かめる。
 - CI の `layout-check` job は ubuntu だけで動く（chromium を入れる）。
 

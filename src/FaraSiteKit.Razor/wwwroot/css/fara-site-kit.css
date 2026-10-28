@@ -254,6 +254,28 @@ html .mud-nav-link:focus-visible {
     cursor: not-allowed;
 }
 
+/* スマホのメニューの閉じるボタン（ドロワーの一番上。位置はヘッダーのハンバーガーと同じ。ドロワーがヘッダーの左側を覆うため、ハンバーガーは使えない） */
+.fsk-drawer-head {
+    display: flex;
+    align-items: center;
+    height: 3.5rem;
+    padding: 0 12px;
+}
+
+.fsk-drawer-close.mud-icon-button {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.fsk-drawer-close.mud-icon-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
 /* グループの見出し。細い列のときは文字だけ消して、高さは残す（アイコンが動かない） */
 .fsk-sidebar .fsk-nav-section {
     padding: 0 1rem;
@@ -717,15 +739,20 @@ a.fsk-footer-social:focus-visible {
 
 /* スマホ（600px 未満）のフッターの当たり判定（44px）。文字リンクは ::after で 44px の判定の箱を持つので、文字の幅・高さに関係なく 44px 以上になる（作者名が短くても）。
    上の全幅の規則（padding-block・負の margin）は、ここで打ち消す（二重に重ねない）。
-   行と行の中心どうしは 44px 以上離す（上の行の判定が下の行に重ならない）。見た目の変化は、行の間隔と上下の余白、SNS の間隔だけ */
+   行と行の中心どうしは 44px 以上離す（上の行の判定が下の行に重ならない）。行の高さを 22px に固定し（サイトの line-height に左右されない）、行間を 22px にする。
+   中心どうしは 22 + 22 = 44px。フッターは 2 段（名前・問い合わせ・プライバシーポリシー ／ © と SNS）のまま、高さを詰める（1 段は 360px に収まらないため。docs/changelog.md） */
 @media (max-width: 599.98px) {
     .fsk-footer {
-        padding-top: 0.75rem;
-        padding-bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px));
+        padding-top: 0.5rem;
+        padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
     }
 
     .fsk-footer-line {
-        row-gap: 28px;
+        row-gap: 22px;
+    }
+
+    .fsk-footer-line > * {
+        line-height: 22px;
     }
 
     .fsk-footer a:not(.fsk-footer-social) {
