@@ -172,13 +172,14 @@
         Nav.LocationChanged += OnLocationChanged;
         if (JS is IJSInProcessRuntime sync)
         {
-            try { desktopOpen = sync.Invoke<string?>("localStorage.getItem", Site.SidebarKey) != "1"; } catch { }
+            try { desktopOpen = sync.Invoke<string?>("localStorage.getItem", Site.SidebarKey) != "1"; }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* localStorage が使えないときは、開いたままにする */ }
             try
             {
                 self = DotNetObjectReference.Create(this);
                 mobile = sync.Invoke<bool>("faraSiteKit.watchMobile", self);
             }
-            catch { /* JS が使えないときは PC として扱う */ }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは PC として扱う */ }
         }
     }
 
@@ -273,11 +274,19 @@
     // 画面を移ったら、スマホのメニューと検索欄を閉じ、本文へフォーカスを移す（項目は <a href> のまま。SiteNavMenu の項目は、OnClick を持たない）
     private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        CloseOnMobile();
-        if (searchOpen) HideSearch(focusButton: true);
-        StateHasChanged();
-        // ページが移ったら、本文（main）へフォーカスを移す（スクリーンリーダーに、新しいページだと伝わる）。最初の読み込みでは動かさない
-        if (!firstLocation) await FocusMain();
+        // async void は、例外が出ると画面全体の処理を止める。JS の失敗（回線が切れた後など）だけ受け、それ以外は隠さない
+        try
+        {
+            CloseOnMobile();
+            if (searchOpen) HideSearch(focusButton: true);
+            StateHasChanged();
+            // ページが移ったら、本文（main）へフォーカスを移す（スクリーンリーダーに、新しいページだと伝わる）。最初の読み込みでは動かさない
+            if (!firstLocation) await FocusMain();
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+        {
+            // 画面の移動の後始末（フォーカスを移すだけ）。失敗しても、ページの表示は変わっている
+        }
     }
 
     public void Dispose()

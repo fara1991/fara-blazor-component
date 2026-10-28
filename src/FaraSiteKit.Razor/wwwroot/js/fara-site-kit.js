@@ -13,14 +13,22 @@
 
     api.watchMobile = function (ref) {
         var mq = window.matchMedia(MOBILE_QUERY);
-        var handler = function (e) { ref.invokeMethodAsync("OnMobileChanged", e.matches); };
+        var handler = function (e) {
+            // 回線が切れた後は、送れない（拒否された Promise が残らないように受ける）。画面は再読み込みで戻る
+            Promise.resolve(ref.invokeMethodAsync("OnMobileChanged", e.matches)).catch(function (err) {
+                console.warn("[fara-site-kit] OnMobileChanged を送れませんでした。", err);
+            });
+        };
         if (mq.addEventListener) mq.addEventListener("change", handler); else if (mq.addListener) mq.addListener(handler);
         return mq.matches;
     };
 
     api.sidebarChanged = function (hidden, key) {
         document.documentElement.classList.toggle("fsk-sidebar-hidden", !!hidden);
-        try { localStorage.setItem(key, hidden ? "1" : "0"); } catch (err) { }
+        try { localStorage.setItem(key, hidden ? "1" : "0"); } catch (err) {
+            // 保存できない（プライベートブラウズ・容量の上限など）ときは、この表示だけ有効
+            console.warn("[fara-site-kit] サイドバーの設定を保存できませんでした。", err);
+        }
         // 隠す・開くで、ページの幅が変わるので、測り直させる（fsk-scroll-progress.js など）
         window.dispatchEvent(new Event("resize"));
     };
