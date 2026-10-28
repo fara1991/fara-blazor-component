@@ -9,7 +9,10 @@ import { planFromEnv, runAll, STAGES, ALLOWED_RUN_REF } from "../../tools/mainte
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TIP = "a".repeat(40);
-const OK = "inputs: maintenance_mode maintenance_message";
+/** 入力つきのワークフロー（on.workflow_dispatch.inputs に両方）。 */
+const OK = "on:\n  workflow_dispatch:\n    inputs:\n      maintenance_mode:\n        type: choice\n      maintenance_message:\n        type: string\n";
+/** 入力の無い古いワークフロー（run の中に文字列があっても、入力とは数えない）。 */
+const OLD = "name: old\non: push\njobs:\n  a:\n    steps:\n      - run: echo maintenance_mode\n";
 const REPOS = { pokemon: "fara1991/fara-pokemon-battle-assistant", avatar: "fara1991/fara-avatar-modding-guide", bot: "fara1991/fara-bot-moderator", portfolio: "fara1991/fara-portfolio-site" };
 const base = { RUN_REF: "refs/heads/master", TARGET_DEVELOP: "true", TARGET_MASTER: "false", MAINTENANCE_MODE_INPUT: "notice", MAINTENANCE_MESSAGE_INPUT: "" };
 
@@ -134,7 +137,7 @@ test("対象ブランチのワークフローが入力を受け取れない版�
 });
 
 test("すべて飛ばされたら失敗(何も反映されない)。dispatch は 1 つも起動しない", async () => {
-  const old = Object.fromEntries(Object.values(REPOS).map((repo) => [`${repo}@develop`, "old"]));
+  const old = Object.fromEntries(Object.values(REPOS).map((repo) => [`${repo}@develop`, OLD]));
   const r = await go({}, { contents: old });
   assert.equal(r.code, 1);
   assert.match(r.out, /実行できる対象が 1 つもありません/);
@@ -152,7 +155,7 @@ test("ワークフローのファイルが無い(404)は飛ばす。権限が無
 });
 
 test("段階 dev: 本番(master)を選んでいても、本番は起動せず、本番で飛ばすサイトが計画としてサマリーに出る(承認画面より前)", async () => {
-  const prodOld = { [`${REPOS.pokemon}@master`]: "old", [`${REPOS.avatar}@master`]: "old" };
+  const prodOld = { [`${REPOS.pokemon}@master`]: OLD, [`${REPOS.avatar}@master`]: OLD };
   const r = await go({ ...master }, { contents: prodOld }, { phase: "dev" });
   assert.equal(r.code, 0, r.out);
   assert.ok(r.g.dispatches().every((x) => x.ref === "develop"), "本番は dev の段階では起動しない");
@@ -163,7 +166,7 @@ test("段階 dev: 本番(master)を選んでいても、本番は起動せず、
 });
 
 test("段階 dev: master だけを選んでも、計画のために動く(何も起動せず、本番ですべて飛ばされるなら失敗)", async () => {
-  const prodOld = Object.fromEntries(Object.values(REPOS).map((repo) => [`${repo}@master`, "old"]));
+  const prodOld = Object.fromEntries(Object.values(REPOS).map((repo) => [`${repo}@master`, OLD]));
   const r = await go({ TARGET_DEVELOP: "false", ...master }, { contents: prodOld }, { phase: "dev" });
   assert.equal(r.code, 1);
   assert.equal(r.g.dispatches().length, 0);
@@ -173,7 +176,7 @@ test("段階 dev: master だけを選んでも、計画のために動く(何も
 });
 
 test("段階 production: 本番だけを起動する。飛ばすサイトは本番側でも除かれる", async () => {
-  const r = await go({ ...master }, { contents: { [`${REPOS.pokemon}@master`]: "old" } }, { phase: "production" });
+  const r = await go({ ...master }, { contents: { [`${REPOS.pokemon}@master`]: OLD } }, { phase: "production" });
   assert.equal(r.code, 0, r.out);
   assert.deepEqual(r.g.dispatches().map((x) => x.ref), ["master", "master", "master"]);
   assert.ok(!r.g.dispatches().some((x) => x.repo === REPOS.pokemon));

@@ -271,6 +271,7 @@ on:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           SKIP_MAINTENANCE_CHECK: ${{ inputs.skip_maintenance_check }}
+          ALLOW_MISSING_WORKER: ${{ inputs.first_publish && '1' || '' }}   # 初回の公開だけ（Worker がまだ無いとき）
 
       - name: Deploy to Cloudflare Workers
         shell: bash
@@ -335,7 +336,7 @@ on:
 1. 上の入力・公開のステップ・実行後のサマリーのステップを、サイトの deploy ワークフロー（pokemon: `deploy.yml` と `deploy-develop.yml`、avatar: `deploy.yml`、bot: `site.yml`、portfolio: `deploy.yml` と `deploy-develop.yml`）に入れる。avatar と bot は 1 つのワークフローが dev と production の両方を担うので、ステップの `--env` の式（`github.ref_name == 'master' && 'production' || 'dev'`）はそのまま使い、`--var` の部分だけ置き換える
 2. `require-maintenance.mjs` が読む変数名を `MAINTENANCE_MODE` にする（`b.name === "MAINTENANCE_MODE"`）。メッセージ・テストも合わせる
 3. ワークフローを参照しているテスト（`--var MAINTENANCE:true` の文字列を探すもの）を、新しい式に合わせる
-4. **ゲートが Worker の不在（404）をどう扱うか**を確かめる（`require-maintenance.mjs` の `run`）。まだ本番の Worker が無いサイト（例: pokemon）では、ゲートが止めるのか通すのかで、初回の手順が変わる。止めるなら、初回は `set --mode true` でゲートを飛ばして作る（下の「本番の初回」）
+4. **ゲートが Worker の不在（404）をどう扱うか**を確かめる（`require-maintenance.mjs` の `run`）。まだ本番の Worker が無いサイト（例: pokemon）では、ゲートは Worker の不在（404）を失敗にする。初回の公開だけ、入力 `first_publish`（boolean）を true にして `ALLOW_MISSING_WORKER=1` で通す（下の「本番の初回」）。Worker 名の打ち違い・権限不足を、初回と取り違えないため
 5. 文面に `:` を含む場合でも、`wrangler deploy --var NAME:値` が最初の `:` で分けて値を受け取ることを、dev で一度確かめる（`set --env dev --mode notice --message "20:00 ごろ"` → `status`）
 6. **dev で実測する（`set` → `status`）**: `--var` で渡した変数が、`status`（`GET .../settings`）で `"notice"` のように値が見えること、`require-maintenance.mjs`（同じ GET で読む）が読めることを確かめる。`--var` の変数が値の見えない形（`(secret_text)` や未設定）で返る場合は、次のどちらかにする
    - ゲートの読み取りを GET 以外にする（例: Worker の `/api/maintenance` を読む）。`status` の値の確認も同様に `/api/maintenance` で行う

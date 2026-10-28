@@ -98,6 +98,7 @@ test("種類・内容・確認の欠けを断る", async () => {
     [{ ...valid, category: undefined }, "invalid_category"],
     [{ ...valid, category: "__proto__" }, "invalid_category"],
     [{ ...valid, message: "あ" }, "invalid_message"],
+    [{ ...valid, message: "😀😀😀" }, "invalid_message"],
     [{ ...valid, message: "   \n  " }, "invalid_message"],
     [{ ...valid, message: 123 }, "invalid_message"],
     [{ ...valid, turnstileToken: "" }, "missing_token"],
@@ -192,6 +193,11 @@ test("Turnstile が返した hostname が、このサイトと違えば断る（
 });
 
 /** console.error を記録して、終わったら戻す。 */
+test("clean: 対になっていないサロゲートを取り、絵文字は割らない（長さは文字単位）", () => {
+  assert.equal(clean("a\uD83Db😀", 10), "ab😀");
+  assert.equal(clean("😀".repeat(5), 3), "😀😀😀");
+});
+
 async function captureErrors(fn) {
   const logs = [];
   const original = console.error;

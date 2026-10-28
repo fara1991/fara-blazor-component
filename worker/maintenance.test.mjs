@@ -6,6 +6,12 @@ import { getMaintenance, maintenanceResponse, maintenancePageHtml, noticeHtml, w
 
 const req = (path, accept = "text/html", method = "GET") => new Request(`https://site.example${path}`, { method, headers: { Accept: accept } });
 
+test("MAINTENANCE_MESSAGE: 対になっていないサロゲートを取り、絵文字は割らず、200 文字（文字単位）で切る", () => {
+  assert.equal(getMaintenance({ MAINTENANCE_MODE: "notice", MAINTENANCE_MESSAGE: "a\uD83Db😀" }).message, "ab😀");
+  const long = getMaintenance({ MAINTENANCE_MODE: "notice", MAINTENANCE_MESSAGE: "😀".repeat(250) }).message;
+  assert.equal(Array.from(long).length, 200);
+});
+
 test("getMaintenance: true / on / 1 はメンテナンス、notice はお知らせ、それ以外は通常", () => {
   for (const v of ["true", "TRUE", " True ", "on", "1"]) assert.equal(getMaintenance({ MAINTENANCE_MODE: v }).state, "on", v);
   for (const v of ["notice", "NOTICE", " Notice "]) assert.equal(getMaintenance({ MAINTENANCE_MODE: v }).state, "notice", v);

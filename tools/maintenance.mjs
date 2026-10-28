@@ -29,8 +29,15 @@ export const LEGACY_VAR = "MAINTENANCE";
 export const INPUT_MODE = "maintenance_mode";
 export const INPUT_MESSAGE = "maintenance_message";
 export const MAX_MESSAGE = 200;
-const MODES = ["true", "notice", "false"];
+export const MODES = ["true", "notice", "false"];
 const API = "https://api.cloudflare.com/client/v4";
+/** Cloudflare API の 1 回の待ち時間。 */
+const API_TIMEOUT_MS = 20000;
+/** 起動した実行を探すとき、起動の時刻から見る余裕（時計のずれ）。 */
+const RUN_CLOCK_SLACK_MS = 5 * 60 * 1000;
+/** 起動した実行を探す回数と間隔（GitHub の一覧に出るまでの待ち）。 */
+const RUN_LOOKUP_TRIES = 10;
+const RUN_LOOKUP_INTERVAL_MS = 3000;
 const here = dirname(fileURLToPath(import.meta.url));
 
 export class UsageError extends Error {}
@@ -139,7 +146,7 @@ function makeApi({ token, accountId, fetchImpl }) {
   return {
     /** @returns {Promise<{missing: boolean, bindings: object[]}>} */
     async getSettings(worker) {
-      const res = await fetchImpl(url(worker), { method: "GET", headers, signal: AbortSignal.timeout(20000) });
+      const res = await fetchImpl(url(worker), { method: "GET", headers, signal: AbortSignal.timeout(API_TIMEOUT_MS) });
       if (res.status === 404) return { missing: true, bindings: [] };
       if (!res.ok) {
         let detail = "";
@@ -263,15 +270,15 @@ async function dispatch(t, opts, { gh, sleep, now }) {
       : `ワークフローに入力 ${INPUT_MODE} / ${INPUT_MESSAGE} が定義され、ref にそのワークフローがあるか確かめる`;
     throw new Error(`[${t.site}/${t.env}] gh workflow run が失敗しました: ${r.stderr.trim() || `終了コード ${r.code}`}(${hint})`);
   }
-  const since = startedAt - 5 * 60 * 1000; // 時計のずれの余裕
-  for (let i = 0; i < 10; i++) {
+  const since = startedAt - RUN_CLOCK_SLACK_MS;
+  for (let i = 0; i < RUN_LOOKUP_TRIES; i++) {
     const found = (await listRuns(gh, t, user)).filter((x) => !before.has(x.databaseId) && x.headBranch === t.workflow.ref && Date.parse(x.createdAt) >= since);
     if (found.length > 1) throw new Error(`起動したはずの実行が ${found.length} 件見つかりました（${found.map((x) => x.url).join(" ")}）。取り違えを避けるため中断します。GitHub の Actions で確認してください`);
     if (found.length === 1) {
       if (tip && found[0].headSha !== tip) throw new Error(`起動した実行のコミット（${String(found[0].headSha).slice(0, 7)}）が ${t.workflow.ref} の先頭（${tip.slice(0, 7)}）と違います: ${found[0].url}`);
       return { id: String(found[0].databaseId), url: found[0].url };
     }
-    await sleep(3000);
+    await sleep(RUN_LOOKUP_INTERVAL_MS);
   }
   throw new Error("起動した実行が見つかりませんでした（GitHub の Actions のページで確認してください）");
 }
@@ -279,6 +286,29 @@ async function dispatch(t, opts, { gh, sleep, now }) {
 async function watch(t, run, { gh }) {
   const r = await gh(["run", "watch", run.id, "--repo", t.repo, "--exit-status", "--interval", "10"]);
   if (r.code !== 0) throw new Error(`実行が失敗しました: ${run.url}`);
+}
+
+/**
+ * YAML（ワークフローのファイル）から、on.workflow_dispatch.inputs のキー（入力の名前）を取り出す。
+ * 依存を増やさないための小さな行の解析: インデントで親子を追い、on → workflow_dispatch → inputs の直下のキーだけを数える。
+ * コメントや run の中の文字列（「maintenance_mode」と書いてあるだけ）は数えない。
+ * @returns {string[]}
+ */
+export function dispatchInputNames(yamlText) {
+  const stack = []; // { indent, key }: いまの位置までの親のキー
+  const names = [];
+  for (const raw of String(yamlText).split(/\r?\n/)) {
+    if (/^\s*(#.*)?$/.test(raw)) continue;
+    const m = /^(\s*)([^\s#'"-][^:]*?|'[^']*'|"[^"]*"):(\s|$)/.exec(raw);
+    if (!m) continue; // リストの項目など、キーでない行
+    const indent = m[1].length;
+    const key = m[2].replace(/^['"]|['"]$/g, "").trim();
+    while (stack.length > 0 && stack[stack.length - 1].indent >= indent) stack.pop();
+    const path = stack.map((s) => s.key);
+    stack.push({ indent, key });
+    if (path.length === 3 && path[0] === "on" && path[1] === "workflow_dispatch" && path[2] === "inputs") names.push(key);
+  }
+  return names;
 }
 
 /**
@@ -290,7 +320,8 @@ export async function preflight(t, opts, gh) {
   const need = [opts.mode !== undefined && INPUT_MODE, opts.message !== undefined && INPUT_MESSAGE].filter(Boolean);
   const r = await gh(["api", `repos/${t.repo}/contents/.github/workflows/${t.workflow.file}?ref=${encodeURIComponent(t.workflow.ref)}`, "-H", "Accept: application/vnd.github.raw"]);
   if (r.code === 0) {
-    const missing = need.filter((n) => !r.stdout.includes(n));
+    const names = dispatchInputNames(r.stdout);
+    const missing = need.filter((n) => !names.includes(n));
     return missing.length === 0 ? { supported: true, reason: "" } : { supported: false, reason: `${t.repo} の ${t.workflow.ref} の ${t.workflow.file} に、入力 ${missing.join(" / ")} がまだ無い(新しい入力つきのワークフローが、その ref に入っていない)` };
   }
   if (/HTTP 404|Not Found/i.test(r.stderr)) return { supported: false, reason: `${t.repo} の ${t.workflow.ref} に ${t.workflow.file} が見つからない` };
