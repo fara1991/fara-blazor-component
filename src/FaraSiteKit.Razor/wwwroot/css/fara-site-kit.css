@@ -435,9 +435,17 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
         margin: -10px;
     }
 
-    .fsk-footer a {
-        padding-block: 10px;
-        margin-block: -10px;
+    /* 報告フォームの入力欄と送信ボタン（見た目の幅・色は変えず、高さだけ 44px） */
+    .fsk-select input,
+    .fsk-field input,
+    #report-category,
+    #report-contact {
+        height: 44px;
+        min-height: 44px;
+    }
+
+    .fsk-report-submit {
+        min-height: 44px;
     }
 }
 
@@ -642,6 +650,25 @@ a.fsk-footer-social:hover {
 a.fsk-footer-social:focus-visible {
     outline: 2px solid var(--fsk-brand);
     outline-offset: 2px;
+}
+
+/* タブレットまで（1024px 以下）のタップの大きさ。フッターの文字リンクと、本文中の小さなリンク（プライバシーポリシー）は、
+   見た目の高さは変えず、padding と負の margin で当たり判定を 44px 近くまで広げる（行間は崩れない）。
+   このブロックは .fsk-footer-socials の既定の gap より後に書く（同じ詳細度で上書きするため） */
+@media (max-width: 1024px) {
+    .fsk-footer a:not(.fsk-footer-social) {
+        padding-block: 13px;
+        margin-block: -13px;
+    }
+
+    .fsk-small a {
+        padding-block: 12px;
+    }
+
+    /* SNS のアイコンの当たり判定（44px。::after）が隣と重ならないよう、間隔を 44px - 22px にする */
+    .fsk-footer-socials {
+        gap: 22px;
+    }
 }
 
 /* ---- メンテナンス ---- */

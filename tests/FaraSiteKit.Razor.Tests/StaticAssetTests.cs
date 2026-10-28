@@ -66,6 +66,42 @@ public class StaticAssetTests
         Assert.Contains("small.fsk-muted", css);
     }
 
+    [Fact]
+    public void PhoneFormControlsAreAtLeast44PxHigh()
+    {
+        var css = ReadRazorFile("wwwroot/css/fara-site-kit.css");
+
+        // 報告フォームの送信ボタン（既定の 37px）と入力欄（input 40px）を、スマホで 44px にする
+        var phone = Between(css, "@media (max-width: 599.98px)", "/* タブレット");
+        Assert.Contains(".fsk-report-submit", phone);
+        Assert.Contains("#report-contact", phone);
+        Assert.Contains("min-height: 44px", phone);
+    }
+
+    [Fact]
+    public void FooterAndInlineLinkTapTargetsGrowUpToTabletWidth()
+    {
+        var css = ReadRazorFile("wwwroot/css/fara-site-kit.css");
+
+        // 1024px 以下で、フッターの文字リンク・本文中の小さなリンクの当たり判定を広げる。SNS の間隔は、44px の当たり判定が重ならない 22px
+        var tablet = Between(css, "@media (max-width: 1024px)", "}\n}");
+        Assert.Contains(".fsk-footer a:not(.fsk-footer-social)", tablet);
+        Assert.Contains("padding-block: 13px", tablet);
+        Assert.Contains(".fsk-small a", tablet);
+        Assert.Contains("gap: 22px", tablet);
+        // .fsk-footer-socials の既定の gap より後に書く（同じ詳細度の後勝ち）
+        Assert.True(css.IndexOf("@media (max-width: 1024px)", StringComparison.Ordinal) > css.IndexOf(".fsk-footer-socials {", StringComparison.Ordinal));
+    }
+
+    private static string Between(string text, string start, string end)
+    {
+        var from = text.IndexOf(start, StringComparison.Ordinal);
+        Assert.True(from >= 0, $"{start} が見つかりません");
+        var to = text.IndexOf(end, from, StringComparison.Ordinal);
+        Assert.True(to > from, $"{end} が見つかりません");
+        return text.Substring(from, to - from);
+    }
+
     [Theory]
     [InlineData("fsk-page")]
     [InlineData("fsk-header")]
