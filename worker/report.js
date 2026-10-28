@@ -27,6 +27,8 @@ const MAX_MESSAGE = 2000;
 const MAX_CONTACT = 200;
 const MAX_PAGE = 300;
 const MIN_MESSAGE = 5;
+/** 報告のきっかけのページ（先頭の / を含めて 300 文字まで）。 */
+const PAGE_PATTERN = new RegExp("^/[A-Za-z0-9\\-_/.]{0," + (MAX_PAGE - 1) + "}$");
 const TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 /** siteverify が返す error-codes のうち、利用者ではなくこちらの設定・Turnstile 側の問題を示すもの（400 にしない）。 */
 const TURNSTILE_SERVER_ERRORS = new Set(["missing-input-secret", "invalid-input-secret", "internal-error"]);
@@ -53,7 +55,7 @@ export function clean(value, max) {
 
 /** 報告のきっかけのページ（パスだけ）。フッターのリンク・report.js と同じ条件。そうでなければ空。 */
 export function cleanPage(value) {
-  return typeof value === "string" && /^\/[A-Za-z0-9\-_/.]{0,299}$/.test(value) && !value.startsWith("//") ? value : "";
+  return typeof value === "string" && PAGE_PATTERN.test(value) && !value.startsWith("//") ? value : "";
 }
 
 /**
@@ -136,7 +138,7 @@ export async function handleReport(request, env, siteName, deps = {}) {
   const category = typeof body.category === "string" && Object.hasOwn(CATEGORIES, body.category) ? body.category : null;
   if (!category) return json(400, { error: "invalid_category", message: "種類を選んでください" });
   const message = clean(body.message, MAX_MESSAGE);
-  if (message.length < MIN_MESSAGE) return json(400, { error: "invalid_message", message: `内容を ${MIN_MESSAGE} 文字以上で書いてください` });
+  if (Array.from(message).length < MIN_MESSAGE) return json(400, { error: "invalid_message", message: `内容を ${MIN_MESSAGE} 文字以上で書いてください` });
   const contact = clean(body.contact, MAX_CONTACT);
   const page = cleanPage(body.page);
   const token = typeof body.turnstileToken === "string" ? body.turnstileToken.slice(0, 2048) : "";

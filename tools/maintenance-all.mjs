@@ -21,7 +21,7 @@
 import { appendFileSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { main, loadSites, selectTargets, validateMessage, UsageError } from "./maintenance.mjs";
+import { main, loadSites, selectTargets, validateMessage, UsageError, MODES } from "./maintenance.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** チェックボックスの入力と set の --env の対応(この順 = dev 系を先に、本番は最後)。 */
@@ -31,7 +31,6 @@ export const STAGES = [
 ];
 /** 実行してよい kit の ref。master だけ(develop などの上のワークフローは、PAT を使う Environment の Deployment branches でも使えない想定)。 */
 export const ALLOWED_RUN_REF = "refs/heads/master";
-const MODES = ["true", "notice", "false"];
 
 /**
  * 入力を検査して、段階ごとの set の引数を作る(検査に通らなければ UsageError)。

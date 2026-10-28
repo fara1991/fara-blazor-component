@@ -107,6 +107,9 @@
     /// <summary>送信の待ち時間の上限（これを過ぎたら、通信できなかったものとして案内する）。</summary>
     [Parameter] public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(15);
 
+    /// <summary>確認のトークンを待つ最大（ミリ秒）。読み込み直後や作り直した直後は数秒かかることがある。</summary>
+    private const int TokenWaitMs = 5000;
+
     private const string TurnstileId = "fsk-report-turnstile";
 
     /// <summary>入力の内容（テストからも見る）。</summary>
@@ -182,7 +185,7 @@
         try
         {
             // 確認のトークンは、読み込み直後や、送信に失敗して作り直した直後は、数秒かかることがある。待ってから送る
-            try { Form.TurnstileToken = await JS.InvokeAsync<string>("faraSiteKit.report.waitToken", 5000) ?? ""; }
+            try { Form.TurnstileToken = await JS.InvokeAsync<string>("faraSiteKit.report.waitToken", TokenWaitMs) ?? ""; }
             catch { Form.TurnstileToken = ""; }
             if (Form.Validate() is { } notChecked)
             {

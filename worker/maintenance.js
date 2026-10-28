@@ -17,7 +17,12 @@ export const escapeHtml = (text) =>
 function cleanMessage(value) {
   if (typeof value !== "string") return "";
   // eslint-disable-next-line no-control-regex
-  const text = value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim();
+  // 対になっていないサロゲートも取る（UTF-16 のまま切ると絵文字が割れる）。report.js の clean と同じ規則
+  const text = value
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
+    .replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, "")
+    .trim();
   const chars = Array.from(text);
   return chars.length > MAX_MESSAGE ? chars.slice(0, MAX_MESSAGE).join("").trim() : text;
 }

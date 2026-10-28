@@ -4,6 +4,7 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 
 ## 未リリース
 
+- レビュー指摘（Worker・ツール・CI・ビルド）: `worker/maintenance.js` のメンテナンスの文を、報告（`report.js`）と同じ規則で整えた（対になっていないサロゲートを取る。以前は取らなかった）。`worker/report.js` の本文の最小の長さを文字（コードポイント）で数えた（絵文字 3 個は、画面と同じく拒否する。以前は UTF-16 の長さで通していた。**挙動の変更**）。`tools/maintenance.mjs` の事前確認は、ワークフローを YAML として読み、`on.workflow_dispatch.inputs` のキーを確かめる（`run` の中の文字列では「入力がある」と判定しない）。`MODES` を `tools/maintenance.mjs` の 1 か所に（`maintenance-all.mjs` は import）。マジックナンバーを名前つきの定数に（API の待ち時間・実行の探し方・報告の待ち時間・ページのパターン）。`build/build-pages.mjs` の `#app` を閉じる `</div>` は、入れ子の div を数えて求める（最初の `</div>` で外と判定して、正しい入れ子の中の SEO-BODY を断っていた）。`require-maintenance` の 404（Worker が無い）は、既定で失敗にする扱いを docs に明記（初回の公開だけ `first_publish` と `ALLOW_MISSING_WORKER=1`。各サイトの `require-maintenance.mjs` の直し）。`set-maintenance-all.yml` は既に top-level で `permissions: contents: read` を明示していた（変更なし）。
 - `tools/maintenance-sites.json` から album を外し、一括変更の対象を 4 サイト（pokemon・avatar・bot・portfolio）に戻した。fara-vrc-photo-album は、リポジトリをパブリックにするため（2026-10-28）サイトの公開を GitHub Actions では行わなくなり、起動するワークフロー（deploy-develop.yml）が無くなったため。tests・docs・set-maintenance-all.yml の「5 サイト」も 4 に直した。
 
 ## 0.4.0
