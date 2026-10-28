@@ -32,6 +32,7 @@ function makeEnv({ main = null, windowPage = null, battle = false } = {}) {
         style: { setProperty: (k, v) => { styles[k] = v; writes += 1; } },
     };
     const listeners = {}, docListeners = {};
+    let qsaCount = 0;
     let mutationCb = null;
     const doc = {
         documentElement: {},
@@ -46,6 +47,7 @@ function makeEnv({ main = null, windowPage = null, battle = false } = {}) {
         },
         // 本文の中の候補（.fsk-content 自身と .fsk-pane-scroll）。画面の作り直し後は、いま本文にあるものだけ
         querySelectorAll: () => {
+            qsaCount += 1;
             const list = [];
             const walk = (n) => n.children.forEach((c) => { if (c.matches(PANE) || c.matches(MAIN)) list.push(c); walk(c); });
             if (main) { list.push(main); walk(main); }
@@ -68,6 +70,7 @@ function makeEnv({ main = null, windowPage = null, battle = false } = {}) {
         styles,
         doc,
         writes: () => writes,
+        querySelectorAllCalls: () => qsaCount,
         flush() { const f = frames; frames = []; f.forEach((fn) => fn(0)); },
         // target: 本文の中の要素、または document（window のスクロール）
         scroll(target) { (docListeners.scroll || []).forEach((fn) => fn({ target })); },
@@ -210,6 +213,21 @@ test("同じ値なら、線の style には書かない（スクロールして�
     env.resize();
     env.flush();
     assert.equal(env.writes(), after);
+});
+
+test("スクロールのたびに、候補の一覧（querySelectorAll）を作り直さない", () => {
+    const pane = node({ sel: [PANE], scrollHeight: 3000, clientHeight: 800 });
+    const main = node({ sel: [MAIN], scrollHeight: 800, clientHeight: 800, children: [pane] });
+    const env = makeEnv({ main });
+    env.flush();
+    const before = env.querySelectorAllCalls();
+    for (let i = 1; i <= 50; i += 1) {
+        pane.scrollTop = i * 40;
+        env.scroll(pane);
+        env.flush();
+    }
+    assert.equal(env.querySelectorAllCalls(), before);
+    assert.equal(env.styles["--scroll-progress"], "0.9091");
 });
 
 test("html（文書全体）には書かない。値は線自身の style に入る", () => {

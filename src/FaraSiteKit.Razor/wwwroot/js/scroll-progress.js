@@ -20,8 +20,22 @@
 
     function scrollable(el) { return !!el && el.isConnected && el.scrollHeight - el.clientHeight > 1; }
 
-    // 動かせる候補（.fsk-content と .fsk-pane-scroll）のうち、ほかの動かせる候補の中に入っていないもの
+    // 外側の候補の一覧。作り直すのは、画面の大きさが変わったとき・DOM が変わったとき（invalidate）だけ。スクロールのたびには作らない
+    var outer = [];
+    var outerStale = true;
+
     function outerScrollers() {
+        if (outerStale) { outer = computeOuter(); outerStale = false; }
+        return outer;
+    }
+
+    function invalidate() {
+        outerStale = true;
+        queue();
+    }
+
+    // 動かせる候補（.fsk-content と .fsk-pane-scroll）のうち、ほかの動かせる候補の中に入っていないもの
+    function computeOuter() {
         var list = Array.prototype.filter.call(document.querySelectorAll(PANES), scrollable);
         return list.filter(function (el) {
             return !list.some(function (o) { return o !== el && o.contains(el); });
@@ -35,7 +49,7 @@
         if (scrollable(active)) return active;
         active = null;
         outerScrollers().forEach(function (el) {
-            if (!active || el.clientHeight > active.clientHeight) active = el;
+            if (scrollable(el) && (!active || el.clientHeight > active.clientHeight)) active = el;
         });
         return active;
     }
@@ -76,8 +90,8 @@
         active = t;
         queue();
     }, { capture: true, passive: true });
-    window.addEventListener("resize", queue, { passive: true });
+    window.addEventListener("resize", invalidate, { passive: true });
     // 画面が替わると、測っていた要素が外れる（isConnected で見直す）。描画の変化は、ここで受ける
-    new MutationObserver(queue).observe(document.getElementById("app") || document.body, { childList: true, subtree: true });
+    new MutationObserver(invalidate).observe(document.getElementById("app") || document.body, { childList: true, subtree: true });
     queue();
 })();

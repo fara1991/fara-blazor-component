@@ -228,6 +228,16 @@ test("fara-site-kit: watchMobile は、今の幅（matches）を返す", () => {
     assert.equal(s.win.faraSiteKit.watchMobile(ref), true);
 });
 
+test("fara-site-kit: 送れなかった OnMobileChanged の Promise は、未処理の拒否のまま残らない（回線が切れた後）", async () => {
+    let fire = null;
+    const s = runKit({ matchMedia: () => ({ matches: false, addEventListener(_t, fn) { fire = fn; } }) });
+    const ref = { invokeMethodAsync() { return Promise.reject(new Error("回線が切れました")); } };
+    s.win.faraSiteKit.watchMobile(ref);
+    fire({ matches: true });
+    // 未処理の拒否があれば、ここで node:test が失敗にする
+    await new Promise((resolve) => setTimeout(resolve, 20));
+});
+
 test("fara-site-kit: checkConfig は、キーが一致すれば true、違えば警告を出す", () => {
     const s = runKit();
     const script = element("script", { dataset: { storageKey: "a.settings", sidebarKey: "a.sidebar" } });
