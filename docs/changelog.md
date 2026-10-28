@@ -2,8 +2,9 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
-## 未リリース
+## 0.6.1
 
+2026-10-29。
 レイアウトの自動計測（`tools/layout-check/`）の精度。v0.6.0 を導入した 5 サイトの報告を直した。**挙動が変わる点**: (1) tap-target の判定が ±21.5px から **±20px** になった（40px 以上の箱が通る。隣と 44px 間隔の SNS の誤検出を避けるため）。(2) tap-target は無効な要素（`disabled`・`aria-disabled="true"`・`pointer-events: none`）を既定で数えない。(3) 表のセルの中のリンクは、文字が横にあっても文中のリンクとして外さない。(4) 計測の既定の `reducedMotion: true`。(5) 公開の kit の部品（CSS・C#・Worker）は変えない。
 
 - serve-static（`tools/layout-check/serve-static.mjs`）: 解決の順を「ファイル → `<パス>.html` → `<パス>/index.html`（無ければ `<フォルダ>.html`）」に直した。同名のフォルダがあるパス（`/worlds`・`/docs`）が 404 になっていた。末尾が `/` のパスはフォルダを先に見る。ルートの外のファイルは返さない（候補の検査）。`--not-found <file>` で、404 の本文をステータス 404 のまま返す。`--spa` で、存在しないパスを `index.html`（200）で返す。
