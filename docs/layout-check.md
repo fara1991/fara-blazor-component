@@ -160,7 +160,12 @@ node tools/layout-check/cli.mjs --config layout-check.config.mjs
 
    サイトのビルドの手順は、そのサイトの CI に合わせる（上の `dotnet publish` は例）。
 
-6. 初めて入れるときは、違反を全部直すか、理由つきで除外してから必須にする（既存の違反で CI が落ちる状態にしない）。
+6. kit を上げたときの移行（`menuEsc` を設定済みのサイト）。kit の SiteLayout のスマホのメニューは、開くと左上の閉じるボタン（`.fsk-drawer-close`）を出す。ドロワーがメニューボタンを覆うため、`menuEsc` だけの設定では `menu-close-visible` が違反になる。次のどちらかを行う。
+   - **閉じるボタンを指す（推奨）**: `menuEsc: { buttonSelector: ".fsk-menu-toggle", closeSelector: ".fsk-drawer-close" }`。samples/MinimalSite の `layout-check.config.mjs` がこの書き方。
+   - **そのルールだけ止める**: `rules: { "menu-close-visible": false }`（理由をコミットに書く）。
+   kit の SiteLayout を使わず、自前のドロワーでメニューボタンを覆うサイトは、閉じる手段を `closeSelector` で指すか、ドロワーを直す。
+
+7. 初めて入れるときは、違反を全部直すか、理由つきで除外してから必須にする（既存の違反で CI が落ちる状態にしない）。
 
 ## 6. kit 自身の確認
 

@@ -7,6 +7,7 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 - **スマホのフッター**（600px 未満・`fara-site-kit.css`）: 行の高さを 22px に固定し、行間を 22px にした（行の中心どうし 44px。tap-target の判定を保つ最小）。上下の余白も詰めた。kit 単体で 99px → 83px（360・390 で計測。portfolio の app.css の上書きを外した場合）。1 段にはできなかった（名前・問い合わせ・プライバシーポリシー・© と SNS の 4 つは、360px の内側 328px に、どう並べても収まらない）ため、2 段のまま。**サイト側**: `app.css` などでフッターの gap・line-height・padding を上書きしているサイトは、その上書きを外すまで高さは変わらない（kit の CSS より後に読まれるため）。
 - **スマホのメニュー**（`SiteLayout`）: ドロワーが画面の左上を覆い、開いたとき、ヘッダーのハンバーガーが押せなかった（閉じるのは背景タップと Esc だけ）。ドロワーの一番上に閉じるボタン（`.fsk-drawer-close`・44px・`aria-label` は「メニューを閉じる」）を置いた。押すと、Esc と同じく閉じて、フォーカスをメニューボタンに戻す。PC には出さない。`inert` と Esc は変えていない。
 - **layout-check**: ルール `menu-close-visible` を足した（`menuEsc` を設定したサイトは既定で on）。開いたメニューの閉じる手段（`menuEsc.closeSelector` の閉じるボタン。無ければメニューボタン）が押せない（覆われている）と違反。**挙動が変わる点**: `menuEsc` を設定済みのサイトで、ドロワーがメニューボタンを覆っていると、kit を上げた時点で CI が落ちる（閉じるボタンを `closeSelector` で指す。または `rules: { "menu-close-visible": false }` で止める）。
+  - 移行の手順: `menuEsc` に `closeSelector: ".fsk-drawer-close"` を書く（docs/layout-check.md の 6.）。samples/MinimalSite は、この修正で書き換え済み（CI の layout-check で、360・390 の 2 件が出ていた）。
 
 ## 0.6.1
 
