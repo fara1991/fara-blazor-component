@@ -15,7 +15,16 @@
 <PageTitle>@Title | @Site.Name</PageTitle>
 
 <div class="fsk-page-header fsk-page-column">
-    <h3>@Title</h3>
+    @* 題名の見出し。既定は h1（このページの題名）。サイト側が既に h1 を持つときは HeadingLevel を 2 以上にする *@
+    @switch (HeadingLevel)
+    {
+        case 2: <h2 class="fsk-page-title">@Title</h2> break;
+        case 3: <h3 class="fsk-page-title">@Title</h3> break;
+        case 4: <h4 class="fsk-page-title">@Title</h4> break;
+        case 5: <h5 class="fsk-page-title">@Title</h5> break;
+        case 6: <h6 class="fsk-page-title">@Title</h6> break;
+        default: <h1 class="fsk-page-title">@Title</h1> break;
+    }
     <p class="fsk-muted fsk-mb-0">@Lead</p>
 </div>
 
@@ -73,6 +82,9 @@
 @code {
     /// <summary>画面の題名（見出しと、ページの題名に使う）。</summary>
     [Parameter] public string Title { get; set; } = "問い合わせ";
+
+    /// <summary>題名の見出しのレベル（1〜6）。既定は 1（ページの題名）。サイトが既に h1 を出しているときは 2 以上にして、見出しを二重にしない。1〜6 以外は 1。</summary>
+    [Parameter] public int HeadingLevel { get; set; } = 1;
 
     /// <summary>見出しの下の説明。</summary>
     [Parameter] public string Lead { get; set; } = "不具合・要望・ご意見を、作者に直接送れます。いただいた内容は、作者に通知されます（公開はされません）。";
