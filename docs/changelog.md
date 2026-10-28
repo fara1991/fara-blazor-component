@@ -2,8 +2,9 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
-## 未リリース
+## 0.7.0
 
+2026-10-29。
 > **【CI に影響する変更】** この版を上げるだけで、`menuEsc` を設定済みのサイトのうち、ドロワーがメニューボタンを覆うサイトは、layout-check の CI が落ちる（`menu-close-visible`）。マイナー変更だが、CI に影響する。移行: `layout-check.config.mjs` の `menuEsc` に `closeSelector: ".fsk-drawer-close"` を書く（閉じるボタンを指す）。または、そのルールだけ止める `rules: { "menu-close-visible": false }`（理由をコミットに書く）。手順は docs/layout-check.md の 6.
 
 - **スマホのフッター**（600px 未満・`fara-site-kit.css`）: 行の高さを 22px に固定し、行間を 22px にした（行の中心どうし 44px。tap-target の判定を保つ最小）。上下の余白も詰めた。kit 単体で 99px → 83px（360・390 で計測。portfolio の app.css の上書きを外した場合）。1 段にはできなかった（名前・問い合わせ・プライバシーポリシー・© と SNS の 4 つは、360px の内側 328px に、どう並べても収まらない）ため、2 段のまま。**サイト側**: `app.css` などでフッターの gap・line-height・padding を上書きしているサイトは、その上書きを外すまで高さは変わらない（kit の CSS より後に読まれるため）。
