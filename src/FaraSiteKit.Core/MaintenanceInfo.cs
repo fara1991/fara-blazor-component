@@ -61,9 +61,15 @@ public sealed record MaintenanceInfo(MaintenanceState State, string Message)
             using var response = await http.GetAsync("api/maintenance", cts.Token);
             return response.IsSuccessStatusCode ? Parse(await response.Content.ReadAsStringAsync(cts.Token)) : Off;
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
-            // 通信の失敗・時間切れ・想定外の例外のどれでも、起動を止めずに通常として扱う
+            // 通信の失敗・時間切れ（想定内）。起動を止めずに通常として扱う
+            return Off;
+        }
+        catch (Exception ex)
+        {
+            // 想定外の例外も起動は止めない（通常として扱う）。型名だけを標準エラーに残す（メッセージは出さない。起動の時点で見えるように）
+            Console.Error.WriteLine($"MaintenanceInfo.LoadAsync: 想定外の例外（{ex.GetType().Name}）。通常として扱います。");
             return Off;
         }
     }

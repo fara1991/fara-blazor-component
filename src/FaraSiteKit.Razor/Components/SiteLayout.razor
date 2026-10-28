@@ -56,7 +56,7 @@
         @* PC: 隠すと、アイコンだけの細い列になる。マウスを乗せている間は広がる（Mini）。スマホ: ハンバーガーで開く一時的なメニュー。
            Breakpoint は Sm（既定の Md だと、768〜959px で Mini が画面の外に消えるため） *@
         <MudDrawer Open="DrawerOpen" OpenChanged="OnDrawerOpenChanged" Variant="@(Mobile ? DrawerVariant.Temporary : DrawerVariant.Mini)" OpenMiniOnHover="true" Breakpoint="Breakpoint.Sm"
-                   ClipMode="@(Mobile ? DrawerClipMode.Never : DrawerClipMode.Always)" Elevation="0" Class="fsk-sidebar" id="fsk-sidebar">
+                   ClipMode="@(Mobile ? DrawerClipMode.Never : DrawerClipMode.Always)" Elevation="0" Class="fsk-sidebar" UserAttributes="@DrawerAttributes">
             @if (DrawerContent is not null)
             {
                 @DrawerContent(CloseOnNavigate)
@@ -170,6 +170,20 @@
 
     private bool DrawerOpen => Mobile ? mobileOpen : desktopOpen;
 
+    /// <summary>
+    /// サイドバーの属性。スマホで閉じている間は inert（画面の外にある項目を Tab で通らず、支援技術からも外す。開くと外れる）。
+    /// PC（常に見える細い列）では付けない。MudDrawer の閉じた状態も DOM に残るため、属性で止める（版に依存しない）。
+    /// </summary>
+    private Dictionary<string, object> DrawerAttributes
+    {
+        get
+        {
+            var attributes = new Dictionary<string, object> { ["id"] = "fsk-sidebar" };
+            if (Mobile && !mobileOpen) attributes["inert"] = "";
+            return attributes;
+        }
+    }
+
     /// <summary>最初の描画の前に、保存された PC の開閉と、スマホかどうかを同期で決める（非同期だと、開いた状態で一度描かれてから閉じて見える）。</summary>
     protected override void OnInitialized()
     {
@@ -196,7 +210,7 @@
         if (!firstRender || checkedConfig) return;
         checkedConfig = true;
         try { await JS.InvokeVoidAsync("faraSiteKit.checkConfig", Site.StorageKey, Site.SidebarKey); }
-        catch { /* JS が使えないときは、確かめない */ }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、確かめない（回線が切れたときも同じ） */ }
     }
 
     [JSInvokable]
@@ -280,19 +294,19 @@
     private async Task SetSearchSheetAsync(bool open, bool focus)
     {
         try { await JS.InvokeVoidAsync("faraSiteKit.searchSheet", open, focus); }
-        catch { /* JS が使えないときは、反映しない */ }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、反映しない（回線が切れたときも同じ） */ }
     }
 
     private async Task ApplyDesktopStateAsync()
     {
         try { await JS.InvokeVoidAsync("faraSiteKit.sidebarChanged", !desktopOpen, Site.SidebarKey); }
-        catch { /* JS が使えないときは、反映しない */ }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、反映しない（回線が切れたときも同じ） */ }
     }
 
     private async Task FocusMain()
     {
         try { await JS.InvokeVoidAsync("faraSiteKit.focusMain"); }
-        catch { /* JS が使えないときは、リンクの移動（現在のページの #fsk-main）に任せる */ }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、リンクの移動（現在のページの #fsk-main）に任せる */ }
     }
 
     // 画面を移ったら、スマホのメニューと検索欄を閉じ、本文へフォーカスを移す（項目は <a href> のまま。SiteNavMenu の項目は、OnClick を持たない）
