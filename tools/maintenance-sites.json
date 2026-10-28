@@ -30,7 +30,7 @@
     },
     {
       "name": "portfolio",
-      "repo": "fara1991/fara-portfolio-site",
+      "repo": "fara1991/fara-labs",
       "workflows": {
         "dev": { "file": "deploy-develop.yml", "ref": "develop" },
         "production": { "file": "deploy.yml", "ref": "master" }
