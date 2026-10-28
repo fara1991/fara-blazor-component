@@ -304,6 +304,33 @@ public class ReportFormViewTests : SiteKitTestContext
     }
 
     [Fact]
+    public void ItsTitleIsAnH1ByDefaultSoThePageHasOneHeading()
+    {
+        var cut = RenderForm();
+
+        var heading = cut.Find(".fsk-page-header h1");
+        Assert.Equal("問い合わせ", heading.TextContent);
+        Assert.Empty(cut.FindAll("h3"));
+    }
+
+    [Fact]
+    public void TheTitleHeadingLevelCanBeChangedWhenTheSitePageAlreadyHasAnH1()
+    {
+        var cut = RenderForm(extra: p => p.Add(c => c.HeadingLevel, 2));
+
+        Assert.Equal("問い合わせ", cut.Find(".fsk-page-header h2.fsk-page-title").TextContent);
+        Assert.Empty(cut.FindAll("h1"));
+    }
+
+    [Fact]
+    public void AnOutOfRangeHeadingLevelFallsBackToH1()
+    {
+        var cut = RenderForm(extra: p => p.Add(c => c.HeadingLevel, 9));
+
+        Assert.NotEmpty(cut.FindAll(".fsk-page-header h1"));
+    }
+
+    [Fact]
     public void ARequiredContactMarksTheInputRequiredForAssistiveTechnologyAndAnOptionalOneDoesNot()
     {
         var required = RenderForm(extra: p => p.Add(c => c.ContactRequired, true));
