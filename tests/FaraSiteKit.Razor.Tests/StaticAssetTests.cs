@@ -139,13 +139,14 @@ public class StaticAssetTests
     {
         var css = ReadRazorFile("wwwroot/css/fara-site-kit.css");
 
-        // 報告フォームの送信ボタン（既定の 37px）と入力欄（input 40px）を、スマホで 44px にする
-        var phone = Between(css, "@media (max-width: 599.98px)", "/* タブレット");
-        Assert.Contains(".fsk-report-submit", phone);
-        Assert.Contains(".fsk-report-card #report-contact", phone);
-        Assert.Contains("min-height: 44px", phone);
         // ドロワーの文字のボタン（テーマ切替）も 44px（見た目は変えない）
+        var phone = Between(css, "@media (max-width: 599.98px)", "/* タブレット");
         Assert.Contains(".fsk-theme-button", phone);
+        // 報告フォームの送信ボタン（既定の 37px）と入力欄（input 40px）は、1024px 以下（768〜1440 でも小さいままにしない）で 44px
+        var tablet = Between(css, "@media (max-width: 1024px) {\n    .fsk-report-card", "/* ---- 内容の列");
+        Assert.Contains(".fsk-report-submit", tablet);
+        Assert.Contains(".fsk-report-card #report-contact", tablet);
+        Assert.Contains("min-height: 44px", tablet);
     }
 
     [Fact]
@@ -165,14 +166,17 @@ public class StaticAssetTests
     {
         var css = ReadRazorFile("wwwroot/css/fara-site-kit.css");
 
-        // 1024px 以下で、フッターの文字リンク・本文中の小さなリンクの当たり判定を広げる。SNS の間隔は、44px の当たり判定が重ならない 22px
-        var tablet = Between(css, "@media (max-width: 1024px)", "}\n}");
-        Assert.Contains(".fsk-footer a:not(.fsk-footer-social)", tablet);
-        Assert.Contains("padding-block: 13px", tablet);
+        // フッターの文字リンク（問い合わせ・プライバシー）は全幅で当たり判定を広げる（1440px でも 22px 高にしない）。1024px の @media の外にある
+        var footerLink = Between(css, ".fsk-footer a:not(.fsk-footer-social) {", "}");
+        Assert.Contains("padding-block: 13px", footerLink);
+        Assert.Contains("margin-block: -13px", footerLink);
+        // 1024px 以下: 本文中の小さなリンク・SNS の間隔（44px の当たり判定が重ならない 22px）
+        var tablet = Between(css, "@media (max-width: 1024px) {\n    .fsk-small a", "}\n}");
         Assert.Contains(".fsk-small a", tablet);
         Assert.Contains("gap: 22px", tablet);
+        Assert.DoesNotContain("fsk-footer a:not", tablet);
         // .fsk-footer-socials の既定の gap より後に書く（同じ詳細度の後勝ち）
-        Assert.True(css.IndexOf("@media (max-width: 1024px)", StringComparison.Ordinal) > css.IndexOf(".fsk-footer-socials {", StringComparison.Ordinal));
+        Assert.True(css.IndexOf("@media (max-width: 1024px) {\n    .fsk-small a", StringComparison.Ordinal) > css.IndexOf(".fsk-footer-socials {", StringComparison.Ordinal));
     }
 
     private static string Between(string text, string start, string end)

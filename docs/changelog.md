@@ -12,6 +12,9 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 - ドキュメント（レビュー指摘）: `worker/maintenance.js` の先頭コメントの「5 つのリポジトリに同じ内容を置いている」を、「各サイトは kit の `worker/` を submodule から読む（コピーを持つサイトもある）」に直した。
 - アクセシビリティ・CSS（レビュー指摘）: ページ全体の既定のフォーカスの枠を足した（`html a:focus-visible`・`html button:focus-visible`・`html [role="button"]:focus-visible`・`html [tabindex]:focus-visible`・サイドバーの `.mud-nav-link:focus-visible`。MudBlazor の reset に負けない詳細度。色は `--fsk-focus`）。入力欄（input・textarea・select）は対象外（MudBlazor が枠線の色で示す）。
 - 色（レビュー指摘）: 報告の受付停止の文（`ReportFormView` の警告。class `fsk-report-unavailable`）の文字色を、変数 `--fsk-warning-text` で決めるようにした。白地での既定の橙（`#d68100`・約 3.0:1）は、4.5:1 以上の `#9a5b00`（白地 5.43:1、本文の背景 4.99:1）にし、ダークは `#ffb74d`（`#1a1030` で 10.45:1）。
+- ドロワー（レイアウトレビュー）: スマホで閉じているサイドバー（`MudDrawer`）に `inert` を付けた（画面の外の項目が Tab で止まらず、支援技術からも外れる）。開くと外れ、Esc で閉じると付く（フォーカスはメニューボタンへ戻る）。PC（常に見える列）では付けない。`MudDrawer` の `UserAttributes` で付ける（閉じた状態も DOM に残るため、版に依存しない属性で止める）。テスト 3 件（SiteLayoutTests）。サイドバーの `id` は `UserAttributes` に移した（`#fsk-sidebar` は変わらない）。
+- 報告フォームの 44px（レイアウトレビュー）: 送信ボタン・入力欄の高さ 44px を、600px 未満から **1024px 以下**に広げた（768〜1440 でも小さいままにしない。見た目の幅・色は変えない）。
+- フッターのリンク（レイアウトレビュー）: 問い合わせ・プライバシーポリシーの当たり判定の拡大（padding-block・負の margin）を、1024px 以下だけでなく全幅にした（見た目は変えない）。SNS の間隔は従来どおり 1024px 以下の 22px。portfolio の `.fsk-footer-socials { gap: 6px }` による上書きは portfolio 側で直す（kit では触らない）。
 - テスト: `worker/error-summary.test.mjs`（トークンだけの文字列・`token:`・URL つき・長いメッセージ・Error 以外の値・Symbol）、`worker/report.test.mjs`（Discord・Turnstile の通信の例外のログに秘密が出ない）、`MaintenanceInfoTests`（ログの型名だけ・通信の失敗で何も出ないこと）、`StaticAssetTests`（ページ全体のフォーカスの枠・受付停止の文の対比・型のない `catch {` が無いこと）。
 
 ## 0.5.1

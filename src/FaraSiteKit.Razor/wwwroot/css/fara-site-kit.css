@@ -468,7 +468,15 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
         margin: -10px;
     }
 
-    /* 報告フォームの入力欄と送信ボタン（見た目の幅・色は変えず、高さだけ 44px） */
+    /* ドロワーの中の文字のボタン（ThemeSwitch AsButton。見た目は変えず、タップの高さだけ 44px） */
+    .fsk-theme-button {
+        min-height: 44px;
+    }
+}
+
+/* タブレットまで（1024px 以下）の報告フォームの入力欄と送信ボタン（見た目の幅・色は変えず、高さだけ 44px）。
+   768〜1440 の幅でも、送信ボタン（既定 36.5px）と入力欄（40px）が小さいままにならないように */
+@media (max-width: 1024px) {
     .fsk-report-card .fsk-select input,
     .fsk-report-card .fsk-field input,
     .fsk-report-card #report-category,
@@ -479,11 +487,6 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
     }
 
     .fsk-report-submit {
-        min-height: 44px;
-    }
-
-    /* ドロワーの中の文字のボタン（ThemeSwitch AsButton。見た目は変えず、タップの高さだけ 44px） */
-    .fsk-theme-button {
         min-height: 44px;
     }
 }
@@ -691,15 +694,17 @@ a.fsk-footer-social:focus-visible {
     outline-offset: 2px;
 }
 
-/* タブレットまで（1024px 以下）のタップの大きさ。フッターの文字リンクと、本文中の小さなリンク（プライバシーポリシー）は、
-   見た目の高さは変えず、padding と負の margin で当たり判定を 44px 近くまで広げる（行間は崩れない）。
+/* フッターの文字リンク（問い合わせ・プライバシーポリシー）の当たり判定。見た目の高さは変えず、padding と負の margin で 44px 近くまで広げる（行間は崩れない）。
+   全幅で効く（PC の 1440px でも 22px 高にならない）。SNS のアイコンは別（::after の 44px） */
+.fsk-footer a:not(.fsk-footer-social) {
+    padding-block: 13px;
+    margin-block: -13px;
+}
+
+/* タブレットまで（1024px 以下）のタップの大きさ。本文中の小さなリンク（プライバシーポリシー）は、
+   見た目の高さは変えず、padding で当たり判定を広げる（行間は崩れない）。
    このブロックは .fsk-footer-socials の既定の gap より後に書く（同じ詳細度で上書きするため） */
 @media (max-width: 1024px) {
-    .fsk-footer a:not(.fsk-footer-social) {
-        padding-block: 13px;
-        margin-block: -13px;
-    }
-
     .fsk-small a {
         padding-block: 13px;
     }

@@ -252,4 +252,36 @@ public class SiteLayoutTests : SiteKitTestContext
 
         Assert.False(cut.FindComponent<MudDrawer>().Instance.Open);
     }
+
+    [Fact]
+    public void ClosedPhoneDrawerIsInertSoItsLinksAreNotTabStops()
+    {
+        var cut = RenderLayout(mobile: true);
+
+        var drawer = cut.Find("#fsk-sidebar");
+        Assert.True(drawer.HasAttribute("inert"));
+        Assert.Equal(1, cut.FindAll("#fsk-sidebar .nav-item").Count);   // 中身は残す（閉じている間も DOM にある）
+    }
+
+    [Fact]
+    public void OpeningThePhoneDrawerRemovesInertAndEscapePutsItBack()
+    {
+        var cut = RenderLayout(mobile: true);
+
+        cut.Find(".fsk-menu-toggle").Click();
+        Assert.False(cut.Find("#fsk-sidebar").HasAttribute("inert"));
+
+        cut.InvokeAsync(() => cut.Instance.OnEscape()).Wait();
+
+        Assert.True(cut.Find("#fsk-sidebar").HasAttribute("inert"));
+        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.focusMenu");
+    }
+
+    [Fact]
+    public void ThePcDrawerIsNeverInert()
+    {
+        var cut = RenderLayout(mobile: false);
+
+        Assert.False(cut.Find("#fsk-sidebar").HasAttribute("inert"));
+    }
 }
