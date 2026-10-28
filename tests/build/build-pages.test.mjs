@@ -242,6 +242,16 @@ test("知らない項目（綴りの間違い）は失敗する", () => {
     assert.ok(problems.some((p) => /知らない項目 "robotDisallow"/.test(p)));
 });
 
+test("SEO-BODY は #app の中の入れ子の div の後ろに置いてもよい（最初の </div> で外と判定しない）", () => {
+    const problemsIfAny = (template) => {
+        try { buildPages({ site: SITE, pages: PAGES, template, env: "production" }); return []; } catch (error) { return error.problems; }
+    };
+    const nested = `<html><head>${HEAD_START}${HEAD_END}</head><body><div id="app"><div class="loading-progress-text"></div>${BODY_START}${BODY_END}</div></body></html>`;
+    assert.ok(!problemsIfAny(nested).some((p) => /SEO-BODY の区切りは/.test(p)));
+    const outside = `<html><head>${HEAD_START}${HEAD_END}</head><body><div id="app"><div class="x"></div></div>${BODY_START}${BODY_END}</body></html>`;
+    assert.ok(problemsIfAny(outside).some((p) => /SEO-BODY の区切りは/.test(p)));
+});
+
 test("テンプレートの区切りが無い・重複・#app が無いと失敗する", () => {
     assert.ok(problemsOf(() => build({ template: "<html><head></head><body></body></html>" })).some((p) => /区切り/.test(p)));
     assert.ok(problemsOf(() => build({ template: TEMPLATE.replace(BODY_END, BODY_END + BODY_END) })).some((p) => /区切り/.test(p)));

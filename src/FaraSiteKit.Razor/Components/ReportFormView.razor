@@ -15,7 +15,16 @@
 <PageTitle>@Title | @Site.Name</PageTitle>
 
 <div class="fsk-page-header fsk-page-column">
-    <h3>@Title</h3>
+    @* 題名の見出し。既定は h1（このページの題名）。サイト側が既に h1 を持つときは HeadingLevel を 2 以上にする *@
+    @switch (HeadingLevel)
+    {
+        case 2: <h2 class="fsk-page-title">@Title</h2> break;
+        case 3: <h3 class="fsk-page-title">@Title</h3> break;
+        case 4: <h4 class="fsk-page-title">@Title</h4> break;
+        case 5: <h5 class="fsk-page-title">@Title</h5> break;
+        case 6: <h6 class="fsk-page-title">@Title</h6> break;
+        default: <h1 class="fsk-page-title">@Title</h1> break;
+    }
     <p class="fsk-muted fsk-mb-0">@Lead</p>
 </div>
 
@@ -74,6 +83,9 @@
     /// <summary>画面の題名（見出しと、ページの題名に使う）。</summary>
     [Parameter] public string Title { get; set; } = "問い合わせ";
 
+    /// <summary>題名の見出しのレベル（1〜6）。既定は 1（ページの題名）。サイトが既に h1 を出しているときは 2 以上にして、見出しを二重にしない。1〜6 以外は 1。</summary>
+    [Parameter] public int HeadingLevel { get; set; } = 1;
+
     /// <summary>見出しの下の説明。</summary>
     [Parameter] public string Lead { get; set; } = "不具合・要望・ご意見を、作者に直接送れます。いただいた内容は、作者に通知されます（公開はされません）。";
 
@@ -106,6 +118,9 @@
 
     /// <summary>送信の待ち時間の上限（これを過ぎたら、通信できなかったものとして案内する）。</summary>
     [Parameter] public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(15);
+
+    /// <summary>確認のトークンを待つ最大（ミリ秒）。読み込み直後や作り直した直後は数秒かかることがある。</summary>
+    private const int TokenWaitMs = 5000;
 
     private const string TurnstileId = "fsk-report-turnstile";
 
@@ -157,7 +172,7 @@
                 StateHasChanged();
             }
         }
-        catch
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
         {
             // JS が使えない・確認の部品を読み込めないとき。mounted は戻さない（戻すと、描画のたびに読み込みを繰り返してしまう）
             disabled = true;
@@ -182,11 +197,17 @@
         try
         {
             // 確認のトークンは、読み込み直後や、送信に失敗して作り直した直後は、数秒かかることがある。待ってから送る
-            try { Form.TurnstileToken = await JS.InvokeAsync<string>("faraSiteKit.report.waitToken", 5000) ?? ""; }
-            catch { Form.TurnstileToken = ""; }
+            string? tokenProblem = null;
+            try { Form.TurnstileToken = await JS.InvokeAsync<string>("faraSiteKit.report.waitToken", TokenWaitMs) ?? ""; }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+            {
+                // 確認の部品が使えない（読み込みの失敗・回線が切れた）。「確認が済んでいない」とは分けて案内する
+                Form.TurnstileToken = "";
+                tokenProblem = "確認の部品を読み込めませんでした。ページを再読み込みしてから、もう一度お試しください";
+            }
             if (Form.Validate() is { } notChecked)
             {
-                error = notChecked;
+                error = tokenProblem ?? notChecked;
                 return;
             }
             using var cts = new CancellationTokenSource(Timeout);
@@ -226,7 +247,7 @@
     private async Task SafeJsAsync(string identifier)
     {
         try { await JS.InvokeVoidAsync(identifier); }
-        catch { /* 確認の部品が無いとき（JS が使えない）は、何もしない */ }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* 確認の部品が無いとき（JS が使えない）・回線が切れたときは、何もしない（送信の結果は画面に出している） */ }
     }
 
     private void StartOver()

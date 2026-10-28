@@ -47,6 +47,7 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 - `src/FaraSiteKit.Core/`: C#（`SiteLinks`・`MaintenanceInfo`・`ReportForm`）。UI と通信に依存しない純粋なコードだけを置く（Razor・MudBlazor は K0-4 で別のプロジェクトに）
 - `tests/FaraSiteKit.Core.Tests/`: C# のテスト（xUnit）。`global.json` の SDK（10.0.x）で実行する
 - `.github/workflows/ci.yml`: `npm test`（Node 22）と `dotnet test` を、ubuntu と windows の matrix で並列に実行
+- `.claude/hooks/session-start.sh`（`.claude/settings.json` で登録）: Claude Code のクラウドセッション開始時に .NET SDK 10.0 を packages.microsoft.com の apt から入れ、`dotnet restore` する（dot.net のインストールスクリプトはネットワークの制限で取れない）。ローカルでは何もしない
 
 ## 変更の流れ
 

@@ -2,6 +2,16 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 0.5.0
+
+2026-10-28。レビュー指摘の修正。**挙動が変わる点**: (1) `ReportFormView` の題名が h1 になった（従来は h3。サイトが既にページの h1 を持つ場合は `HeadingLevel="2"` 以上を指定する）。(2) `worker/report.js` の最小文字数の判定が、絵文字を 1 文字として数えるようになった（クライアントの数え方と同じ）。(3) `worker/maintenance.js` のメッセージの除去規則が `report.js` と同じになった。各サイトの `worker/` のコピーも同じ内容に揃える。
+
+
+- レビュー指摘（Worker・ツール・CI・ビルド）: `worker/maintenance.js` のメンテナンスの文を、報告（`report.js`）と同じ規則で整えた（対になっていないサロゲートを取る。以前は取らなかった）。`worker/report.js` の本文の最小の長さを文字（コードポイント）で数えた（絵文字 3 個は、画面と同じく拒否する。以前は UTF-16 の長さで通していた。**挙動の変更**）。`tools/maintenance.mjs` の事前確認は、ワークフローを YAML として読み、`on.workflow_dispatch.inputs` のキーを確かめる（`run` の中の文字列では「入力がある」と判定しない）。`MODES` を `tools/maintenance.mjs` の 1 か所に（`maintenance-all.mjs` は import）。マジックナンバーを名前つきの定数に（API の待ち時間・実行の探し方・報告の待ち時間・ページのパターン）。`build/build-pages.mjs` の `#app` を閉じる `</div>` は、入れ子の div を数えて求める（最初の `</div>` で外と判定して、正しい入れ子の中の SEO-BODY を断っていた）。`require-maintenance` の 404（Worker が無い）は、既定で失敗にする扱いを docs に明記（初回の公開だけ `first_publish` と `ALLOW_MISSING_WORKER=1`。各サイトの `require-maintenance.mjs` の直し）。`set-maintenance-all.yml` は既に top-level で `permissions: contents: read` を明示していた（変更なし）。
+- 例外の処理（レビュー指摘）: 空の `catch` を、JS の失敗（`JSException`・`JSDisconnectedException`）だけを受ける形に絞った（`SiteLayout`・`SiteThemeState`・`ReportFormView`）。`ReportFormView` は、確認の待ち合わせ（`waitToken`）が失敗したとき「確認が終わっていません」ではなく、確認の部品を読み込めなかったことを案内する。JS の `fara-site-kit.js`・`theme-init.js` は、捨てる例外に console.warn を出す。`OnLocationChanged` は例外を外に出さない。`OnMobileChanged` の Promise の拒否を受ける（回線が切れた後に未処理の拒否を残さない）。`scroll-progress.js` は、外側の候補の一覧を、画面の大きさ・DOM が変わったときだけ作り直す（スクロールのたびに作らない。挙動は同じ）。
+- アクセシビリティ（レビュー指摘）: 問い合わせの題名（`ReportFormView`）の見出しを **h1** にした（従来は h3。見た目は同じ）。サイトが既に h1 を持つときは新しいパラメータ `HeadingLevel`（2〜6。既定 1）で下げられる。キーボードのフォーカス枠を、ヘッダーのボタン・ブランド・「本文へ移動」で出るようにした（MudBlazor の reset に負けていた。色は `--fsk-focus`）。スマホ（600px 未満）のタップの大きさを 44px にした（☰・ブランド・テーマのスイッチ・フッターのリンク。見た目の高さは変えず、余白で当たり判定を広げる）。欄の補助の文字（`small.fsk-muted`）を 12px 以上にした。
+- `tools/maintenance-sites.json` から album を外し、一括変更の対象を 4 サイト（pokemon・avatar・bot・portfolio）に戻した。fara-vrc-photo-album は、リポジトリをパブリックにするため（2026-10-28）サイトの公開を GitHub Actions では行わなくなり、起動するワークフロー（deploy-develop.yml）が無くなったため。tests・docs・set-maintenance-all.yml の「5 サイト」も 4 に直した。
+
 ## 0.4.0
 
 2026-10-25。追加の API のみ（破壊的変更なし）。既存のサイトは、submodule をこのタグに上げるだけで、動作は変わらない。

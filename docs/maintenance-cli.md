@@ -5,9 +5,9 @@ Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTEN
 | 方法 | 使う場面 | 必要なもの |
 | --- | --- | --- |
 | 1. Actions の画面で実行する | 1 サイトずつ。いつでも・どこからでも | GitHub のアカウントだけ(ブラウザかスマホアプリ) |
-| 2. CLI の `set`(補助) | 5 サイトをまとめて(dev を先に流し、成功したら本番) | `gh auth login` 済みの `gh`。環境変数は不要 |
-| 3. kit の Actions「Set maintenance (all sites)」 | 5 サイトをまとめて、スマホからでも。手元の環境変数も CLI も不要 | 一度だけ: PAT(`SITES_DISPATCH_TOKEN`)と Environment の登録(下の 3) |
-| 2. CLI の `status`(補助) | 5 サイトの現在値を 1 つの表で見る(任意) | Cloudflare の読み取りトークン(Workers Scripts の Read)。無くてもよい(結果は Actions のジョブサマリーにも出る) |
+| 2. CLI の `set`(補助) | 4 サイトをまとめて(dev を先に流し、成功したら本番) | `gh auth login` 済みの `gh`。環境変数は不要 |
+| 3. kit の Actions「Set maintenance (all sites)」 | 4 サイトをまとめて、スマホからでも。手元の環境変数も CLI も不要 | 一度だけ: PAT(`SITES_DISPATCH_TOKEN`)と Environment の登録(下の 3) |
+| 2. CLI の `status`(補助) | 4 サイトの現在値を 1 つの表で見る(任意) | Cloudflare の読み取りトークン(Workers Scripts の Read)。無くてもよい(結果は Actions のジョブサマリーにも出る) |
 
 1・2・3 のどの方法でも、実際の反映は各サイトの deploy ワークフロー(`wrangler deploy --var ...`)が行う。いずれも同じ入力 `maintenance_mode` / `maintenance_message` を使う。**公開されるのは、実行するブランチ(dev = `develop`、本番 = `master`)の最新のコード**である点に注意する。
 
@@ -123,15 +123,15 @@ node tools/maintenance.mjs set --env all --mode false --apply --confirm "product
 
 `set` は、サイトのコードを公開し直す（`wrangler deploy`）。つまり、そのブランチ（dev は `develop`、production は `master`）の最新の内容が公開される。公開してはいけない変更が `master` に入っていないか、実行の前に確かめる。
 
-## 3. kit の Actions から 5 サイトまとめて切り替える
+## 3. kit の Actions から 4 サイトまとめて切り替える
 
-> album（fara-vrc-photo-album）は **develop（確認用）だけ**が対象。本番は初回公開がメンテナンス画面のままなので、公開準備ができるまで載せない。載せるときは `tools/maintenance-sites.json` の album に `workflows.production`（`{ "file": "deploy.yml", "ref": "master" }`）と `workers.production`（`fara-vrc-album`）を足し、テスト（`tests/tools/`）の本番側の期待値（dispatch 数・確認の再入力 `production album,avatar,…`）を更新する。それまで album の本番は、album の Actions → Deploy → Run workflow（`maintenance_mode`）で操作する。
+> album（fara-vrc-photo-album）は対象に**含めない**。2026-10-28 から、サイトの公開を GitHub Actions では行わず（手元のアプリから公開）、起動するワークフローが無いため。
 
-kit のリポジトリ(`fara1991/fara-site-kit`)の Actions →「**Set maintenance (all sites)**」→ Run workflow で、5 サイトに一度に反映する。手元の環境変数も CLI も要らない(スマホの GitHub アプリからも可)。中身は 2 の `set` を、Actions の上で動かしているだけ(`.github/workflows/set-maintenance-all.yml` → `tools/maintenance-all.mjs` → `tools/maintenance.mjs set`)。
+kit のリポジトリ(`fara1991/fara-site-kit`)の Actions →「**Set maintenance (all sites)**」→ Run workflow で、4 サイトに一度に反映する。手元の環境変数も CLI も要らない(スマホの GitHub アプリからも可)。中身は 2 の `set` を、Actions の上で動かしているだけ(`.github/workflows/set-maintenance-all.yml` → `tools/maintenance-all.mjs` → `tools/maintenance.mjs set`)。
 
 **Use workflow from は `master` のみ**(`validate` が検査する。develop など、ほかのブランチ上からは実行できない)。
 
-入力(反映先は**チェックボックス**で選ぶ。複数チェック可。サイトは常に 5 つすべて):
+入力(反映先は**チェックボックス**で選ぶ。複数チェック可。サイトは常に 4 つすべて):
 
 | 入力 | 値 |
 | --- | --- |
@@ -176,7 +176,7 @@ PAT は repository secret ではなく、**Environment のシークレット**�
 
 1. fine-grained PAT を作る: GitHub → 右上のアイコン → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
    - Resource owner: 自分(`fara1991`)
-   - Repository access: **Only select repositories** → `fara-pokemon-battle-assistant`、`fara-avatar-modding-guide`、`fara-bot-moderator`、`fara-portfolio-site`、`fara-vrc-photo-album` の **5 つだけ**
+   - Repository access: **Only select repositories** → `fara-pokemon-battle-assistant`、`fara-avatar-modding-guide`、`fara-bot-moderator`、`fara-portfolio-site` の **4 つだけ**（album は、公開を Actions で行わなくなったので外した）
    - Repository permissions: **Actions: Read and write**(Metadata: Read-only は自動で付く)。あわせて **Contents: Read-only を付けることを推奨**する。(a) 事前確認(入力を受け取れないサイトを飛ばす)ができる、(b) 起動した run が各ブランチの先頭のコミットのものかまで照合でき、取り違えを防げる(付けなくても動くが、その 2 つが働かない)
    - 有効期限(Expiration): 必ず付ける(短めにして、切れたら作り直す)
 2. Environment を **2 つ**作る: **fara-site-kit → Settings → Environments → New environment**
@@ -271,6 +271,7 @@ on:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           SKIP_MAINTENANCE_CHECK: ${{ inputs.skip_maintenance_check }}
+          ALLOW_MISSING_WORKER: ${{ inputs.first_publish && '1' || '' }}   # 初回の公開だけ（Worker がまだ無いとき）
 
       - name: Deploy to Cloudflare Workers
         shell: bash
@@ -335,7 +336,7 @@ on:
 1. 上の入力・公開のステップ・実行後のサマリーのステップを、サイトの deploy ワークフロー（pokemon: `deploy.yml` と `deploy-develop.yml`、avatar: `deploy.yml`、bot: `site.yml`、portfolio: `deploy.yml` と `deploy-develop.yml`）に入れる。avatar と bot は 1 つのワークフローが dev と production の両方を担うので、ステップの `--env` の式（`github.ref_name == 'master' && 'production' || 'dev'`）はそのまま使い、`--var` の部分だけ置き換える
 2. `require-maintenance.mjs` が読む変数名を `MAINTENANCE_MODE` にする（`b.name === "MAINTENANCE_MODE"`）。メッセージ・テストも合わせる
 3. ワークフローを参照しているテスト（`--var MAINTENANCE:true` の文字列を探すもの）を、新しい式に合わせる
-4. **ゲートが Worker の不在（404）をどう扱うか**を確かめる（`require-maintenance.mjs` の `run`）。まだ本番の Worker が無いサイト（例: pokemon）では、ゲートが止めるのか通すのかで、初回の手順が変わる。止めるなら、初回は `set --mode true` でゲートを飛ばして作る（下の「本番の初回」）
+4. **ゲートが Worker の不在（404）をどう扱うか**を確かめる（`require-maintenance.mjs` の `run`）。まだ本番の Worker が無いサイト（例: pokemon）では、ゲートは Worker の不在（404）を失敗にする。初回の公開だけ、入力 `first_publish`（boolean）を true にして `ALLOW_MISSING_WORKER=1` で通す（下の「本番の初回」）。Worker 名の打ち違い・権限不足を、初回と取り違えないため
 5. 文面に `:` を含む場合でも、`wrangler deploy --var NAME:値` が最初の `:` で分けて値を受け取ることを、dev で一度確かめる（`set --env dev --mode notice --message "20:00 ごろ"` → `status`）
 6. **dev で実測する（`set` → `status`）**: `--var` で渡した変数が、`status`（`GET .../settings`）で `"notice"` のように値が見えること、`require-maintenance.mjs`（同じ GET で読む）が読めることを確かめる。`--var` の変数が値の見えない形（`(secret_text)` や未設定）で返る場合は、次のどちらかにする
    - ゲートの読み取りを GET 以外にする（例: Worker の `/api/maintenance` を読む）。`status` の値の確認も同様に `/api/maintenance` で行う

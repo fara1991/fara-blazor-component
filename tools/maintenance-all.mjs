@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // kit のリポジトリの Actions「Set maintenance (all sites)」(.github/workflows/set-maintenance-all.yml) から呼ぶ。
-// 5 サイトの deploy ワークフローを、tools/maintenance.mjs の set で一括して起動する(dev 系を先に全部・全成功後に本番、失敗で中断、起動 run の特定、本番の確認は set のもの)。
+// 4 サイトの deploy ワークフローを、tools/maintenance.mjs の set で一括して起動する(dev 系を先に全部・全成功後に本番、失敗で中断、起動 run の特定、本番の確認は set のもの)。
 //
-// 反映先は、対象ブランチのチェックボックス(boolean 入力)で選ぶ。サイトは常に 5 つすべて。
+// 反映先は、対象ブランチのチェックボックス(boolean 入力)で選ぶ。サイトは常に 4 つすべて。
 //   develop        → 各サイトの dev(develop ブランチ)
 //   master         → 各サイトの本番(master ブランチ)
 //
@@ -21,7 +21,7 @@
 import { appendFileSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { main, loadSites, selectTargets, validateMessage, UsageError } from "./maintenance.mjs";
+import { main, loadSites, selectTargets, validateMessage, UsageError, MODES } from "./maintenance.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** チェックボックスの入力と set の --env の対応(この順 = dev 系を先に、本番は最後)。 */
@@ -31,7 +31,6 @@ export const STAGES = [
 ];
 /** 実行してよい kit の ref。master だけ(develop などの上のワークフローは、PAT を使う Environment の Deployment branches でも使えない想定)。 */
 export const ALLOWED_RUN_REF = "refs/heads/master";
-const MODES = ["true", "notice", "false"];
 
 /**
  * 入力を検査して、段階ごとの set の引数を作る(検査に通らなければ UsageError)。

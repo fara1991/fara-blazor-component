@@ -11,6 +11,12 @@ import { main, parseArgs, validateMessage, displayCommand, dispatchArgs, INPUT_M
 
 const TOKEN = "tok_SECRET_VALUE_12345";
 const ENV = { CLOUDFLARE_API_TOKEN: TOKEN, CLOUDFLARE_ACCOUNT_ID: "acc123" };
+/** 入力つきのワークフロー（on.workflow_dispatch.inputs に両方）。 */
+const OK_WF = "on:\n  workflow_dispatch:\n    inputs:\n      maintenance_mode:\n        type: choice\n      maintenance_message:\n        type: string\n";
+/** 入力が maintenance_mode だけのワークフロー。 */
+const MODE_ONLY_WF = "on:\n  workflow_dispatch:\n    inputs:\n      maintenance_mode:\n        type: choice\n";
+/** 入力の無い古いワークフロー（run の中に文字列があっても、入力とは数えない）。 */
+const OLD_WF = "name: old\non: push\njobs:\n  a:\n    steps:\n      - run: echo maintenance_mode\n";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const dir = mkdtempSync(join(tmpdir(), "mcli-"));
@@ -40,7 +46,7 @@ function fakeGh({ failWatch = [], failDispatch = [], noRun = [], extraRun = [], 
     if (args[0] === "api" && args[1].includes("/contents/")) {
       assert.match(args[1], /^repos\/[^/]+\/[^/]+\/contents\/\.github\/workflows\/[^/?]+\?ref=/, `ワークフローのパスは .github/workflows/ 以下: ${args[1]}`);
       const repoName = args[1].split("/").slice(1, 3).join("/");
-      const c = contents[repoName] ?? "inputs: maintenance_mode maintenance_message";
+      const c = contents[repoName] ?? OK_WF;
       if (c === 404) return { code: 1, stdout: "", stderr: "gh: Not Found (HTTP 404)" };
       if (c === 403) return { code: 1, stdout: "", stderr: "gh: Resource not accessible by personal access token (HTTP 403)" };
       return { code: 0, stdout: c, stderr: "" };
@@ -357,26 +363,22 @@ test("status: 想定外の応答は失敗として扱う", async () => {
 
 // ---- 同梱ファイル・ドキュメント ----
 
-test("同梱の maintenance-sites.json は読め、5 サイトの dev と、4 サイトの production のワークフローと Worker がそろっている（album は develop のみ）", async () => {
+test("同梱の maintenance-sites.json は読め、4 サイトの dev と production のワークフローと Worker がそろっている（album は載せない）", async () => {
   const sites = JSON.parse(readFileSync(join(root, "tools", "maintenance-sites.json"), "utf8")).sites;
-  assert.deepEqual(sites.map((s) => s.name), ["pokemon", "avatar", "bot", "portfolio", "album"]);
+  assert.deepEqual(sites.map((s) => s.name), ["pokemon", "avatar", "bot", "portfolio"]);
   for (const s of sites) {
     assert.match(s.repo, /^fara1991\//);
     assert.equal(s.workflows.dev.ref, "develop");
-    if (s.name === "album") continue; // 本番は公開準備ができてから足す（maintenance-sites.json の _comment）
     assert.equal(s.workflows.production.ref, "master");
     assert.ok(s.workers.dev.endsWith("-dev") && !s.workers.production.endsWith("-dev"));
   }
-  const album = sites.find((s) => s.name === "album");
-  assert.equal(album.workflows.production, undefined, "album の本番は、公開準備ができるまで載せない（メンテ画面のままの本番を、一括切替で公開しない）");
-  assert.equal(album.workers.production, undefined);
-  assert.equal(album.workers.dev, "fara-vrc-album-dev");
+  assert.equal(sites.find((s) => s.name === "album"), undefined, "album は Actions で公開しないので、一括切替の対象にしない");
   const r = await new Promise((resolve) => {
     const out = [];
     main(["set", "--env", "all", "--mode", "false"], { env: {}, log: (t) => out.push(t), error: (t) => out.push(t) }).then((code) => resolve({ code, out: out.join("\n") }));
   });
   assert.equal(r.code, 0);
-  assert.equal((r.out.match(/gh workflow run/g) ?? []).length, 9);
+  assert.equal((r.out.match(/gh workflow run/g) ?? []).length, 8);
 });
 
 test("docs/maintenance-cli.md の雛形は、CLI が渡す入力名と合い、新しい変数名 MAINTENANCE_MODE だけを --var で渡す", () => {
@@ -494,7 +496,7 @@ test("事前確認: 入力が無い版のサイトは飛ばして警告を出し
   assert.equal(r.code, 0, r.all);
   assert.deepEqual(g.dispatches().map((a) => a[a.indexOf("--repo") + 1]), ["o/pf"], "pokemon は dispatch しない");
   assert.match(r.out, /\[警告\] 飛ばす: \[pokemon\/dev\] o\/pk の develop の deploy-develop\.yml に、入力 maintenance_mode がまだ無い/);
-  const all = fakeGh({ contents: { "o/pk": "x", "o/pf": "y" } });
+  const all = fakeGh({ contents: { "o/pk": OLD_WF, "o/pf": OLD_WF } });
   const none = await run(["set", "--env", "dev", "--site", "pokemon,portfolio", "--mode", "true", "--apply"], { gh: all.gh });
   assert.equal(none.code, 1);
   assert.match(none.err, /すべて飛ばされました。何も反映されません/);
@@ -510,18 +512,18 @@ test("事前確認: ワークフローのファイルが無い(404)は飛ばす�
 });
 
 test("事前確認: --message を渡すときは maintenance_message も要る。--mode だけなら mode だけ見る", async () => {
-  const g = fakeGh({ contents: { "o/pk": "maintenance_mode only" } });
+  const g = fakeGh({ contents: { "o/pk": MODE_ONLY_WF } });
   const r1 = await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--message", "x", "--apply", "--allow-empty"], { gh: g.gh });
   assert.equal(r1.code, 0);
   assert.match(r1.out, /入力 maintenance_message がまだ無い/);
   assert.equal(g.dispatches().length, 0);
-  const g2 = fakeGh({ contents: { "o/pk": "maintenance_mode only" } });
+  const g2 = fakeGh({ contents: { "o/pk": MODE_ONLY_WF } });
   assert.equal((await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--apply"], { gh: g2.gh })).code, 0);
   assert.equal(g2.dispatches().length, 1);
 });
 
 test("--plan: 事前確認だけ(読み取り)して計画を表示し、dispatch も本番の確認もしない。ドライランは gh を呼ばない", async () => {
-  const g = fakeGh({ contents: { "o/pk": "old" } });
+  const g = fakeGh({ contents: { "o/pk": OLD_WF } });
   const r = await run(["set", "--env", "all", "--site", "pokemon,portfolio", "--mode", "true", "--plan"], { gh: g.gh, prompt: async () => { throw new Error("求めない"); } });
   assert.equal(r.code, 0, r.all);
   assert.equal(g.dispatches().length, 0);
@@ -534,7 +536,7 @@ test("--plan: 事前確認だけ(読み取り)して計画を表示し、dispatc
 });
 
 test("事前確認: 本番の再入力は、飛ばす前に選んだサイト名。飛ばした本番は実行しない。結果は report に残る", async () => {
-  const g = fakeGh({ contents: { "o/pk": "old" } });
+  const g = fakeGh({ contents: { "o/pk": OLD_WF } });
   const report = {};
   const r = await run(["set", "--env", "production", "--site", "pokemon,portfolio", "--mode", "true", "--apply", "--confirm", "production pokemon,portfolio"], { gh: g.gh, report });
   assert.equal(r.code, 0, r.all);

@@ -196,7 +196,7 @@ export function checkTemplate(template, problems) {
         const appEnd = appMatch.index + appMatch[0].length;
         const bodyStart = template.indexOf(BODY_START);
         const bodyEnd = template.indexOf(BODY_END);
-        const appClose = template.indexOf("</div>", appEnd);
+        const appClose = findClosingDiv(template, appEnd);
         if (bodyStart < appEnd || appClose < 0 || bodyEnd > appClose) {
             problems.push('SEO-BODY の区切りは <div id="app"> の直下（#app を閉じる </div> より前）に置いてください');
         }
@@ -206,6 +206,25 @@ export function checkTemplate(template, problems) {
         }
     }
     if (!/<html\b[^>]*>/i.test(template)) problems.push("テンプレートに <html> がありません");
+}
+
+/**
+ * from（開始タグの直後）から、対応する </div> の位置を返す（入れ子の <div> を数える）。無ければ -1。
+ * 最初の </div> を使うと、#app の中の入れ子の div（読み込み表示など）の後ろの区切りを誤って「外」と判定する。
+ */
+function findClosingDiv(text, from) {
+    const tag = /<div\b[^>]*>|<\/div\s*>/gi;
+    tag.lastIndex = from;
+    let depth = 1;
+    for (let m = tag.exec(text); m; m = tag.exec(text)) {
+        if (m[0][1] === "/") {
+            depth -= 1;
+            if (depth === 0) return m.index;
+        } else {
+            depth += 1;
+        }
+    }
+    return -1;
 }
 
 /** start と end の間を content に置き換える（前後に改行とインデントを 1 つずつ入れる）。区切りは検査済みであること。 */
