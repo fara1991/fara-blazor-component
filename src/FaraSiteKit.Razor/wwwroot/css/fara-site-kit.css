@@ -675,7 +675,7 @@ a.fsk-footer-social:focus-visible {
     }
 
     .fsk-small a {
-        padding-block: 12px;
+        padding-block: 13px;
     }
 
     /* SNS のアイコンの当たり判定（44px。::after）が隣と重ならないよう、間隔を 44px - 22px にする */
