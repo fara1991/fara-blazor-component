@@ -10,7 +10,7 @@ using Xunit;
 
 namespace FaraBlazorComponent.Razor.Tests;
 
-public class SiteLayoutTests : SiteKitTestContext
+public class SiteLayoutTests : BlazorComponentTestContext
 {
     private const string SidebarKey = "fara-blazor-component.sidebar-hidden";
 

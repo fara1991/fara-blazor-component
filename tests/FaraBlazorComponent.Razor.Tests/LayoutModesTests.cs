@@ -11,7 +11,7 @@ using Xunit;
 namespace FaraBlazorComponent.Razor.Tests;
 
 /// <summary>上部ナビだけの構成、検索の欄の Esc、起動時の設定の確認、フッターの位置、リンクの安全さ。</summary>
-public class LayoutModesTests : SiteKitTestContext
+public class LayoutModesTests : BlazorComponentTestContext
 {
     private static RenderFragment TopNavFragment => builder =>
     {
@@ -165,7 +165,7 @@ public class LayoutModesTests : SiteKitTestContext
     }
 }
 
-public class LinkSafetyTests : SiteKitTestContext
+public class LinkSafetyTests : BlazorComponentTestContext
 {
     [Theory]
     [InlineData("https://github.com/example", true)]
@@ -211,7 +211,7 @@ public class LinkSafetyTests : SiteKitTestContext
     }
 }
 
-public class NavAccessibilityTests : SiteKitTestContext
+public class NavAccessibilityTests : BlazorComponentTestContext
 {
     [Fact]
     public void DisabledItemsAreMarkedAriaDisabled()

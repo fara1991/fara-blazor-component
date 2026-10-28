@@ -5,7 +5,7 @@ using MudBlazor.Services;
 namespace FaraBlazorComponent.Razor;
 
 /// <summary>Fara のサイト共通の部品を、DI に登録する（サイトの Program.cs から 1 回呼ぶ）。</summary>
-public static class SiteKitServiceCollectionExtensions
+public static class FaraBlazorComponentServiceCollectionExtensions
 {
     /// <summary>
     /// SiteOptions（サイトの設定）・テーマの状態・MudBlazor（通知の位置など、サイト共通の既定）を登録する。

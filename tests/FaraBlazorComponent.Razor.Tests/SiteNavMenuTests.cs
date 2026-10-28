@@ -9,7 +9,7 @@ using Xunit;
 
 namespace FaraBlazorComponent.Razor.Tests;
 
-public class SiteNavMenuTests : SiteKitTestContext
+public class SiteNavMenuTests : BlazorComponentTestContext
 {
     private static IReadOnlyList<SiteNavGroup> SampleGroups() => new[]
     {

@@ -6,7 +6,7 @@ using Xunit;
 
 namespace FaraBlazorComponent.Razor.Tests;
 
-public class MaintenanceTests : SiteKitTestContext
+public class MaintenanceTests : BlazorComponentTestContext
 {
     private static MaintenanceInfo Notice(string message) => new(MaintenanceState.Notice, message);
 

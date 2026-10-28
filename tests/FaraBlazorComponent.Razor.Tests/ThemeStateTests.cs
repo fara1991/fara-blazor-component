@@ -60,7 +60,7 @@ public class ThemeStateTests
     }
 }
 
-public class MudProvidersTests : SiteKitTestContext
+public class MudProvidersTests : BlazorComponentTestContext
 {
     [Fact]
     public void DarkSavedThemeIsAppliedBeforeTheFirstRender()

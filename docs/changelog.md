@@ -8,7 +8,7 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 **破壊的変更（メジャー）**: リポジトリ・名前空間・アセンブリ・CSS のクラス・変数・id・JS の名前を、すべて `fara-blazor-component` に統一した。旧名の別名・読み替えは作らない（旧名は通常の不明扱い）。各サイトは `docs/migration-v1.0.0.md` の手順で、submodule の付け替えと名前の置き換えを行う。
 
 - リポジトリ名: `fara-site-kit` → `fara-blazor-component`（submodule のフォルダは `external/fara-blazor-component`）
-- C#: 名前空間・プロジェクト・アセンブリを `FaraSiteKit.Core`・`FaraSiteKit.Razor` → `FaraBlazorComponent.Core`・`FaraBlazorComponent.Razor`。拡張メソッド `AddFaraSiteKit` → `AddFaraBlazorComponent`
+- C#: 名前空間・プロジェクト・アセンブリを `FaraSiteKit.Core`・`FaraSiteKit.Razor` → `FaraBlazorComponent.Core`・`FaraBlazorComponent.Razor`。拡張メソッド `AddFaraSiteKit` → `AddFaraBlazorComponent`。公開の static クラス `SiteKitServiceCollectionExtensions` → `FaraBlazorComponentServiceCollectionExtensions`（サイトは直接参照しない）
 - 静的アセット: `_content/FaraSiteKit.Razor/…` → `_content/FaraBlazorComponent.Razor/…`。CSS は `fara-blazor-component.css`、JS は `fara-blazor-component.js`
 - CSS: 接頭辞 `.fsk-*`・`--fsk-*`・`#fsk-*` → `.fbc-*`・`--fbc-*`・`#fbc-*`（お知らせの `noticeHtml` が出す class も含む）
 - JS: `window.faraSiteKit` → `window.faraBlazorComponent`（呼び出し名も同じ。サイトが定義する `faraSite.*` は変わらない）

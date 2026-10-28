@@ -4,7 +4,7 @@ using Xunit;
 
 namespace FaraBlazorComponent.Razor.Tests;
 
-public class NotFoundViewTests : SiteKitTestContext
+public class NotFoundViewTests : BlazorComponentTestContext
 {
     [Fact]
     public void ShowsTheCodeTitleLeadAndAHomeButton()

@@ -11,7 +11,7 @@ using Xunit;
 
 namespace FaraBlazorComponent.Razor.Tests;
 
-public class ReportFormViewTests : SiteKitTestContext
+public class ReportFormViewTests : BlazorComponentTestContext
 {
     /// <summary>送信を、テストが決める形で返す偽の HTTP。送った先と内容（JSON）を記録する。</summary>
     private sealed class FakeHandler : HttpMessageHandler

@@ -7,7 +7,7 @@ using Xunit;
 
 namespace FaraBlazorComponent.Razor.Tests;
 
-public class ThemeSwitchTests : SiteKitTestContext
+public class ThemeSwitchTests : BlazorComponentTestContext
 {
     [Fact]
     public void SwitchIsOnWhenTheSavedThemeIsDark()

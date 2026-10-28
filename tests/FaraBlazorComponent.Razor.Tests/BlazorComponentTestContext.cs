@@ -9,9 +9,9 @@ namespace FaraBlazorComponent.Razor.Tests;
 /// 部品のテストの共通の土台。JS は Loose（呼ばれたものは受け、設定していないものは既定値を返す）。
 /// サイトの設定（SiteOptions）は、テストごとに AddFaraBlazorComponent で入れる。
 /// </summary>
-public abstract class SiteKitTestContext : BunitContext, IAsyncLifetime
+public abstract class BlazorComponentTestContext : BunitContext, IAsyncLifetime
 {
-    protected SiteKitTestContext()
+    protected BlazorComponentTestContext()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddFaraBlazorComponent(options =>

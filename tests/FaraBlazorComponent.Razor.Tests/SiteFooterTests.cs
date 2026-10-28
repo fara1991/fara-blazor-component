@@ -8,7 +8,7 @@ using Xunit;
 
 namespace FaraBlazorComponent.Razor.Tests;
 
-public class SiteFooterTests : SiteKitTestContext
+public class SiteFooterTests : BlazorComponentTestContext
 {
     private IRenderedComponent<SiteFooter> RenderAt(string path)
     {

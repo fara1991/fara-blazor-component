@@ -26,6 +26,10 @@
 | `FaraSiteKit.Core`（`using FaraSiteKit.Core;`） | `FaraBlazorComponent.Core` |
 | `FaraSiteKit.Razor`・`FaraSiteKit.Razor.Components`（`@using`） | `FaraBlazorComponent.Razor`・`FaraBlazorComponent.Razor.Components` |
 | `AddFaraSiteKit(...)`（`Program.cs`） | `AddFaraBlazorComponent(...)` |
+| `SiteKitServiceCollectionExtensions`（拡張メソッドを持つ公開の static クラス） | `FaraBlazorComponentServiceCollectionExtensions` |
+| `SiteKitTestContext`（kit のテストの基底クラス。公開しない） | `BlazorComponentTestContext` |
+
+サイトが kit の C# で直接使う名前は、拡張メソッド `AddFaraBlazorComponent` だけ。`SiteKitServiceCollectionExtensions` の名前は、サイトの C# には出てこない（確認: 5 サイトの develop で、`SiteKit` を含む型名の参照は無い）。ほかの型名（`SiteLayout`・`SiteFooter` など）は変えていない。
 
 ### 1.3 静的アセット（Razor のパッケージ）
 
@@ -182,17 +186,32 @@ kit の CSS（改名前の `fara-site-kit.css`）と、kit の JS・Razor・Work
 
 サイトのリポジトリのルートで（作業ブランチは develop から切る）。
 
+**前提（順序）**: 新しい URL（`https://github.com/fara1991/fara-blazor-component.git`）は、ユーザーが GitHub のリポジトリ名を `fara-blazor-component` に変えた後に有効になる。それまでは旧 URL（`https://github.com/fara1991/fara-site-kit.git`）を使う。GitHub は、改名後に旧 URL への git の操作（clone・fetch）を新しいリポジトリへ転送する（GitHub の仕様。ローカルでは再現していない）。転送があっても、`.gitmodules` は新しい URL に書き換えておく（下の手順）。タグ `v1.0.0` も、切られてから固定する。
+
 ```bash
-git submodule deinit -f external/fara-site-kit
-git rm -f external/fara-site-kit
-rm -rf .git/modules/external/fara-site-kit
+git submodule deinit -f external/fara-site-kit        # 作業ツリーの submodule を空にする
+git rm -f external/fara-site-kit                      # .gitmodules の項目と、旧いフォルダを消す
+rm -rf .git/modules/external/fara-site-kit            # 旧い submodule の Git の保存先を消す
 git submodule add https://github.com/fara1991/fara-blazor-component.git external/fara-blazor-component
-cd external/fara-blazor-component && git checkout v1.0.0 && cd ../..   # タグ v1.0.0 が切られてから固定する
+cd external/fara-blazor-component && git checkout v1.0.0 && cd ../..
 git add .gitmodules external/fara-blazor-component
 ```
 
-- `.gitmodules` の `[submodule "external/fara-site-kit"]` の項目も、この手順で消える（名前ごと付け替える）。
-- bot は `external/` が repo ルートにある（`site/` から `../external/` を参照する）。ほかのサイトも、`.gitmodules` の場所を確かめてから同じ手順を使う。
+- この方法（`deinit` → `git rm` → `.git/modules` の削除 → `submodule add`）で、submodule の名前（`.gitmodules` の `[submodule "…"]`）も、保存先（`.git/modules/…`）も新名になる。
+- `git rm` の前に、`git status` で submodule の中に未コミットの変更が無いことを確かめる（`deinit -f` は、変更を捨てる）。
+- 別の方法（`git mv external/fara-site-kit external/fara-blazor-component` で、フォルダだけ移す）も動く（確認済み）。ただし、`.gitmodules` の名前と `.git/modules/external/fara-site-kit` が旧名のまま残るので、この移行では使わない。
+
+**既存の clone（ほかの人の作業コピーを含む）**: 親の PR を pull しただけでは、`.git/config` の URL は旧いまま残る。次を実行する。
+
+```bash
+git submodule sync --recursive                       # .gitmodules の URL を .git/config に反映する
+git submodule update --init --recursive               # 新しい項目を取得し、タグのコミットに合わせる
+git config --remove-section submodule.external/fara-site-kit 2>/dev/null || true   # 旧い項目（残っていれば）を消す
+rm -rf external/fara-site-kit                         # 旧いフォルダが残っていれば（中身を確かめてから）
+```
+
+- pull の直後に `Could not access submodule …` と出ることがある（確認した）。上の `sync` と `update --init` で直る。
+- 旧いフォルダを消す前に、中に自分の変更が無いことを確かめる（`git -C external/fara-site-kit status`）。
 
 ### 2.2 名前を置き換える
 
