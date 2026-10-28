@@ -98,7 +98,7 @@ test("除外（理由つき）で、その要素の違反が消える", { timeou
   const { violations } = await runLayoutCheck(
     config("bad", {
       viewports: [360],
-      rules: { "single-h1": false, "no-horizontal-scroll": false, "focus-visible": false, "no-offscreen-focus": false, "min-font-size": false, "menu-esc": false },
+      rules: { "single-h1": false, "no-horizontal-scroll": false, "focus-visible": false, "no-offscreen-focus": false, "min-font-size": false, "menu-esc": false, "menu-close-visible": false },
       exclusions: [{ rule: "tap-target", selector: "#small-button", reason: "テスト用の小さなボタン（除外の動作を見る）" }],
     }),
   );
@@ -106,6 +106,35 @@ test("除外（理由つき）で、その要素の違反が消える", { timeou
   assert.ok(violations.every((v) => v.rule === "tap-target"), text);
   assert.ok(violations.some((v) => v.selector.includes("#menu")), `前提が崩れている（メニューボタンも違反に出るはず）:\n${text}`);
   assert.ok(!violations.some((v) => v.selector.includes("#small-button")), `除外したボタンが違反に出ている:\n${text}`);
+});
+
+test("開いたメニューを、ドロワーが覆う例: 閉じる手段が押せないと menu-close-visible の違反。closeSelector で閉じるボタンを指すと通る", { timeout: TIMEOUT }, async () => {
+  const only = { "single-h1": false, "no-horizontal-scroll": false, "tap-target": false, "focus-visible": false, "no-offscreen-focus": false, "min-font-size": false, "menu-esc": false };
+  const covered = await runLayoutCheck(config("covered", { viewports: [360], rules: only, menuEsc: { buttonSelector: "#menu" } }));
+  const text = covered.violations.map(formatViolation).join("\n");
+  assert.ok(covered.violations.some((v) => v.rule === "menu-close-visible" && /nav#drawer/.test(v.value)), `覆われた違反が出ていない:\n${text}`);
+
+  const closable = await runLayoutCheck(config("covered", { viewports: [360], rules: only, menuEsc: { buttonSelector: "#menu", closeSelector: "#drawer-close" } }));
+  assert.deepEqual(closable.violations.map(formatViolation), []);
+});
+
+test("closeSelector の綴りが違う（ハンバーガーは覆われていない）→ 「見つからない」の違反", { timeout: TIMEOUT }, async () => {
+  const only = { "single-h1": false, "no-horizontal-scroll": false, "tap-target": false, "focus-visible": false, "no-offscreen-focus": false, "min-font-size": false, "menu-esc": false };
+  const { violations } = await runLayoutCheck(config("good", { viewports: [360], rules: only, menuEsc: { buttonSelector: "#menu", closeSelector: "#drawer-clos" } }));
+  const found = violations.find((v) => v.rule === "menu-close-visible");
+  assert.ok(found, `見つからない違反が出ていない: ${violations.map(formatViolation).join("\n")}`);
+  assert.equal(found.value, "見つからない");
+  assert.match(found.message, /#drawer-clos/);
+});
+
+test("閉じるボタンだけが覆われ、メニューボタンは空いている → 違反。メッセージは閉じるボタンを指す（メニューボタンで判定しない）", { timeout: TIMEOUT }, async () => {
+  const only = { "single-h1": false, "no-horizontal-scroll": false, "tap-target": false, "focus-visible": false, "no-offscreen-focus": false, "min-font-size": false, "menu-esc": false };
+  const { violations } = await runLayoutCheck(config("close-covered", { viewports: [360], rules: only, menuEsc: { buttonSelector: "#menu", closeSelector: "#drawer-close" } }));
+  const found = violations.find((v) => v.rule === "menu-close-visible");
+  assert.ok(found, `閉じるボタンの覆われが出ていない: ${violations.map(formatViolation).join("\n")}`);
+  assert.match(found.message, /閉じるボタン（#drawer-close）/);
+  assert.match(found.value, /cover/);
+  assert.equal(violations.length, 1, violations.map(formatViolation).join("\n"));
 });
 
 test("ブラウザを起動できないときは、明確な文の LayoutCheckRunError（CLI は終了コード 2）", { timeout: TIMEOUT }, async () => {

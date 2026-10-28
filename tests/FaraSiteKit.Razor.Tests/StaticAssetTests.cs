@@ -191,8 +191,9 @@ public class StaticAssetTests
         Assert.Contains("height: 44px", phone);
         Assert.Contains("padding-block: 0", phone);
         Assert.Contains("margin-block: 0", phone);
-        // 行と行の中心どうしを 44px 以上離す（上の行の判定が下の行の判定に重ならない）
-        Assert.Contains("row-gap: 28px", phone);
+        // 行と行の中心どうしを 44px 以上離す（上の行の判定が下の行の判定に重ならない）。行の高さ 22px ＋ 行間 22px
+        Assert.Contains("row-gap: 22px", phone);
+        Assert.Contains("line-height: 22px", phone);
         // 作者名の判定が右の SNS に重ならないよう、SNS の前の間隔を足す
         Assert.Contains("margin-left: 0.5rem", phone);
 
