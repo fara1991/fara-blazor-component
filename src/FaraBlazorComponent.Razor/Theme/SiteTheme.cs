@@ -1,10 +1,10 @@
 using MudBlazor;
 
-namespace FaraSiteKit.Razor;
+namespace FaraBlazorComponent.Razor;
 
 /// <summary>
 /// 既定の MudBlazor のテーマ（紫系。pokemon の Shared/MudProviders.razor と同じ色と字体）。サイトは MudProviders の CustomTheme で替えられる。
-/// 色の変数（CSS）は wwwroot/css/fara-site-kit.css の :root にある。両方を揃えて変える。
+/// 色の変数（CSS）は wwwroot/css/fara-blazor-component.css の :root にある。両方を揃えて変える。
 /// </summary>
 public static class SiteTheme
 {

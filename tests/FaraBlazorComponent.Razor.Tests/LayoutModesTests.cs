@@ -1,14 +1,14 @@
 #pragma warning disable MUD0012
 using Bunit;
-using FaraSiteKit.Core;
-using FaraSiteKit.Razor.Components;
+using FaraBlazorComponent.Core;
+using FaraBlazorComponent.Razor.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using Xunit;
 
-namespace FaraSiteKit.Razor.Tests;
+namespace FaraBlazorComponent.Razor.Tests;
 
 /// <summary>上部ナビだけの構成、検索の欄の Esc、起動時の設定の確認、フッターの位置、リンクの安全さ。</summary>
 public class LayoutModesTests : SiteKitTestContext
@@ -16,12 +16,12 @@ public class LayoutModesTests : SiteKitTestContext
     private static RenderFragment TopNavFragment => builder =>
     {
         builder.OpenElement(0, "a");
-        builder.AddAttribute(1, "class", "fsk-topnav-link");
+        builder.AddAttribute(1, "class", "fbc-topnav-link");
         builder.AddAttribute(2, "href", "./");
         builder.AddContent(3, "ホーム");
         builder.CloseElement();
         builder.OpenElement(4, "a");
-        builder.AddAttribute(5, "class", "fsk-topnav-link");
+        builder.AddAttribute(5, "class", "fbc-topnav-link");
         builder.AddAttribute(6, "href", "works");
         builder.AddContent(7, "作品");
         builder.CloseElement();
@@ -29,7 +29,7 @@ public class LayoutModesTests : SiteKitTestContext
 
     private IRenderedComponent<SiteLayout> RenderTopNavOnly(bool mobile, bool collapse)
     {
-        JSInterop.Setup<bool>("faraSiteKit.watchMobile", _ => true).SetResult(mobile);
+        JSInterop.Setup<bool>("faraBlazorComponent.watchMobile", _ => true).SetResult(mobile);
         return Render<SiteLayout>(p =>
         {
             p.Add(c => c.Body, builder => builder.AddMarkupContent(0, "<p class=\"body-text\">本文</p>"));
@@ -44,9 +44,9 @@ public class LayoutModesTests : SiteKitTestContext
     {
         var cut = RenderTopNavOnly(mobile: false, collapse: false);
 
-        Assert.Empty(cut.FindAll(".fsk-sidebar"));
-        Assert.Empty(cut.FindAll(".fsk-menu-toggle"));
-        Assert.Contains("fsk-no-drawer", cut.Find("div.mud-layout").ClassName);
+        Assert.Empty(cut.FindAll(".fbc-sidebar"));
+        Assert.Empty(cut.FindAll(".fbc-menu-toggle"));
+        Assert.Contains("fbc-no-drawer", cut.Find("div.mud-layout").ClassName);
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public class LayoutModesTests : SiteKitTestContext
     {
         var cut = RenderTopNavOnly(mobile: false, collapse: false);
 
-        var links = cut.FindAll("header .fsk-topnav-link");
+        var links = cut.FindAll("header .fbc-topnav-link");
         Assert.Equal(2, links.Count);
         Assert.Equal("作品", links[1].TextContent);
     }
@@ -64,8 +64,8 @@ public class LayoutModesTests : SiteKitTestContext
     {
         var cut = RenderTopNavOnly(mobile: true, collapse: false);
 
-        Assert.Equal(2, cut.FindAll("header .fsk-topnav-link").Count);
-        Assert.Empty(cut.FindAll(".fsk-menu-toggle"));
+        Assert.Equal(2, cut.FindAll("header .fbc-topnav-link").Count);
+        Assert.Empty(cut.FindAll(".fbc-menu-toggle"));
     }
 
     [Fact]
@@ -73,14 +73,14 @@ public class LayoutModesTests : SiteKitTestContext
     {
         var cut = RenderTopNavOnly(mobile: true, collapse: true);
 
-        Assert.Single(cut.FindAll(".fsk-menu-toggle"));
-        Assert.Empty(cut.FindAll("header .fsk-topnav-link"));
+        Assert.Single(cut.FindAll(".fbc-menu-toggle"));
+        Assert.Empty(cut.FindAll("header .fbc-topnav-link"));
         var drawer = cut.FindComponent<MudDrawer>().Instance;
         Assert.Equal(DrawerVariant.Temporary, drawer.Variant);
         Assert.False(drawer.Open);
-        cut.Find(".fsk-menu-toggle").Click();
+        cut.Find(".fbc-menu-toggle").Click();
         Assert.True(cut.FindComponent<MudDrawer>().Instance.Open);
-        Assert.Equal(2, cut.FindAll(".fsk-sidebar .fsk-topnav-link").Count);
+        Assert.Equal(2, cut.FindAll(".fbc-sidebar .fbc-topnav-link").Count);
     }
 
     [Fact]
@@ -88,8 +88,8 @@ public class LayoutModesTests : SiteKitTestContext
     {
         var cut = RenderTopNavOnly(mobile: false, collapse: true);
 
-        Assert.Empty(cut.FindAll(".fsk-menu-toggle"));
-        Assert.Equal(2, cut.FindAll("header .fsk-topnav-link").Count);
+        Assert.Empty(cut.FindAll(".fbc-menu-toggle"));
+        Assert.Equal(2, cut.FindAll("header .fbc-topnav-link").Count);
     }
 
     [Fact]
@@ -97,37 +97,37 @@ public class LayoutModesTests : SiteKitTestContext
     {
         var cut = Render<SiteLayout>();
 
-        Assert.Single(cut.FindAll(".fsk-menu-toggle"));
-        Assert.NotNull(cut.Find(".fsk-sidebar"));
+        Assert.Single(cut.FindAll(".fbc-menu-toggle"));
+        Assert.NotNull(cut.Find(".fbc-sidebar"));
     }
 
     [Fact]
     public void EscapeInsideTheSearchSheetClosesItAndPutsFocusBackOnTheButton()
     {
-        JSInterop.Setup<bool>("faraSiteKit.watchMobile", _ => true).SetResult(true);
+        JSInterop.Setup<bool>("faraBlazorComponent.watchMobile", _ => true).SetResult(true);
         var cut = Render<SiteLayout>(p =>
         {
             p.Add(c => c.SearchSheet, (EventCallback _) => builder => builder.AddMarkupContent(0, "<input class=\"sheet-input\" />"));
         });
-        cut.Find(".fsk-search-toggle").Click();
-        Assert.Equal("true", cut.Find(".fsk-search-toggle").GetAttribute("aria-expanded"));
+        cut.Find(".fbc-search-toggle").Click();
+        Assert.Equal("true", cut.Find(".fbc-search-toggle").GetAttribute("aria-expanded"));
 
-        cut.Find("#fsk-search-sheet .sheet-input").KeyDown(new KeyboardEventArgs { Key = "Escape" });
+        cut.Find("#fbc-search-sheet .sheet-input").KeyDown(new KeyboardEventArgs { Key = "Escape" });
 
-        Assert.Equal("false", cut.Find(".fsk-search-toggle").GetAttribute("aria-expanded"));
-        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.searchSheet" && i.Arguments[0] is false);
+        Assert.Equal("false", cut.Find(".fbc-search-toggle").GetAttribute("aria-expanded"));
+        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraBlazorComponent.searchSheet" && i.Arguments[0] is false);
     }
 
     [Fact]
     public void OtherKeysDoNotCloseTheSearchSheet()
     {
-        JSInterop.Setup<bool>("faraSiteKit.watchMobile", _ => true).SetResult(true);
+        JSInterop.Setup<bool>("faraBlazorComponent.watchMobile", _ => true).SetResult(true);
         var cut = Render<SiteLayout>(p => p.Add(c => c.SearchSheet, (EventCallback _) => builder => builder.AddMarkupContent(0, "<input class=\"sheet-input\" />")));
-        cut.Find(".fsk-search-toggle").Click();
+        cut.Find(".fbc-search-toggle").Click();
 
-        cut.Find("#fsk-search-sheet .sheet-input").KeyDown(new KeyboardEventArgs { Key = "Enter" });
+        cut.Find("#fbc-search-sheet .sheet-input").KeyDown(new KeyboardEventArgs { Key = "Enter" });
 
-        Assert.Equal("true", cut.Find(".fsk-search-toggle").GetAttribute("aria-expanded"));
+        Assert.Equal("true", cut.Find(".fbc-search-toggle").GetAttribute("aria-expanded"));
     }
 
     [Fact]
@@ -135,24 +135,24 @@ public class LayoutModesTests : SiteKitTestContext
     {
         var cut = Render<SiteLayout>();
 
-        var calls = JSInterop.Invocations.Where(i => i.Identifier == "faraSiteKit.checkConfig").ToList();
+        var calls = JSInterop.Invocations.Where(i => i.Identifier == "faraBlazorComponent.checkConfig").ToList();
         Assert.Single(calls);
         Assert.Equal(Services.GetRequiredService<SiteOptions>().StorageKey, calls[0].Arguments[0]);
         Assert.Equal(Services.GetRequiredService<SiteOptions>().SidebarKey, calls[0].Arguments[1]);
         cut.Render();
-        Assert.Single(JSInterop.Invocations.Where(i => i.Identifier == "faraSiteKit.checkConfig"));
+        Assert.Single(JSInterop.Invocations.Where(i => i.Identifier == "faraBlazorComponent.checkConfig"));
     }
 
     [Fact]
     public void MovingToAPageMovesFocusToTheMainButTheFirstLoadDoesNot()
     {
         var cut = Render<SiteLayout>();
-        Assert.DoesNotContain(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.focusMain");
+        Assert.DoesNotContain(JSInterop.Invocations, i => i.Identifier == "faraBlazorComponent.focusMain");
 
         Services.GetRequiredService<NavigationManager>().NavigateTo("http://localhost/report");
         cut.Render();
 
-        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.focusMain");
+        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraBlazorComponent.focusMain");
     }
 
     [Fact]
@@ -161,7 +161,7 @@ public class LayoutModesTests : SiteKitTestContext
         var cut = Render<SiteLayout>();
 
         Assert.Empty(cut.FindAll("main footer"));
-        Assert.NotNull(cut.Find("footer.fsk-footer"));
+        Assert.NotNull(cut.Find("footer.fbc-footer"));
     }
 }
 

@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace FaraSiteKit.Core.Tests;
+namespace FaraBlazorComponent.Core.Tests;
 
 public class SiteOptionsTests
 {

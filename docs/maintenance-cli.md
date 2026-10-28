@@ -127,7 +127,7 @@ node tools/maintenance.mjs set --env all --mode false --apply --confirm "product
 
 > album（fara-vrc-photo-album）は対象に**含めない**。2026-10-28 から、サイトの公開を GitHub Actions では行わず（手元のアプリから公開）、起動するワークフローが無いため。
 
-kit のリポジトリ(`fara1991/fara-site-kit`)の Actions →「**Set maintenance (all sites)**」→ Run workflow で、4 サイトに一度に反映する。手元の環境変数も CLI も要らない(スマホの GitHub アプリからも可)。中身は 2 の `set` を、Actions の上で動かしているだけ(`.github/workflows/set-maintenance-all.yml` → `tools/maintenance-all.mjs` → `tools/maintenance.mjs set`)。
+kit のリポジトリ(`fara1991/fara-blazor-component`)の Actions →「**Set maintenance (all sites)**」→ Run workflow で、4 サイトに一度に反映する。手元の環境変数も CLI も要らない(スマホの GitHub アプリからも可)。中身は 2 の `set` を、Actions の上で動かしているだけ(`.github/workflows/set-maintenance-all.yml` → `tools/maintenance-all.mjs` → `tools/maintenance.mjs set`)。
 
 **Use workflow from は `master` のみ**(`validate` が検査する。develop など、ほかのブランチ上からは実行できない)。
 
@@ -179,7 +179,7 @@ PAT は repository secret ではなく、**Environment のシークレット**�
    - Repository access: **Only select repositories** → `fara-pokemon-battle-assistant`、`fara-avatar-modding-guide`、`fara-bot-moderator`、`fara-labs` の **4 つだけ**（album は、公開を Actions で行わなくなったので外した）
    - Repository permissions: **Actions: Read and write**(Metadata: Read-only は自動で付く)。あわせて **Contents: Read-only を付けることを推奨**する。(a) 事前確認(入力を受け取れないサイトを飛ばす)ができる、(b) 起動した run が各ブランチの先頭のコミットのものかまで照合でき、取り違えを防げる(付けなくても動くが、その 2 つが働かない)
    - 有効期限(Expiration): 必ず付ける(短めにして、切れたら作り直す)
-2. Environment を **2 つ**作る: **fara-site-kit → Settings → Environments → New environment**
+2. Environment を **2 つ**作る: **fara-blazor-component → Settings → Environments → New environment**
 
    | Environment | Deployment branches and tags(Selected branches and tags) | Required reviewers |
    | --- | --- | --- |

@@ -4,6 +4,6 @@ export default {
   baseURL: "http://127.0.0.1:8830",
   pages: ["/"],
   readySelector: ".mud-layout",
-  // 閉じるボタンは、ドロワーの一番上の .fsk-drawer-close（SiteLayout のスマホのメニュー）。ドロワーがメニューボタンを覆うため、これで閉じる手段を測る
-  menuEsc: { buttonSelector: ".fsk-menu-toggle", closeSelector: ".fsk-drawer-close" },
+  // 閉じるボタンは、ドロワーの一番上の .fbc-drawer-close（SiteLayout のスマホのメニュー）。ドロワーがメニューボタンを覆うため、これで閉じる手段を測る
+  menuEsc: { buttonSelector: ".fbc-menu-toggle", closeSelector: ".fbc-drawer-close" },
 };

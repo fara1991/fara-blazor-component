@@ -2,14 +2,14 @@
 using System.Net;
 using System.Text.Json;
 using Bunit;
-using FaraSiteKit.Core;
-using FaraSiteKit.Razor.Components;
+using FaraBlazorComponent.Core;
+using FaraBlazorComponent.Razor.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace FaraSiteKit.Razor.Tests;
+namespace FaraBlazorComponent.Razor.Tests;
 
 public class ReportFormViewTests : SiteKitTestContext
 {
@@ -34,8 +34,8 @@ public class ReportFormViewTests : SiteKitTestContext
     public ReportFormViewTests()
     {
         Services.AddSingleton(new HttpClient(_handler) { BaseAddress = new Uri("http://localhost/") });
-        JSInterop.Setup<bool>("faraSiteKit.report.mount", _ => true).SetResult(true);
-        JSInterop.Setup<string>("faraSiteKit.report.waitToken", _ => true).SetResult("token-123");
+        JSInterop.Setup<bool>("faraBlazorComponent.report.mount", _ => true).SetResult(true);
+        JSInterop.Setup<string>("faraBlazorComponent.report.waitToken", _ => true).SetResult("token-123");
     }
 
     private IRenderedComponent<ReportFormView> RenderForm(string? from = null, Action<ComponentParameterCollectionBuilder<ReportFormView>>? extra = null) =>
@@ -58,10 +58,10 @@ public class ReportFormViewTests : SiteKitTestContext
 
         Assert.NotNull(cut.Find("#report-message"));
         Assert.NotNull(cut.Find("#report-contact"));
-        Assert.NotNull(cut.Find("#fsk-report-turnstile"));
+        Assert.NotNull(cut.Find("#fbc-report-turnstile"));
         Assert.NotNull(cut.Find("button.mud-button-filled"));
-        Assert.Equal("true", cut.Find(".fsk-report-trap").GetAttribute("aria-hidden"));
-        Assert.Equal("-1", cut.Find(".fsk-report-trap input").GetAttribute("tabindex"));
+        Assert.Equal("true", cut.Find(".fbc-report-trap").GetAttribute("aria-hidden"));
+        Assert.Equal("-1", cut.Find(".fbc-report-trap input").GetAttribute("tabindex"));
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public class ReportFormViewTests : SiteKitTestContext
     {
         var cut = RenderForm();
 
-        Assert.Contains("fsk-report-submit", cut.Find("button.mud-button-filled").ClassName);
+        Assert.Contains("fbc-report-submit", cut.Find("button.mud-button-filled").ClassName);
     }
 
     [Fact]
@@ -77,8 +77,8 @@ public class ReportFormViewTests : SiteKitTestContext
     {
         var cut = RenderForm();
 
-        Assert.NotNull(cut.Find(".fsk-page-header.fsk-page-column"));
-        Assert.NotNull(cut.Find(".fsk-pane-scroll.fsk-page-pane .fsk-report-card"));
+        Assert.NotNull(cut.Find(".fbc-page-header.fbc-page-column"));
+        Assert.NotNull(cut.Find(".fbc-pane-scroll.fbc-page-pane .fbc-report-card"));
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class ReportFormViewTests : SiteKitTestContext
     [Fact]
     public void WhenTheServiceIsOffTheFormIsDisabledWithTheNote()
     {
-        JSInterop.Setup<bool>("faraSiteKit.report.mount", _ => true).SetResult(false);
+        JSInterop.Setup<bool>("faraBlazorComponent.report.mount", _ => true).SetResult(false);
 
         var cut = RenderForm(extra: p => p.Add(c => c.UnavailableNote, "お急ぎの場合は、フッターから連絡してください。"));
 
@@ -129,7 +129,7 @@ public class ReportFormViewTests : SiteKitTestContext
     public void AFailedTokenWaitSaysTheConfirmationCouldNotBeLoadedAndSendsNothing()
     {
         // 確認の部品の待ち合わせが例外（JS の失敗）のとき、「確認が終わっていません」ではなく、部品が使えなかったことを案内する
-        JSInterop.Setup<string>("faraSiteKit.report.waitToken", _ => true).SetException(new JSException("確認の部品が無い"));
+        JSInterop.Setup<string>("faraBlazorComponent.report.waitToken", _ => true).SetException(new JSException("確認の部品が無い"));
         var cut = RenderForm(from: "/damage-calculator");
         FillValid(cut.Instance);
 
@@ -363,7 +363,7 @@ public class ReportFormViewTests : SiteKitTestContext
     {
         var cut = RenderForm();
 
-        var heading = cut.Find(".fsk-page-header h1");
+        var heading = cut.Find(".fbc-page-header h1");
         Assert.Equal("問い合わせ", heading.TextContent);
         Assert.Empty(cut.FindAll("h3"));
     }
@@ -373,7 +373,7 @@ public class ReportFormViewTests : SiteKitTestContext
     {
         var cut = RenderForm(extra: p => p.Add(c => c.HeadingLevel, 2));
 
-        Assert.Equal("問い合わせ", cut.Find(".fsk-page-header h2.fsk-page-title").TextContent);
+        Assert.Equal("問い合わせ", cut.Find(".fbc-page-header h2.fbc-page-title").TextContent);
         Assert.Empty(cut.FindAll("h1"));
     }
 
@@ -382,7 +382,7 @@ public class ReportFormViewTests : SiteKitTestContext
     {
         var cut = RenderForm(extra: p => p.Add(c => c.HeadingLevel, 9));
 
-        Assert.NotEmpty(cut.FindAll(".fsk-page-header h1"));
+        Assert.NotEmpty(cut.FindAll(".fbc-page-header h1"));
     }
 
     [Fact]

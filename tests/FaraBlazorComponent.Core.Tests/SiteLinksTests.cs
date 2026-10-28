@@ -1,7 +1,7 @@
-using FaraSiteKit.Core;
+using FaraBlazorComponent.Core;
 using Xunit;
 
-namespace FaraSiteKit.Core.Tests;
+namespace FaraBlazorComponent.Core.Tests;
 
 public class SiteLinksTests
 {
@@ -13,7 +13,7 @@ public class SiteLinksTests
     [InlineData("site.fara-labs.com", "https://fara-labs.com/", "https://fara-labs.com/")]
     [InlineData("localhost", "https://fara-labs.com/", "https://fara-labs.com/")]
     [InlineData("", "https://fara-labs.com/", "https://fara-labs.com/")]
-    [InlineData("site-dev.fara-labs.com", "https://github.com/fara1991/fara-site-kit", "https://github.com/fara1991/fara-site-kit")]
+    [InlineData("site-dev.fara-labs.com", "https://github.com/fara1991/fara-blazor-component", "https://github.com/fara1991/fara-blazor-component")]
     [InlineData("site-dev.fara-labs.com", "https://twitter.com/game_fara", "https://twitter.com/game_fara")]
     [InlineData("site-dev.fara-labs.com", "https://avatar.fara-labs.com/guide?x=1", "https://avatar-dev.fara-labs.com/guide?x=1")]
     [InlineData("site-dev.fara-labs.com", "https://dev.fara-labs.com/", "https://dev.fara-labs.com/")]

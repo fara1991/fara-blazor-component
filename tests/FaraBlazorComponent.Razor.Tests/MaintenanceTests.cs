@@ -1,10 +1,10 @@
 using Bunit;
-using FaraSiteKit.Core;
-using FaraSiteKit.Razor.Components;
+using FaraBlazorComponent.Core;
+using FaraBlazorComponent.Razor.Components;
 using Microsoft.AspNetCore.Components;
 using Xunit;
 
-namespace FaraSiteKit.Razor.Tests;
+namespace FaraBlazorComponent.Razor.Tests;
 
 public class MaintenanceTests : SiteKitTestContext
 {
@@ -15,9 +15,9 @@ public class MaintenanceTests : SiteKitTestContext
     {
         var cut = Render<MaintenanceBanner>(p => p.Add(c => c.Info, Notice("6 月 1 日 2:00〜")));
 
-        Assert.Equal("【お知らせ】", cut.Find(".fsk-notice-title").TextContent);
-        Assert.Equal("6 月 1 日 2:00〜", cut.Find(".fsk-notice-text").TextContent);
-        Assert.Equal("status", cut.Find(".fsk-notice").GetAttribute("role"));
+        Assert.Equal("【お知らせ】", cut.Find(".fbc-notice-title").TextContent);
+        Assert.Equal("6 月 1 日 2:00〜", cut.Find(".fbc-notice-text").TextContent);
+        Assert.Equal("status", cut.Find(".fbc-notice").GetAttribute("role"));
     }
 
     [Fact]
@@ -25,7 +25,7 @@ public class MaintenanceTests : SiteKitTestContext
     {
         var cut = Render<MaintenanceBanner>(p => p.Add(c => c.Info, Notice("   ")));
 
-        Assert.Equal("まもなくメンテナンスを行います。", cut.Find(".fsk-notice-text").TextContent);
+        Assert.Equal("まもなくメンテナンスを行います。", cut.Find(".fbc-notice-text").TextContent);
     }
 
     [Theory]
@@ -35,7 +35,7 @@ public class MaintenanceTests : SiteKitTestContext
     {
         var cut = Render<MaintenanceBanner>(p => p.Add(c => c.Info, new MaintenanceInfo(state, "x")));
 
-        Assert.Empty(cut.FindAll(".fsk-notice"));
+        Assert.Empty(cut.FindAll(".fbc-notice"));
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public class MaintenanceTests : SiteKitTestContext
     {
         var cut = Render<MaintenanceBanner>();
 
-        Assert.Empty(cut.FindAll(".fsk-notice"));
+        Assert.Empty(cut.FindAll(".fbc-notice"));
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class MaintenanceTests : SiteKitTestContext
         var text = new string('文', 1000);
         var cut = Render<MaintenanceBanner>(p => p.Add(c => c.Info, Notice(text)));
 
-        Assert.Equal(text, cut.Find(".fsk-notice-text").TextContent);
+        Assert.Equal(text, cut.Find(".fbc-notice-text").TextContent);
     }
 
     [Fact]
@@ -64,9 +64,9 @@ public class MaintenanceTests : SiteKitTestContext
             p.Add(c => c.Body, builder => builder.AddMarkupContent(0, "<p class=\"body-text\">本文</p>"));
         });
 
-        Assert.Equal("お知らせ本文", cut.Find("main .fsk-notice-text").TextContent);
+        Assert.Equal("お知らせ本文", cut.Find("main .fbc-notice-text").TextContent);
         Assert.Equal("本文", cut.Find("main article .body-text").TextContent);
-        Assert.NotNull(cut.Find("footer.fsk-footer"));
+        Assert.NotNull(cut.Find("footer.fbc-footer"));
         Assert.Empty(cut.FindAll("main footer"));
     }
 
@@ -75,8 +75,8 @@ public class MaintenanceTests : SiteKitTestContext
     {
         var cut = Render<MaintenanceScreen>(p => p.Add(c => c.Info, new MaintenanceInfo(MaintenanceState.On, "6 月 1 日 2:00〜 まで")));
 
-        Assert.Equal("ただいまメンテナンス中です", cut.Find("main.fsk-maintenance h1").TextContent);
-        Assert.Equal("6 月 1 日 2:00〜 まで", cut.Find(".fsk-maintenance-schedule").TextContent);
+        Assert.Equal("ただいまメンテナンス中です", cut.Find("main.fbc-maintenance h1").TextContent);
+        Assert.Equal("6 月 1 日 2:00〜 まで", cut.Find(".fbc-maintenance-schedule").TextContent);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class MaintenanceTests : SiteKitTestContext
     {
         var cut = Render<MaintenanceScreen>(p => p.Add(c => c.Info, new MaintenanceInfo(MaintenanceState.On, "")));
 
-        Assert.Empty(cut.FindAll(".fsk-maintenance-schedule"));
+        Assert.Empty(cut.FindAll(".fbc-maintenance-schedule"));
     }
 
     [Fact]
@@ -93,11 +93,11 @@ public class MaintenanceTests : SiteKitTestContext
         var cut = Render<MaintenanceScreen>(p =>
         {
             p.Add(c => c.Heading, "工事中");
-            p.Add(c => c.Contact, builder => builder.AddMarkupContent(0, "<a class=\"fsk-maintenance-link\" href=\"https://example.test/x\">@contact</a>"));
+            p.Add(c => c.Contact, builder => builder.AddMarkupContent(0, "<a class=\"fbc-maintenance-link\" href=\"https://example.test/x\">@contact</a>"));
         });
 
         Assert.Equal("工事中", cut.Find("h1").TextContent);
-        Assert.Equal("@contact", cut.Find("a.fsk-maintenance-link").TextContent);
+        Assert.Equal("@contact", cut.Find("a.fbc-maintenance-link").TextContent);
     }
 
     [Fact]

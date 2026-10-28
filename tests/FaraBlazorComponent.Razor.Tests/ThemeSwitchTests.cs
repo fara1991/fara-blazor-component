@@ -1,11 +1,11 @@
 #pragma warning disable MUD0012 // テストでは、部品の状態（IsDarkMode など）を直接読んで確かめる
 using Bunit;
-using FaraSiteKit.Razor.Components;
+using FaraBlazorComponent.Razor.Components;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using Xunit;
 
-namespace FaraSiteKit.Razor.Tests;
+namespace FaraBlazorComponent.Razor.Tests;
 
 public class ThemeSwitchTests : SiteKitTestContext
 {

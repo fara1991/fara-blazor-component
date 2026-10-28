@@ -1,7 +1,7 @@
 // 起動までの読み込み表示（index.html の #boot-indicator。全画面のオーバーレイ）を管理する。
 // - Blazor の描画（.mud-layout が #app に入る）で外す。入口ページの本文（.entry-static）は、それまでオーバーレイの下にある。
 //   描画の途中（MudBlazor の style だけ）では外さない。.mud-layout が出た同じタスクで外すので、空白の一瞬は出ない。
-//   メンテナンス画面（.fsk-maintenance。MudBlazor のレイアウトを使わない）が出たときも外す（出さないと 60 秒のタイムアウトまで残る）。
+//   メンテナンス画面（.fbc-maintenance。MudBlazor のレイアウトを使わない）が出たときも外す（出さないと 60 秒のタイムアウトまで残る）。
 // - #blazor-error-ui が出たら外す（起動に失敗した。読み込み表示を出し続けない）。
 // - 45 秒たっても描かれない、または blazor.webassembly.js の読み込みに失敗したら、「再読み込み」の案内に変える（data-state="slow"。スピナーを止める）。
 // - 60 秒たったら、オーバーレイを外す（描画されていなくても。本文を見せて、操作できるようにする）。CSS の boot-indicator-release も同じ 60 秒で隠す（JS が動かないときの保険）。
@@ -77,7 +77,7 @@
     }
 
     function rendered() {
-        return !!app.querySelector(".mud-layout, .fsk-maintenance");
+        return !!app.querySelector(".mud-layout, .fbc-maintenance");
     }
 
     function checkRendered() {

@@ -1,4 +1,4 @@
-namespace FaraSiteKit.Razor;
+namespace FaraBlazorComponent.Razor;
 
 /// <summary>サイドバーの 1 項目。Href は相対パス（"" がホーム）。Icon は MudBlazor のアイコン（Icons.Material.Filled.Home など）。</summary>
 /// <param name="Href">移動先（相対パス）。</param>

@@ -1,4 +1,4 @@
-namespace FaraSiteKit.Razor;
+namespace FaraBlazorComponent.Razor;
 
 /// <summary>
 /// SNS の名前と色（kit が持つ目録）。URL は持たない（サイトが SiteOptions.Social に入れる）。

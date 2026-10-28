@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace FaraSiteKit.Core;
+namespace FaraBlazorComponent.Core;
 
 /// <summary>メンテナンスの状態（通常・お知らせ・メンテナンス中）。</summary>
 public enum MaintenanceState

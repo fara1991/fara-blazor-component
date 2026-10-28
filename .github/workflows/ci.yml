@@ -94,10 +94,10 @@ jobs:
           global-json-file: global.json
 
       - name: Test (C# の共通コード)
-        run: dotnet test tests/FaraSiteKit.Core.Tests --configuration Release
+        run: dotnet test tests/FaraBlazorComponent.Core.Tests --configuration Release
 
       - name: Test (Razor 部品)
-        run: dotnet test tests/FaraSiteKit.Razor.Tests --configuration Release
+        run: dotnet test tests/FaraBlazorComponent.Razor.Tests --configuration Release
 
       - name: Build (Razor 部品を使う最小のサイト。公開はしない)
         run: dotnet build samples/MinimalSite --configuration Release

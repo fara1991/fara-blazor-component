@@ -4,20 +4,20 @@
 @inject NavigationManager Nav
 @implements IDisposable
 
-<footer class="fsk-footer">
-    <div class="fsk-footer-line">
-        <span class="fsk-footer-name">@Site.Name</span>
-        <span class="fsk-footer-sep" aria-hidden="true">|</span>
+<footer class="fbc-footer">
+    <div class="fbc-footer-line">
+        <span class="fbc-footer-name">@Site.Name</span>
+        <span class="fbc-footer-sep" aria-hidden="true">|</span>
         <a href="@ReportHref">問い合わせ</a>
-        <span class="fsk-footer-sep" aria-hidden="true">|</span>
+        <span class="fbc-footer-sep" aria-hidden="true">|</span>
         <a href="@Site.PrivacyPath">プライバシーポリシー</a>
-        <span class="fsk-footer-sep" aria-hidden="true">|</span>
+        <span class="fbc-footer-sep" aria-hidden="true">|</span>
         <span>© @Site.PublishedYear@(" ")@if (!string.IsNullOrEmpty(Site.AuthorHomeUrl)) {
             <a href="@AuthorHref">@Site.Author</a>
         } else {
             @Site.Author
         }</span>
-        <span class="fsk-footer-socials">
+        <span class="fbc-footer-socials">
             <SocialLinks />
         </span>
     </div>

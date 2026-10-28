@@ -1,4 +1,4 @@
-namespace FaraSiteKit.Core;
+namespace FaraBlazorComponent.Core;
 
 /// <summary>
 /// サイトごとの設定（サイト名・作者・URL・SNS・保存のキー）。各サイトが起動時に 1 つ作り、Razor の部品（レイアウト・フッター・報告フォームなど）が読む。
@@ -34,10 +34,10 @@ public sealed class SiteOptions
     public string ReportConfigPath { get; set; } = "api/report/config";
 
     /// <summary>設定を保存する localStorage のキー（テーマの Theme を入れる JSON）。theme-init.js と一致させる（data-storage-key）。</summary>
-    public string StorageKey { get; set; } = "fara-site-kit.settings";
+    public string StorageKey { get; set; } = "fara-blazor-component.settings";
 
     /// <summary>PC のサイドバーを隠しているかを保存する localStorage のキー（"1" のとき隠す）。theme-init.js と一致させる（data-sidebar-key）。</summary>
-    public string SidebarKey { get; set; } = "fara-site-kit.sidebar-hidden";
+    public string SidebarKey { get; set; } = "fara-blazor-component.sidebar-hidden";
 
     /// <summary>確認用サイトのホスト名（例: pokemon-dev.fara-labs.com）。空なら、リンクを切り替えない。</summary>
     public string DevelopHost { get; set; } = "";

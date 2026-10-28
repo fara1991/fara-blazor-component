@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FaraSiteKit.Razor\FaraSiteKit.Razor.csproj" />
+    <ProjectReference Include="..\..\src\FaraBlazorComponent.Razor\FaraBlazorComponent.Razor.csproj" />
   </ItemGroup>
 
 </Project>

@@ -5,7 +5,7 @@
 
 <PageTitle>メンテナンス中 | @Site.Name</PageTitle>
 
-<main class="fsk-maintenance">
+<main class="fbc-maintenance">
     <h1>@Heading</h1>
     <p>@for (var i = 0; i < LeadLines.Length; i++)
     {
@@ -17,7 +17,7 @@
     }</p>
     @if (!string.IsNullOrWhiteSpace(Info?.Message))
     {
-        <p class="fsk-maintenance-schedule">@Info.Message</p>
+        <p class="fbc-maintenance-schedule">@Info.Message</p>
     }
     @if (Contact is not null)
     {

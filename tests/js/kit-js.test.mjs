@@ -1,4 +1,4 @@
-// 報告・テーマ・レイアウトの JS（src/FaraSiteKit.Razor/wwwroot/js/）の確認。ブラウザは使わず、最小のフェイクの DOM で動かす。
+// 報告・テーマ・レイアウトの JS（src/FaraBlazorComponent.Razor/wwwroot/js/）の確認。ブラウザは使わず、最小のフェイクの DOM で動かす。
 //   node --test tests/js/kit-js.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
-const JS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "src", "FaraSiteKit.Razor", "wwwroot", "js");
+const JS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "src", "FaraBlazorComponent.Razor", "wwwroot", "js");
 const load = (name) => readFileSync(join(JS_DIR, name), "utf8");
 
 /** クラス名の集合（classList の最小の形）。 */
@@ -136,10 +136,10 @@ function sandbox(extra = {}) {
 
 // ---- theme-init.js ----
 
-function runThemeInit({ storage = {}, storageKey = "fara-site-kit.settings", sidebarKey = "fara-site-kit.sidebar-hidden" } = {}) {
+function runThemeInit({ storage = {}, storageKey = "fara-blazor-component.settings", sidebarKey = "fara-blazor-component.sidebar-hidden" } = {}) {
     const s = sandbox({ storage });
     const script = element("script", { dataset: { storageKey, sidebarKey } });
-    script.attributes.src = "_content/FaraSiteKit.Razor/js/theme-init.js";
+    script.attributes.src = "_content/FaraBlazorComponent.Razor/js/theme-init.js";
     s.doc.currentScript = script;
     vm.runInContext(load("theme-init.js"), s.ctx);
     return s;
@@ -148,106 +148,106 @@ function runThemeInit({ storage = {}, storageKey = "fara-site-kit.settings", sid
 test("theme-init: 保存が無いときは light、サイドバーは開いたまま", () => {
     const s = runThemeInit();
     assert.equal(s.doc.documentElement.getAttribute("data-bs-theme"), "light");
-    assert.equal(s.doc.documentElement.classList.contains("fsk-sidebar-hidden"), false);
+    assert.equal(s.doc.documentElement.classList.contains("fbc-sidebar-hidden"), false);
 });
 
 test("theme-init: 保存された Theme（大文字小文字を問わない）が dark なら dark", () => {
-    const s = runThemeInit({ storage: { "fara-site-kit.settings": '{"DataSetKey":"gen9","theme":"dark"}' } });
+    const s = runThemeInit({ storage: { "fara-blazor-component.settings": '{"DataSetKey":"gen9","theme":"dark"}' } });
     assert.equal(s.doc.documentElement.getAttribute("data-bs-theme"), "dark");
 });
 
 test("theme-init: 壊れた JSON は light（例外で止まらない）", () => {
-    const s = runThemeInit({ storage: { "fara-site-kit.settings": "{broken" } });
+    const s = runThemeInit({ storage: { "fara-blazor-component.settings": "{broken" } });
     assert.equal(s.doc.documentElement.getAttribute("data-bs-theme"), "light");
 });
 
-test("theme-init: サイドバーを隠す保存（1）で fsk-sidebar-hidden を付ける", () => {
-    const s = runThemeInit({ storage: { "fara-site-kit.sidebar-hidden": "1" } });
-    assert.equal(s.doc.documentElement.classList.contains("fsk-sidebar-hidden"), true);
+test("theme-init: サイドバーを隠す保存（1）で fbc-sidebar-hidden を付ける", () => {
+    const s = runThemeInit({ storage: { "fara-blazor-component.sidebar-hidden": "1" } });
+    assert.equal(s.doc.documentElement.classList.contains("fbc-sidebar-hidden"), true);
 });
 
 test("theme-init: キーは script の data 属性から読む（別のキーの保存を見ない）", () => {
     const s = runThemeInit({
-        storage: { "fara-site-kit.settings": '{"Theme":"dark"}', "old.settings": '{"Theme":"light"}' },
-        storageKey: "fara-site-kit.settings",
+        storage: { "fara-blazor-component.settings": '{"Theme":"dark"}', "old.settings": '{"Theme":"light"}' },
+        storageKey: "fara-blazor-component.settings",
     });
     assert.equal(s.doc.documentElement.getAttribute("data-bs-theme"), "dark");
     const other = runThemeInit({ storage: { "old.settings": '{"Theme":"dark"}' }, storageKey: "old.settings" });
     assert.equal(other.doc.documentElement.getAttribute("data-bs-theme"), "dark");
 });
 
-// ---- fara-site-kit.js ----
+// ---- fara-blazor-component.js ----
 
 function runKit(extra = {}) {
     const s = sandbox(extra);
-    vm.runInContext(load("fara-site-kit.js"), s.ctx);
+    vm.runInContext(load("fara-blazor-component.js"), s.ctx);
     return s;
 }
 
-test("fara-site-kit: sidebarChanged は html のクラスと保存（1/0）を変える", () => {
+test("fara-blazor-component: sidebarChanged は html のクラスと保存（1/0）を変える", () => {
     const s = runKit();
-    const api = s.win.faraSiteKit;
+    const api = s.win.faraBlazorComponent;
     api.sidebarChanged(true, "k.sidebar");
-    assert.equal(s.doc.documentElement.classList.contains("fsk-sidebar-hidden"), true);
+    assert.equal(s.doc.documentElement.classList.contains("fbc-sidebar-hidden"), true);
     assert.equal(s.localStorage.getItem("k.sidebar"), "1");
     api.sidebarChanged(false, "k.sidebar");
-    assert.equal(s.doc.documentElement.classList.contains("fsk-sidebar-hidden"), false);
+    assert.equal(s.doc.documentElement.classList.contains("fbc-sidebar-hidden"), false);
     assert.equal(s.localStorage.getItem("k.sidebar"), "0");
 });
 
-test("fara-site-kit: searchSheet を閉じるとき、中にフォーカスがあれば検索ボタンへ戻す", () => {
+test("fara-blazor-component: searchSheet を閉じるとき、中にフォーカスがあれば検索ボタンへ戻す", () => {
     const s = runKit();
-    const sheet = element("div", { id: "fsk-search-sheet" });
+    const sheet = element("div", { id: "fbc-search-sheet" });
     const input = element("input");
     sheet.appendChild(input);
     const button = element("button");
-    button.classList.add("fsk-search-toggle");
+    button.classList.add("fbc-search-toggle");
     s.doc.body.appendChild(sheet);
     s.doc.body.appendChild(button);
     s.doc.activeElement = input;
-    const api = s.win.faraSiteKit;
+    const api = s.win.faraBlazorComponent;
 
     api.searchSheet(true, true);
-    assert.equal(s.doc.documentElement.classList.contains("fsk-search-open"), true);
+    assert.equal(s.doc.documentElement.classList.contains("fbc-search-open"), true);
     assert.equal(s.doc.activeElement, input, "開くとき、欄の入力にフォーカス");
 
     s.doc.activeElement = input;
     api.searchSheet(false, false);
-    assert.equal(s.doc.documentElement.classList.contains("fsk-search-open"), false);
+    assert.equal(s.doc.documentElement.classList.contains("fbc-search-open"), false);
     assert.equal(s.doc.activeElement, button, "閉じるとき、欄の中にあったフォーカスは検索ボタンへ");
 });
 
-test("fara-site-kit: focusMain は main（#fsk-main）にフォーカスする", () => {
+test("fara-blazor-component: focusMain は main（#fbc-main）にフォーカスする", () => {
     const s = runKit();
-    const main = element("main", { id: "fsk-main" });
+    const main = element("main", { id: "fbc-main" });
     s.doc.body.appendChild(main);
-    s.win.faraSiteKit.focusMain();
+    s.win.faraBlazorComponent.focusMain();
     assert.equal(s.doc.activeElement, main);
 });
 
-test("fara-site-kit: watchMobile は、今の幅（matches）を返す", () => {
+test("fara-blazor-component: watchMobile は、今の幅（matches）を返す", () => {
     const s = runKit({ matchMedia: () => ({ matches: true, addEventListener() {} }) });
     const ref = { invokeMethodAsync() {} };
-    assert.equal(s.win.faraSiteKit.watchMobile(ref), true);
+    assert.equal(s.win.faraBlazorComponent.watchMobile(ref), true);
 });
 
-test("fara-site-kit: 送れなかった OnMobileChanged の Promise は、未処理の拒否のまま残らない（回線が切れた後）", async () => {
+test("fara-blazor-component: 送れなかった OnMobileChanged の Promise は、未処理の拒否のまま残らない（回線が切れた後）", async () => {
     let fire = null;
     const s = runKit({ matchMedia: () => ({ matches: false, addEventListener(_t, fn) { fire = fn; } }) });
     const ref = { invokeMethodAsync() { return Promise.reject(new Error("回線が切れました")); } };
-    s.win.faraSiteKit.watchMobile(ref);
+    s.win.faraBlazorComponent.watchMobile(ref);
     fire({ matches: true });
     // 未処理の拒否があれば、ここで node:test が失敗にする
     await new Promise((resolve) => setTimeout(resolve, 20));
 });
 
-test("fara-site-kit: watchMobile は Esc で ref.OnEscape を呼ぶ（Esc 以外のキーでは呼ばない）", () => {
+test("fara-blazor-component: watchMobile は Esc で ref.OnEscape を呼ぶ（Esc 以外のキーでは呼ばない）", () => {
     const calls = [];
     const s = runKit({ matchMedia: () => ({ matches: true, addEventListener() {} }) });
-    s.win.faraSiteKit.watchMobile({ invokeMethodAsync: (name) => { calls.push(name); return Promise.resolve(); } }, "k1");
+    s.win.faraBlazorComponent.watchMobile({ invokeMethodAsync: (name) => { calls.push(name); return Promise.resolve(); } }, "k1");
     // 「同じ key」以外の呼び方（key を渡さない古い呼び出し）は、Esc を監視しない（OnEscape を受けられない参照へ送らない）
     const legacy = runKit({ matchMedia: () => ({ matches: false, addEventListener() {} }) });
-    legacy.win.faraSiteKit.watchMobile({ invokeMethodAsync: () => assert.fail("Esc では送らない") });
+    legacy.win.faraBlazorComponent.watchMobile({ invokeMethodAsync: () => assert.fail("Esc では送らない") });
     assert.equal(legacy.docListeners.keydown, undefined);
     s.docListeners.keydown.forEach((fn) => fn({ key: "Enter" }));
     assert.deepEqual(calls, []);
@@ -255,7 +255,7 @@ test("fara-site-kit: watchMobile は Esc で ref.OnEscape を呼ぶ（Esc 以外
     assert.deepEqual(calls, ["OnEscape"]);
 });
 
-test("fara-site-kit: unwatchMobile は、登録した matchMedia の変化と Esc の監視を外す（画面を移るたびに増えない）", () => {
+test("fara-blazor-component: unwatchMobile は、登録した matchMedia の変化と Esc の監視を外す（画面を移るたびに増えない）", () => {
     const removed = [];
     let mediaFn = null;
     const mq = {
@@ -265,46 +265,46 @@ test("fara-site-kit: unwatchMobile は、登録した matchMedia の変化と Es
     };
     const s = runKit({ matchMedia: () => mq });
     const calls = [];
-    s.win.faraSiteKit.watchMobile({ invokeMethodAsync: (name) => { calls.push(name); return Promise.resolve(); } }, "k2");
+    s.win.faraBlazorComponent.watchMobile({ invokeMethodAsync: (name) => { calls.push(name); return Promise.resolve(); } }, "k2");
     assert.equal(s.docListeners.keydown.length, 1);
-    s.win.faraSiteKit.unwatchMobile("k2");
+    s.win.faraBlazorComponent.unwatchMobile("k2");
     assert.deepEqual(removed, [mediaFn], "matchMedia の listener を外す");
     assert.equal(s.docListeners.keydown.length, 0, "keydown を外す");
     s.docListeners.keydown?.forEach((fn) => fn({ key: "Escape" }));
     assert.deepEqual(calls, [], "外した後は、Esc でも送らない");
 });
 
-test("fara-site-kit: 同じ key で watchMobile を二重に呼んでも、監視は一つだけ残る", () => {
+test("fara-blazor-component: 同じ key で watchMobile を二重に呼んでも、監視は一つだけ残る", () => {
     const s = runKit({ matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) });
     const ref = { invokeMethodAsync() { return Promise.resolve(); } };
-    s.win.faraSiteKit.watchMobile(ref, "same");
-    s.win.faraSiteKit.watchMobile(ref, "same");
+    s.win.faraBlazorComponent.watchMobile(ref, "same");
+    s.win.faraBlazorComponent.watchMobile(ref, "same");
     assert.equal(s.docListeners.keydown.length, 1);
 });
 
-test("fara-site-kit: OnEscape の送信が失敗しても、未処理の拒否は残らない", async () => {
+test("fara-blazor-component: OnEscape の送信が失敗しても、未処理の拒否は残らない", async () => {
     const s = runKit({ matchMedia: () => ({ matches: false, addEventListener() {} }) });
     const ref = { invokeMethodAsync() { return Promise.reject(new Error("回線が切れました")); } };
-    s.win.faraSiteKit.watchMobile(ref, "k3");
+    s.win.faraBlazorComponent.watchMobile(ref, "k3");
     s.docListeners.keydown.forEach((fn) => fn({ key: "Escape" }));
     await new Promise((resolve) => setTimeout(resolve, 20));
 });
 
-test("fara-site-kit: focusMenu はメニューボタン（.fsk-menu-toggle）にフォーカスを戻す", () => {
+test("fara-blazor-component: focusMenu はメニューボタン（.fbc-menu-toggle）にフォーカスを戻す", () => {
     const s = runKit();
     const btn = element("button", { id: "" });
-    btn.classList.add("fsk-menu-toggle");
+    btn.classList.add("fbc-menu-toggle");
     s.doc.body.appendChild(btn);
-    s.win.faraSiteKit.focusMenu();
+    s.win.faraBlazorComponent.focusMenu();
     assert.equal(s.doc.activeElement, btn);
 });
 
-test("fara-site-kit: checkConfig は、キーが一致すれば true、違えば警告を出す", () => {
+test("fara-blazor-component: checkConfig は、キーが一致すれば true、違えば警告を出す", () => {
     const s = runKit();
     const script = element("script", { dataset: { storageKey: "a.settings", sidebarKey: "a.sidebar" } });
-    script.attributes.src = "_content/FaraSiteKit.Razor/js/theme-init.js";
+    script.attributes.src = "_content/FaraBlazorComponent.Razor/js/theme-init.js";
     s.doc.body.appendChild(script);
-    const api = s.win.faraSiteKit;
+    const api = s.win.faraBlazorComponent;
 
     assert.equal(api.checkConfig("a.settings", "a.sidebar"), true);
     assert.equal(s.warnings.length, 0);
@@ -318,9 +318,9 @@ test("fara-site-kit: checkConfig は、キーが一致すれば true、違えば
     assert.match(s.warnings[1], /data-sidebar-key/);
 });
 
-test("fara-site-kit: checkConfig は theme-init.js が無いときに警告する", () => {
+test("fara-blazor-component: checkConfig は theme-init.js が無いときに警告する", () => {
     const s = runKit();
-    assert.equal(s.win.faraSiteKit.checkConfig("a", "b"), false);
+    assert.equal(s.win.faraBlazorComponent.checkConfig("a", "b"), false);
     assert.match(s.warnings[0], /theme-init\.js が無い/);
 });
 
@@ -341,7 +341,7 @@ function runReport({ enabled = true, siteKey = "key-1", ok = true, turnstile } =
             },
         },
     });
-    const container = element("div", { id: "fsk-report-turnstile" });
+    const container = element("div", { id: "fbc-report-turnstile" });
     s.doc.body.appendChild(container);
     s.win.turnstile = ts;
     vm.runInContext(load("report.js"), s.ctx);
@@ -351,7 +351,7 @@ function runReport({ enabled = true, siteKey = "key-1", ok = true, turnstile } =
 test("report.js: mount は設定（enabled と siteKey）を読み、確認の欄を描く", async () => {
     const { s, calls, container } = runReport();
 
-    const ok = await s.win.faraSiteKit.report.mount("fsk-report-turnstile", "api/report/config");
+    const ok = await s.win.faraBlazorComponent.report.mount("fbc-report-turnstile", "api/report/config");
 
     assert.equal(ok, true);
     assert.deepEqual(calls.fetch, ["api/report/config"]);
@@ -362,20 +362,20 @@ test("report.js: mount は設定（enabled と siteKey）を読み、確認の�
 test("report.js: 設定が無効（enabled=false）なら mount は false（描かない）", async () => {
     const { s, calls } = runReport({ enabled: false });
 
-    assert.equal(await s.win.faraSiteKit.report.mount("fsk-report-turnstile", "api/report/config"), false);
+    assert.equal(await s.win.faraBlazorComponent.report.mount("fbc-report-turnstile", "api/report/config"), false);
     assert.equal(calls.render.length, 0);
 });
 
 test("report.js: 設定の取得に失敗したら false", async () => {
     const { s } = runReport({ ok: false });
 
-    assert.equal(await s.win.faraSiteKit.report.mount("fsk-report-turnstile", "api/report/config"), false);
+    assert.equal(await s.win.faraBlazorComponent.report.mount("fbc-report-turnstile", "api/report/config"), false);
 });
 
 test("report.js: 確認が済んだトークンを token() と waitToken() で返し、reset・dispose で消す", async () => {
     const { s, calls } = runReport();
-    const api = s.win.faraSiteKit.report;
-    await api.mount("fsk-report-turnstile", "api/report/config");
+    const api = s.win.faraBlazorComponent.report;
+    await api.mount("fbc-report-turnstile", "api/report/config");
     calls.render[0].opts.callback("tok-1");
 
     assert.equal(api.token(), "tok-1");
@@ -391,7 +391,7 @@ test("report.js: 確認が済んだトークンを token() と waitToken() で�
 
 test("report.js: waitToken は届かなければ、待ち時間の後に空を返す", async () => {
     const { s } = runReport();
-    assert.equal(await s.win.faraSiteKit.report.waitToken(50), "");
+    assert.equal(await s.win.faraBlazorComponent.report.waitToken(50), "");
 });
 
 test("report.js: 確認の部品が例外を投げても、reset と dispose は止まらない", async () => {
@@ -402,8 +402,8 @@ test("report.js: 確認の部品が例外を投げても、reset と dispose は
             remove() { throw new Error("gone"); },
         },
     });
-    const api = s.win.faraSiteKit.report;
-    await api.mount("fsk-report-turnstile", "api/report/config");
+    const api = s.win.faraBlazorComponent.report;
+    await api.mount("fbc-report-turnstile", "api/report/config");
     assert.doesNotThrow(() => api.reset());
     assert.doesNotThrow(() => api.dispose());
 });

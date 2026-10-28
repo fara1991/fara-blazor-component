@@ -129,7 +129,7 @@ test("normalizeConfig: 既定値・ページの省略形・ルールの既定の
 });
 
 test("normalizeConfig: menuEsc を書けば menu-esc は on（既定の breakpoint は kit のスマホの境目）", () => {
-  const config = normalizeConfig({ ...base, menuEsc: { buttonSelector: ".fsk-menu-toggle" } });
+  const config = normalizeConfig({ ...base, menuEsc: { buttonSelector: ".fbc-menu-toggle" } });
   assert.equal(config.rules["menu-esc"], true);
   assert.equal(config.menuEsc.breakpoint, MENU_BREAKPOINT);
 });

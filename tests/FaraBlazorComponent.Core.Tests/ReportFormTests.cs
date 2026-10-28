@@ -1,8 +1,8 @@
 using System.Text.Json;
-using FaraSiteKit.Core;
+using FaraBlazorComponent.Core;
 using Xunit;
 
-namespace FaraSiteKit.Core.Tests;
+namespace FaraBlazorComponent.Core.Tests;
 
 /// <summary>「作者へ報告」の入力の確認（ReportForm）。</summary>
 public class ReportFormTests

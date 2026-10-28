@@ -11,17 +11,17 @@
 @inject SiteOptions Site
 
 @* 本文へ移動（キーボードの利用者向け）。先頭に置く。href は今のページの URL にする（<base> の下で "#..." だけだと、ホームへ移ってしまうため） *@
-<a class="fsk-skip-link" href="@SkipHref" @onclick="FocusMain" @onclick:preventDefault="true">本文へ移動</a>
+<a class="fbc-skip-link" href="@SkipHref" @onclick="FocusMain" @onclick:preventDefault="true">本文へ移動</a>
 
 <MudProviders CustomTheme="CustomTheme" />
 
 <MudLayout Class="@PageClassName">
-    <MudAppBar Fixed="true" Elevation="0" Gutters="false" Class="fsk-header">
+    <MudAppBar Fixed="true" Elevation="0" Gutters="false" Class="fbc-header">
         <ScrollProgress />
         @if (HasMenu)
         {
-            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Class="fsk-menu-toggle" OnClick="ToggleDrawer"
-                           aria-label="メニューの表示・非表示" aria-controls="fsk-sidebar" aria-expanded="@(DrawerOpen ? "true" : "false")" title="メニューの表示・非表示" />
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Class="fbc-menu-toggle" OnClick="ToggleDrawer"
+                           aria-label="メニューの表示・非表示" aria-controls="fbc-sidebar" aria-expanded="@(DrawerOpen ? "true" : "false")" title="メニューの表示・非表示" />
         }
         @if (Brand is not null)
         {
@@ -29,19 +29,19 @@
         }
         else
         {
-            <a class="fsk-brand" href="@Site.HomeHref" title="ホームへ">@Site.Name</a>
+            <a class="fbc-brand" href="@Site.HomeHref" title="ホームへ">@Site.Name</a>
         }
         @if (TopNavInHeader)
         {
-            <div class="fsk-topnav-bar">@TopNav</div>
+            <div class="fbc-topnav-bar">@TopNav</div>
         }
         @if (Mobile)
         {
             @MobileHeaderActions
             @if (SearchSheet is not null)
             {
-                <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Inherit" Class="fsk-search-toggle" OnClick="OpenSearch"
-                               aria-label="検索" aria-controls="fsk-search-sheet" aria-expanded="@(searchOpen ? "true" : "false")" title="検索" />
+                <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Inherit" Class="fbc-search-toggle" OnClick="OpenSearch"
+                               aria-label="検索" aria-controls="fbc-search-sheet" aria-expanded="@(searchOpen ? "true" : "false")" title="検索" />
             }
         }
         else
@@ -56,13 +56,13 @@
         @* PC: 隠すと、アイコンだけの細い列になる。マウスを乗せている間は広がる（Mini）。スマホ: ハンバーガーで開く一時的なメニュー。
            Breakpoint は Sm（既定の Md だと、768〜959px で Mini が画面の外に消えるため） *@
         <MudDrawer Open="DrawerOpen" OpenChanged="OnDrawerOpenChanged" Variant="@(Mobile ? DrawerVariant.Temporary : DrawerVariant.Mini)" OpenMiniOnHover="true" Breakpoint="Breakpoint.Sm"
-                   ClipMode="@(Mobile ? DrawerClipMode.Never : DrawerClipMode.Always)" Elevation="0" Class="fsk-sidebar" UserAttributes="@DrawerAttributes">
+                   ClipMode="@(Mobile ? DrawerClipMode.Never : DrawerClipMode.Always)" Elevation="0" Class="fbc-sidebar" UserAttributes="@DrawerAttributes">
             @if (Mobile)
             {
                 @* スマホ: ドロワーが画面の左上（ヘッダーのハンバーガーの位置）を覆うため、ハンバーガーは押せない。閉じる手段をドロワーの中に置く（Esc・背景タップと同じ後始末） *@
-                <div class="fsk-drawer-head">
-                    <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" Class="fsk-drawer-close" OnClick="CloseDrawerByButton"
-                                   aria-label="メニューを閉じる" aria-controls="fsk-sidebar" title="メニューを閉じる" />
+                <div class="fbc-drawer-head">
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" Class="fbc-drawer-close" OnClick="CloseDrawerByButton"
+                                   aria-label="メニューを閉じる" aria-controls="fbc-sidebar" title="メニューを閉じる" />
                 </div>
             }
             @if (DrawerContent is not null)
@@ -71,7 +71,7 @@
             }
             else if (!ShowDrawer && TopNav is not null)
             {
-                <div class="fsk-topnav-drawer">@TopNav</div>
+                <div class="fbc-topnav-drawer">@TopNav</div>
             }
         </MudDrawer>
     }
@@ -80,15 +80,15 @@
     {
         @* スマホの検索欄。ヘッダーの検索ボタンで、ヘッダーの下に開く（閉じているあいだは表示しない・CSS）。
            Esc で閉じる（欄の中で押したキーが、ここに届く。サイトの検索部品が Esc を止めないこと。docs/usage.md の「検索の契約」） *@
-        <div id="fsk-search-sheet" class="fsk-search-sheet" @onkeydown="OnSheetKeyDown">
+        <div id="fbc-search-sheet" class="fbc-search-sheet" @onkeydown="OnSheetKeyDown">
             @SearchSheet(CloseSearchEvent)
         </div>
     }
 
     <MudMainContent>
-        <main id="fsk-main" tabindex="-1">
+        <main id="fbc-main" tabindex="-1">
             <MaintenanceBanner Info="Maintenance" />
-            <article class="fsk-content">
+            <article class="fbc-content">
                 @Body
             </article>
         </main>
@@ -110,7 +110,7 @@
     [Parameter] public RenderFragment? MobileHeaderActions { get; set; }
 
     /// <summary>
-    /// 上部ナビ（横に並ぶ項目。例: ホーム・プロフィール・作品）。中身は &lt;a class="fsk-topnav-link"&gt; の並び。
+    /// 上部ナビ（横に並ぶ項目。例: ホーム・プロフィール・作品）。中身は &lt;a class="fbc-topnav-link"&gt; の並び。
     /// ShowDrawer=false のとき、PC はヘッダーに出す。スマホは、CollapseTopNavOnMobile が true なら、ハンバーガーで開くメニューに入れる。
     /// </summary>
     [Parameter] public RenderFragment? TopNav { get; set; }
@@ -146,7 +146,7 @@
     [Parameter] public bool MobilePageScroll { get; set; }
 
     private string PageClassName =>
-        "fsk-page" + (ShowDrawer ? "" : " fsk-no-drawer") + (MobilePageScroll ? " fsk-page-scroll" : "") + (string.IsNullOrWhiteSpace(PageClass) ? "" : " " + PageClass);
+        "fbc-page" + (ShowDrawer ? "" : " fbc-no-drawer") + (MobilePageScroll ? " fbc-page-scroll" : "") + (string.IsNullOrWhiteSpace(PageClass) ? "" : " " + PageClass);
 
     /// <summary>メニュー（ハンバーガーとドロワー）を出すか。サイドバーがあるか、スマホで上部ナビを畳むとき。</summary>
     private bool HasMenu => ShowDrawer || (CollapseTopNavOnMobile && TopNav is not null && Mobile);
@@ -171,7 +171,7 @@
     private EventCallback CloseOnNavigate => EventCallback.Factory.Create(this, CloseOnMobile);
     private EventCallback CloseSearchEvent => EventCallback.Factory.Create(this, CloseSearch);
 
-    private string SkipHref => Nav.Uri.Split('#')[0] + "#fsk-main";
+    private string SkipHref => Nav.Uri.Split('#')[0] + "#fbc-main";
 
     /// <summary>スマホかどうか（768px 未満）。スマホは、サイドバーを、ハンバーガーで開く一時的なメニューにする。</summary>
     private bool Mobile => mobile;
@@ -186,7 +186,7 @@
     {
         get
         {
-            var attributes = new Dictionary<string, object> { ["id"] = "fsk-sidebar" };
+            var attributes = new Dictionary<string, object> { ["id"] = "fbc-sidebar" };
             if (Mobile && !mobileOpen) attributes["inert"] = "";
             return attributes;
         }
@@ -203,7 +203,7 @@
             try
             {
                 self = DotNetObjectReference.Create(this);
-                mobile = sync.Invoke<bool>("faraSiteKit.watchMobile", self, watchKey);
+                mobile = sync.Invoke<bool>("faraBlazorComponent.watchMobile", self, watchKey);
                 watching = true;
             }
             catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは PC として扱う */ }
@@ -217,7 +217,7 @@
         // 起動の後に一度だけ、index.html の theme-init.js の設定（キー）が SiteOptions と同じかを確かめる（違えば、コンソールに警告）
         if (!firstRender || checkedConfig) return;
         checkedConfig = true;
-        try { await JS.InvokeVoidAsync("faraSiteKit.checkConfig", Site.StorageKey, Site.SidebarKey); }
+        try { await JS.InvokeVoidAsync("faraBlazorComponent.checkConfig", Site.StorageKey, Site.SidebarKey); }
         catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、確かめない（回線が切れたときも同じ） */ }
     }
 
@@ -258,7 +258,7 @@
         if (Mobile) mobileOpen = false;
     }
 
-    /// <summary>スマホの検索ボタン。欄を開き、フォーカスは JS（faraSiteKit の click）が行う（iOS は、タップの流れの中でフォーカスしないとキーボードが出ない）。ここでは状態を合わせる。</summary>
+    /// <summary>スマホの検索ボタン。欄を開き、フォーカスは JS（faraBlazorComponent の click）が行う（iOS は、タップの流れの中でフォーカスしないとキーボードが出ない）。ここでは状態を合わせる。</summary>
     private void OpenSearch()
     {
         searchOpen = true;
@@ -274,7 +274,7 @@
     }
 
     /// <summary>
-    /// Esc が押されたとき（文書全体で、JS（faraSiteKit.watchMobile）が知らせる）。スマホで開いているメニューを閉じ、フォーカスをメニューボタンに戻す。
+    /// Esc が押されたとき（文書全体で、JS（faraBlazorComponent.watchMobile）が知らせる）。スマホで開いているメニューを閉じ、フォーカスをメニューボタンに戻す。
     /// MudDrawer は Esc では閉じないため、ここで閉じる。検索欄の Esc は OnSheetKeyDown が受けるので、ここでは何もしない。
     /// </summary>
     [JSInvokable]
@@ -297,7 +297,7 @@
 
     private async Task FocusMenuAsync()
     {
-        try { await JS.InvokeVoidAsync("faraSiteKit.focusMenu"); }
+        try { await JS.InvokeVoidAsync("faraBlazorComponent.focusMenu"); }
         catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、フォーカスを動かさない（メニューは閉じている） */ }
     }
 
@@ -310,20 +310,20 @@
 
     private async Task SetSearchSheetAsync(bool open, bool focus)
     {
-        try { await JS.InvokeVoidAsync("faraSiteKit.searchSheet", open, focus); }
+        try { await JS.InvokeVoidAsync("faraBlazorComponent.searchSheet", open, focus); }
         catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、反映しない（回線が切れたときも同じ） */ }
     }
 
     private async Task ApplyDesktopStateAsync()
     {
-        try { await JS.InvokeVoidAsync("faraSiteKit.sidebarChanged", !desktopOpen, Site.SidebarKey); }
+        try { await JS.InvokeVoidAsync("faraBlazorComponent.sidebarChanged", !desktopOpen, Site.SidebarKey); }
         catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、反映しない（回線が切れたときも同じ） */ }
     }
 
     private async Task FocusMain()
     {
-        try { await JS.InvokeVoidAsync("faraSiteKit.focusMain"); }
-        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、リンクの移動（現在のページの #fsk-main）に任せる */ }
+        try { await JS.InvokeVoidAsync("faraBlazorComponent.focusMain"); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、リンクの移動（現在のページの #fbc-main）に任せる */ }
     }
 
     // 画面を移ったら、スマホのメニューと検索欄を閉じ、本文へフォーカスを移す（項目は <a href> のまま。SiteNavMenu の項目は、OnClick を持たない）
@@ -355,7 +355,7 @@
 
     private async Task UnwatchAsync()
     {
-        try { await JS.InvokeVoidAsync("faraSiteKit.unwatchMobile", watchKey); }
+        try { await JS.InvokeVoidAsync("faraBlazorComponent.unwatchMobile", watchKey); }
         catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* 回線が切れた後・JS が無いときは、外す先が無い */ }
     }
 }

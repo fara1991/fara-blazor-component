@@ -1,8 +1,8 @@
-using FaraSiteKit.Core;
+using FaraBlazorComponent.Core;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
 
-namespace FaraSiteKit.Razor;
+namespace FaraBlazorComponent.Razor;
 
 /// <summary>Fara のサイト共通の部品を、DI に登録する（サイトの Program.cs から 1 回呼ぶ）。</summary>
 public static class SiteKitServiceCollectionExtensions
@@ -11,7 +11,7 @@ public static class SiteKitServiceCollectionExtensions
     /// SiteOptions（サイトの設定）・テーマの状態・MudBlazor（通知の位置など、サイト共通の既定）を登録する。
     /// 確認用ホスト（DevelopHost）は、kit の SiteLinks に入れる（フッターなどのリンクの切り替えに使う）。
     /// </summary>
-    public static IServiceCollection AddFaraSiteKit(this IServiceCollection services, Action<SiteOptions> configure)
+    public static IServiceCollection AddFaraBlazorComponent(this IServiceCollection services, Action<SiteOptions> configure)
     {
         var options = new SiteOptions();
         configure(options);

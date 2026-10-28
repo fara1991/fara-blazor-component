@@ -30,4 +30,4 @@ export DOTNET_NOLOGO=1
 echo 'export DOTNET_CLI_TELEMETRY_OPTOUT=1' >> "$CLAUDE_ENV_FILE"
 echo 'export DOTNET_NOLOGO=1' >> "$CLAUDE_ENV_FILE"
 
-dotnet restore "$CLAUDE_PROJECT_DIR/tests/FaraSiteKit.Core.Tests" >/dev/null
+dotnet restore "$CLAUDE_PROJECT_DIR/tests/FaraBlazorComponent.Core.Tests" >/dev/null

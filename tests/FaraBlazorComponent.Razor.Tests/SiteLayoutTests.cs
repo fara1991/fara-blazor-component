@@ -1,22 +1,22 @@
 #pragma warning disable MUD0012 // テストでは、部品の状態（Open・Variant など）を直接読んで確かめる
 using Bunit;
-using FaraSiteKit.Core;
-using FaraSiteKit.Razor.Components;
+using FaraBlazorComponent.Core;
+using FaraBlazorComponent.Razor.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using MudBlazor;
 using Xunit;
 
-namespace FaraSiteKit.Razor.Tests;
+namespace FaraBlazorComponent.Razor.Tests;
 
 public class SiteLayoutTests : SiteKitTestContext
 {
-    private const string SidebarKey = "fara-site-kit.sidebar-hidden";
+    private const string SidebarKey = "fara-blazor-component.sidebar-hidden";
 
     private IRenderedComponent<SiteLayout> RenderLayout(bool mobile = false, bool withSearchSheet = false)
     {
-        JSInterop.Setup<bool>("faraSiteKit.watchMobile", _ => true).SetResult(mobile);
+        JSInterop.Setup<bool>("faraBlazorComponent.watchMobile", _ => true).SetResult(mobile);
         return Render<SiteLayout>(p =>
         {
             p.Add(c => c.Body, builder => builder.AddMarkupContent(0, "<p class=\"body-text\">本文</p>"));
@@ -34,21 +34,21 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout(mobile: true);
 
-        Assert.DoesNotContain("fsk-page-scroll", cut.Find("div.mud-layout").ClassName);
+        Assert.DoesNotContain("fbc-page-scroll", cut.Find("div.mud-layout").ClassName);
     }
 
     [Fact]
     public async Task EscapeClosesThePhoneMenuAndReturnsFocusToTheMenuButton()
     {
         var cut = RenderLayout(mobile: true);
-        cut.Find(".fsk-menu-toggle").Click();
-        Assert.Equal("true", cut.Find(".fsk-menu-toggle").GetAttribute("aria-expanded"));
+        cut.Find(".fbc-menu-toggle").Click();
+        Assert.Equal("true", cut.Find(".fbc-menu-toggle").GetAttribute("aria-expanded"));
 
         // JS の文書の keydown（Escape）から呼ばれる入口
         await cut.InvokeAsync(() => cut.Instance.OnEscape());
 
-        Assert.Equal("false", cut.Find(".fsk-menu-toggle").GetAttribute("aria-expanded"));
-        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.focusMenu");
+        Assert.Equal("false", cut.Find(".fbc-menu-toggle").GetAttribute("aria-expanded"));
+        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraBlazorComponent.focusMenu");
     }
 
     [Fact]
@@ -58,24 +58,24 @@ public class SiteLayoutTests : SiteKitTestContext
 
         cut.InvokeAsync(() => cut.Instance.OnEscape()).Wait();
 
-        Assert.DoesNotContain(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.focusMenu");
+        Assert.DoesNotContain(JSInterop.Invocations, i => i.Identifier == "faraBlazorComponent.focusMenu");
     }
 
     [Fact]
     public void DisposingTheLayoutRemovesTheMobileWatchWithTheSameKey()
     {
         var cut = RenderLayout(mobile: false);
-        var key = JSInterop.Invocations.Single(i => i.Identifier == "faraSiteKit.watchMobile").Arguments[1];
+        var key = JSInterop.Invocations.Single(i => i.Identifier == "faraBlazorComponent.watchMobile").Arguments[1];
 
         ((IDisposable)cut.Instance).Dispose();
 
-        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.unwatchMobile" && Equals(i.Arguments[0], key));
+        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraBlazorComponent.unwatchMobile" && Equals(i.Arguments[0], key));
     }
 
     [Fact]
     public void MobilePageScrollAddsTheClassAndKeepsTheOthers()
     {
-        JSInterop.Setup<bool>("faraSiteKit.watchMobile", _ => true).SetResult(true);
+        JSInterop.Setup<bool>("faraBlazorComponent.watchMobile", _ => true).SetResult(true);
         var cut = Render<SiteLayout>(p =>
         {
             p.Add(c => c.Body, builder => builder.AddMarkupContent(0, "<p>本文</p>"));
@@ -84,8 +84,8 @@ public class SiteLayoutTests : SiteKitTestContext
         });
 
         var classes = cut.Find("div.mud-layout").ClassName!.Split(' ');
-        Assert.Contains("fsk-page", classes);
-        Assert.Contains("fsk-page-scroll", classes);
+        Assert.Contains("fbc-page", classes);
+        Assert.Contains("fbc-page-scroll", classes);
         Assert.Contains("site-extra", classes);
     }
 
@@ -131,10 +131,10 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout();
 
-        var skip = cut.Find("a.fsk-skip-link");
+        var skip = cut.Find("a.fbc-skip-link");
         Assert.Equal("本文へ移動", skip.TextContent.Trim());
-        Assert.EndsWith("#fsk-main", skip.GetAttribute("href"));
-        var main = cut.Find("main#fsk-main");
+        Assert.EndsWith("#fbc-main", skip.GetAttribute("href"));
+        var main = cut.Find("main#fbc-main");
         Assert.Equal("-1", main.GetAttribute("tabindex"));
     }
 
@@ -143,7 +143,7 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout();
 
-        var brand = cut.Find("a.fsk-brand");
+        var brand = cut.Find("a.fbc-brand");
         Assert.Equal("テストサイト", brand.TextContent);
         Assert.Equal("./", brand.GetAttribute("href"));
     }
@@ -156,7 +156,7 @@ public class SiteLayoutTests : SiteKitTestContext
 
         var cut = RenderLayout();
 
-        Assert.Equal(name, cut.Find("a.fsk-brand").TextContent);
+        Assert.Equal(name, cut.Find("a.fbc-brand").TextContent);
     }
 
     [Fact]
@@ -167,8 +167,8 @@ public class SiteLayoutTests : SiteKitTestContext
         Assert.NotNull(cut.Find(".desktop-search"));
         Assert.NotNull(cut.Find(".header-end"));
         Assert.Empty(cut.FindAll(".mobile-actions"));
-        Assert.Empty(cut.FindAll(".fsk-search-toggle"));
-        Assert.Empty(cut.FindAll("#fsk-search-sheet"));
+        Assert.Empty(cut.FindAll(".fbc-search-toggle"));
+        Assert.Empty(cut.FindAll("#fbc-search-sheet"));
     }
 
     [Fact]
@@ -177,9 +177,9 @@ public class SiteLayoutTests : SiteKitTestContext
         var cut = RenderLayout(mobile: true, withSearchSheet: true);
 
         Assert.NotNull(cut.Find(".mobile-actions"));
-        Assert.NotNull(cut.Find(".fsk-search-toggle"));
+        Assert.NotNull(cut.Find(".fbc-search-toggle"));
         Assert.Empty(cut.FindAll(".desktop-search"));
-        Assert.Equal("false", cut.Find(".fsk-search-toggle").GetAttribute("aria-expanded"));
+        Assert.Equal("false", cut.Find(".fbc-search-toggle").GetAttribute("aria-expanded"));
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout(mobile: true, withSearchSheet: false);
 
-        Assert.Empty(cut.FindAll(".fsk-search-toggle"));
+        Assert.Empty(cut.FindAll(".fbc-search-toggle"));
     }
 
     [Fact]
@@ -195,10 +195,10 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout(mobile: true, withSearchSheet: true);
 
-        cut.Find(".fsk-search-toggle").Click();
+        cut.Find(".fbc-search-toggle").Click();
 
-        Assert.Equal("true", cut.Find(".fsk-search-toggle").GetAttribute("aria-expanded"));
-        Assert.NotNull(cut.Find("#fsk-search-sheet .sheet-input"));
+        Assert.Equal("true", cut.Find(".fbc-search-toggle").GetAttribute("aria-expanded"));
+        Assert.NotNull(cut.Find("#fbc-search-sheet .sheet-input"));
     }
 
     [Fact]
@@ -206,11 +206,11 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout(mobile: false);
 
-        cut.Find("button.fsk-menu-toggle").Click();
+        cut.Find("button.fbc-menu-toggle").Click();
 
         Assert.False(cut.FindComponent<MudDrawer>().Instance.Open);
-        Assert.Equal("false", cut.Find("button.fsk-menu-toggle").GetAttribute("aria-expanded"));
-        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.sidebarChanged" && i.Arguments[1]?.ToString() == SidebarKey);
+        Assert.Equal("false", cut.Find("button.fbc-menu-toggle").GetAttribute("aria-expanded"));
+        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraBlazorComponent.sidebarChanged" && i.Arguments[1]?.ToString() == SidebarKey);
     }
 
     [Fact]
@@ -218,7 +218,7 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout();
 
-        Assert.Equal("項目", cut.Find(".fsk-sidebar .nav-item").TextContent);
+        Assert.Equal("項目", cut.Find(".fbc-sidebar .nav-item").TextContent);
         Assert.Equal("本文", cut.Find("main article .body-text").TextContent);
     }
 
@@ -237,7 +237,7 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout();
 
-        var line = cut.Find("header .fsk-scroll-progress");
+        var line = cut.Find("header .fbc-scroll-progress");
         Assert.Equal("true", line.GetAttribute("aria-hidden"));
     }
 
@@ -245,7 +245,7 @@ public class SiteLayoutTests : SiteKitTestContext
     public void OnAPhoneOpeningTheMenuAndMovingToAPageClosesIt()
     {
         var cut = RenderLayout(mobile: true);
-        cut.Find("button.fsk-menu-toggle").Click();
+        cut.Find("button.fbc-menu-toggle").Click();
         Assert.True(cut.FindComponent<MudDrawer>().Instance.Open);
 
         Services.GetRequiredService<NavigationManager>().NavigateTo("http://localhost/damage-calculator");
@@ -258,9 +258,9 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout(mobile: true);
 
-        var drawer = cut.Find("#fsk-sidebar");
+        var drawer = cut.Find("#fbc-sidebar");
         Assert.True(drawer.HasAttribute("inert"));
-        Assert.Equal(1, cut.FindAll("#fsk-sidebar .nav-item").Count);   // 中身は残す（閉じている間も DOM にある）
+        Assert.Equal(1, cut.FindAll("#fbc-sidebar .nav-item").Count);   // 中身は残す（閉じている間も DOM にある）
     }
 
     [Fact]
@@ -268,13 +268,13 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout(mobile: true);
 
-        cut.Find(".fsk-menu-toggle").Click();
-        Assert.False(cut.Find("#fsk-sidebar").HasAttribute("inert"));
+        cut.Find(".fbc-menu-toggle").Click();
+        Assert.False(cut.Find("#fbc-sidebar").HasAttribute("inert"));
 
         cut.InvokeAsync(() => cut.Instance.OnEscape()).Wait();
 
-        Assert.True(cut.Find("#fsk-sidebar").HasAttribute("inert"));
-        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.focusMenu");
+        Assert.True(cut.Find("#fbc-sidebar").HasAttribute("inert"));
+        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraBlazorComponent.focusMenu");
     }
 
     [Fact]
@@ -282,15 +282,15 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         // ドロワーが左上（ハンバーガーの位置）を覆うため、閉じる手段はドロワーの中にある
         var cut = RenderLayout(mobile: true);
-        cut.Find(".fsk-menu-toggle").Click();
-        var close = cut.Find("#fsk-sidebar .fsk-drawer-close");
+        cut.Find(".fbc-menu-toggle").Click();
+        var close = cut.Find("#fbc-sidebar .fbc-drawer-close");
         Assert.Equal("メニューを閉じる", close.GetAttribute("aria-label"));
 
         close.Click();
 
-        Assert.Equal("false", cut.Find(".fsk-menu-toggle").GetAttribute("aria-expanded"));
-        Assert.True(cut.Find("#fsk-sidebar").HasAttribute("inert"));
-        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraSiteKit.focusMenu");
+        Assert.Equal("false", cut.Find(".fbc-menu-toggle").GetAttribute("aria-expanded"));
+        Assert.True(cut.Find("#fbc-sidebar").HasAttribute("inert"));
+        Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraBlazorComponent.focusMenu");
     }
 
     [Fact]
@@ -298,7 +298,7 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout(mobile: false);
 
-        Assert.Empty(cut.FindAll(".fsk-drawer-close"));
+        Assert.Empty(cut.FindAll(".fbc-drawer-close"));
     }
 
     [Fact]
@@ -306,6 +306,6 @@ public class SiteLayoutTests : SiteKitTestContext
     {
         var cut = RenderLayout(mobile: false);
 
-        Assert.False(cut.Find("#fsk-sidebar").HasAttribute("inert"));
+        Assert.False(cut.Find("#fbc-sidebar").HasAttribute("inert"));
     }
 }

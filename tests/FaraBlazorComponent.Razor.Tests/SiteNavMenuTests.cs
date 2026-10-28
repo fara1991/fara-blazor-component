@@ -1,13 +1,13 @@
 #pragma warning disable MUD0012
 using Bunit;
-using FaraSiteKit.Razor.Components;
+using FaraBlazorComponent.Razor.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using Xunit;
 
-namespace FaraSiteKit.Razor.Tests;
+namespace FaraBlazorComponent.Razor.Tests;
 
 public class SiteNavMenuTests : SiteKitTestContext
 {
@@ -29,8 +29,8 @@ public class SiteNavMenuTests : SiteKitTestContext
     {
         var cut = Render();
 
-        Assert.Single(cut.FindAll(".fsk-nav-section"));
-        Assert.Equal("計算", cut.Find(".fsk-nav-section").TextContent);
+        Assert.Single(cut.FindAll(".fbc-nav-section"));
+        Assert.Equal("計算", cut.Find(".fbc-nav-section").TextContent);
         Assert.Equal("ダメージ計算機", cut.Find("a[href='damage-calculator']").TextContent.Trim());
     }
 
@@ -67,7 +67,7 @@ public class SiteNavMenuTests : SiteKitTestContext
     {
         var cut = Render(new[] { new SiteNavGroup(null, new[] { new SiteNavItem("x", "") }) });
 
-        Assert.Empty(cut.FindAll(".fsk-nav-section"));
+        Assert.Empty(cut.FindAll(".fbc-nav-section"));
         Assert.NotNull(cut.Find("a[href='x']"));
     }
 
@@ -89,7 +89,7 @@ public class SiteNavMenuTests : SiteKitTestContext
             p.Add(c => c.Top, builder => builder.AddMarkupContent(0, "<div class=\"top-settings\">設定</div>"));
         });
 
-        Assert.Equal("top-settings", cut.Find(".fsk-nav > *:first-child").ClassName);
+        Assert.Equal("top-settings", cut.Find(".fbc-nav > *:first-child").ClassName);
     }
 
     [Fact]

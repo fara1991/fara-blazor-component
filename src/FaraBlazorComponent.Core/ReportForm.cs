@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace FaraSiteKit.Core;
+namespace FaraBlazorComponent.Core;
 
 /// <summary>連絡先の欄に書く内容の形（検査の種類）。</summary>
 public enum ReportContactFormat

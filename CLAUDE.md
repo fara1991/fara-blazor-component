@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）で共通に使う部品のリポジトリ（fara-site-kit、公開）。移行の計画は fara-avatar-modding-guide リポジトリの `docs/wasm-migration-plan.md`（§10）を参照。使い方は `docs/usage.md`、README は構成の説明。
+Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）で共通に使う部品のリポジトリ（fara-blazor-component、公開）。移行の計画は fara-avatar-modding-guide リポジトリの `docs/wasm-migration-plan.md`（§10）を参照。使い方は `docs/usage.md`、README は構成の説明。1.0.0 の名前の変更に伴う各サイトの移行は `docs/migration-v1.0.0.md`。
 
 ## ブランチ運用（必ず守る）
 
@@ -12,9 +12,9 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 
 ## 目的と使われ方
 
-- 利用するサイトは、このリポジトリを git submodule（`external/fara-site-kit`）として取り込み、必要なファイルを参照する。NuGet では配らない（決定事項）
-- C# は ProjectReference で参照する（`src/FaraSiteKit.Core`、net10.0）
-- 利用するサイトの例: pokemon（`external/fara-site-kit`）
+- 利用するサイトは、このリポジトリを git submodule（`external/fara-blazor-component`）として取り込み、必要なファイルを参照する。NuGet では配らない（決定事項）
+- C# は ProjectReference で参照する（`src/FaraBlazorComponent.Core`、net10.0）
+- 利用するサイトの例: pokemon（`external/fara-blazor-component`）
 
 ## C# 共通コードのルール
 
@@ -44,8 +44,8 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 - メンテナンス表示の切り替えは、第一の手段が各サイトの Actions「Run workflow」画面（入力 `maintenance_mode` / `maintenance_message`。Cloudflare のトークン・環境変数は不要。実行後にジョブサマリーへ値を出す）。雛形は `docs/maintenance-cli.md`
 - `.github/workflows/set-maintenance-all.yml` + `tools/maintenance-all.mjs`: kit の Actions から 5 サイトのメンテナンス表示をまとめて切り替える。反映先はチェックボックス(`develop` = 各サイトの dev、`master` = 各サイトの本番。サイトは常に 5 つすべて)と `maintenance_mode` / `maintenance_message`。実行元は master のみ。`workflow_dispatch` のみ・Environment 2 つ(develop-maintenance、production-maintenance は必須レビュワー。どちらも Deployment branches は master のみ)・シークレット `SITES_DISPATCH_TOKEN` は Environment のシークレットとして置き、各 job の最後の step にだけ渡す。dev job が計画(事前確認: 入力を受け取れない版のサイトは警告つきで飛ばす)を本番の承認より前に出し、すべて飛ばされたら失敗。入力はシェルに埋め込まず環境変数で受けて検査する。`tests/tools/maintenance-all.test.mjs` がワークフローの構造も検査する
 - `tools/maintenance.mjs`（補助）: サイトの Worker の `MAINTENANCE_MODE` / `MAINTENANCE_MESSAGE` をまとめて扱う CLI。`status` は Cloudflare API の GET だけ（Read 権限）。`set` は Cloudflare API に書き込まず、各サイトの deploy ワークフローを `gh workflow run` で手動実行して（入力 `maintenance_mode` / `maintenance_message`）`wrangler deploy --var` で反映する。dev を先に流し、失敗で中断。対象は `tools/maintenance-sites.json`（repo・workflow・ref・Worker 名）。ワークフローの雛形は `docs/maintenance-cli.md`（テストが雛形の入力名を検査）。実 gh・実 API のテストはしない（`tests/tools/`、差し替え）。Worker の変数名は `MAINTENANCE_MODE`（0.3.0 で変更。旧名は読まない）
-- `src/FaraSiteKit.Core/`: C#（`SiteLinks`・`MaintenanceInfo`・`ReportForm`）。UI と通信に依存しない純粋なコードだけを置く（Razor・MudBlazor は K0-4 で別のプロジェクトに）
-- `tests/FaraSiteKit.Core.Tests/`: C# のテスト（xUnit）。`global.json` の SDK（10.0.x）で実行する
+- `src/FaraBlazorComponent.Core/`: C#（`SiteLinks`・`MaintenanceInfo`・`ReportForm`）。UI と通信に依存しない純粋なコードだけを置く（Razor・MudBlazor は K0-4 で別のプロジェクトに）
+- `tests/FaraBlazorComponent.Core.Tests/`: C# のテスト（xUnit）。`global.json` の SDK（10.0.x）で実行する
 - `.github/workflows/ci.yml`: `npm test`（Node 22）と `dotnet test` を、ubuntu と windows の matrix で並列に実行。`lint`（`npm run lint`）と `layout-check`（ubuntu・chromium で `npm run test:layout-check`）の job も動く
 - `tools/layout-check/`: レイアウトの自動計測（ESM・`playwright-core`）。判定は `rules.mjs`（依存なし）、計測は `browser.mjs`、CLI は `cli.mjs`、静的ファイルの簡易サーバーは `serve-static.mjs`。使い方は `docs/layout-check.md`
 - `tools/lint/`: ESLint の共通設定（`eslint.config.shared.mjs`）と .NET のアナライザーの設定（`dotnet.editorconfig`。`Directory.Build.props` が読む）。ラチェット（違反 0 件のルールだけ error）。使い方は `docs/lint.md`。`eslint.config.mjs` は kit 自身の JS に当てる
@@ -63,14 +63,14 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 npm test
 npm run lint
 npm run test:layout-check   # ブラウザを使う（ローカルで Edge は LAYOUT_CHECK_CHANNEL=msedge）
-dotnet test tests/FaraSiteKit.Core.Tests
-dotnet test tests/FaraSiteKit.Razor.Tests
+dotnet test tests/FaraBlazorComponent.Core.Tests
+dotnet test tests/FaraBlazorComponent.Razor.Tests
 ```
 
 - lint の error を増やすときは、先に違反を入れたコードで、そのルールが実際に報告されるかを確かめる（docs/lint.md）。報告されないルールを error にすると「0 件」が誤りになる
 
-- C# の名前空間は `FaraSiteKit.Core`（`SiteLinks`・`MaintenanceInfo`・`MaintenanceState`・`ReportForm` すべて）。利用するサイトは `using FaraSiteKit.Core;` を書く。名前空間を変えると、利用中のサイトが壊れる（破壊的変更）
-- `tests/FaraSiteKit.Core.Tests` のテストが正。pokemon の `tests/FaraPokemonBattleAssistant.Web.Tests`（MaintenanceInfoTests・ReportFormTests）は kit の複製で、サイトの組み込みの確認として残す。pokemon 側は組み込みの確認で、内容が同一である必要はない。kit のテストを変えたら、pokemon 側が壊れていないか（pokemon の Web.Tests が通るか）を確認する
+- C# の名前空間は `FaraBlazorComponent.Core`（`SiteLinks`・`MaintenanceInfo`・`MaintenanceState`・`ReportForm` すべて）。利用するサイトは `using FaraBlazorComponent.Core;` を書く。名前空間を変えると、利用中のサイトが壊れる（破壊的変更）
+- `tests/FaraBlazorComponent.Core.Tests` のテストが正。pokemon の `tests/FaraPokemonBattleAssistant.Web.Tests`（MaintenanceInfoTests・ReportFormTests）は kit の複製で、サイトの組み込みの確認として残す。pokemon 側は組み込みの確認で、内容が同一である必要はない。kit のテストを変えたら、pokemon 側が壊れていないか（pokemon の Web.Tests が通るか）を確認する
 
 ## その他
 

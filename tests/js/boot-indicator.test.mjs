@@ -14,7 +14,7 @@ import vm from "node:vm";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const kitRoot = join(here, "../..");
-const source = readFileSync(join(kitRoot, "src/FaraSiteKit.Razor/wwwroot/js/boot-indicator.js"), "utf8");
+const source = readFileSync(join(kitRoot, "src/FaraBlazorComponent.Razor/wwwroot/js/boot-indicator.js"), "utf8");
 // 読み込み表示の CSS と markup は、index.html の断片（サイトはこれを自分の index.html に合わせる）
 const indexHtml = readFileSync(join(kitRoot, "docs/index-template.html"), "utf8");
 const SLOW_MS = 45000;
@@ -73,7 +73,7 @@ function makeEnv({ staticMain = true, rendered = false, maintenance = false, wit
         },
     };
     if (rendered) app.children.push(element(["mud-layout"]));
-    else if (maintenance) app.children.push(element(["fsk-maintenance"]));
+    else if (maintenance) app.children.push(element(["fbc-maintenance"]));
     else if (staticMain) app.children.push(staticEl);
     const errorUi = { display: "none" };
     const ids = { "boot-indicator": indicator, app, "blazor-error-ui": errorUi };
@@ -117,7 +117,7 @@ function makeEnv({ staticMain = true, rendered = false, maintenance = false, wit
 }
 
 const layout = () => element(["mud-layout"]);
-const maintenanceScreen = () => element(["fsk-maintenance"]);
+const maintenanceScreen = () => element(["fbc-maintenance"]);
 
 test("入口ページの本文（.entry-static）だけのあいだは、オーバーレイを残す", () => {
     const { indicator, app, trigger } = makeEnv();
@@ -135,7 +135,7 @@ test("MudBlazor の style だけが増えた時点では外さず、.mud-layout�
     assert.equal(indicator.removed, true);
 });
 
-test("メンテナンス画面（.fsk-maintenance。.mud-layout が無い）が出たら外す（60 秒を待たない）", () => {
+test("メンテナンス画面（.fbc-maintenance。.mud-layout が無い）が出たら外す（60 秒を待たない）", () => {
     const { indicator, app, staticEl, trigger, observers, timers } = makeEnv();
     app.children.push(element(["mud-theme-provider"]));
     trigger(app);

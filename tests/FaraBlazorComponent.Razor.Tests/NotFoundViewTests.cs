@@ -1,8 +1,8 @@
 using Bunit;
-using FaraSiteKit.Razor.Components;
+using FaraBlazorComponent.Razor.Components;
 using Xunit;
 
-namespace FaraSiteKit.Razor.Tests;
+namespace FaraBlazorComponent.Razor.Tests;
 
 public class NotFoundViewTests : SiteKitTestContext
 {
@@ -11,10 +11,10 @@ public class NotFoundViewTests : SiteKitTestContext
     {
         var cut = Render<NotFoundView>();
 
-        Assert.Equal("404", cut.Find(".fsk-not-found-code").TextContent);
+        Assert.Equal("404", cut.Find(".fbc-not-found-code").TextContent);
         Assert.Equal("ページが見つかりません", cut.Find("h1").TextContent);
-        Assert.Equal("URL が間違っているか、ページが移動した可能性があります。", cut.Find(".fsk-not-found-lead").TextContent);
-        var home = cut.Find("a.fsk-btn-primary");
+        Assert.Equal("URL が間違っているか、ページが移動した可能性があります。", cut.Find(".fbc-not-found-lead").TextContent);
+        var home = cut.Find("a.fbc-btn-primary");
         Assert.Equal("./", home.GetAttribute("href"));
         Assert.Contains("ホームへ戻る", home.TextContent);
     }
@@ -28,7 +28,7 @@ public class NotFoundViewTests : SiteKitTestContext
             p.Add(c => c.HomeText, "トップへ");
         });
 
-        var home = cut.Find("a.fsk-btn-primary");
+        var home = cut.Find("a.fbc-btn-primary");
         Assert.Equal("/top/", home.GetAttribute("href"));
         Assert.Contains("トップへ", home.TextContent);
     }

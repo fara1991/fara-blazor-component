@@ -1,12 +1,12 @@
 #pragma warning disable MUD0012
 using Bunit;
-using FaraSiteKit.Core;
-using FaraSiteKit.Razor.Components;
+using FaraBlazorComponent.Core;
+using FaraBlazorComponent.Razor.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace FaraSiteKit.Razor.Tests;
+namespace FaraBlazorComponent.Razor.Tests;
 
 public class SiteFooterTests : SiteKitTestContext
 {
@@ -21,10 +21,10 @@ public class SiteFooterTests : SiteKitTestContext
     {
         var cut = RenderAt("");
 
-        var text = cut.Find(".fsk-footer").TextContent;
+        var text = cut.Find(".fbc-footer").TextContent;
         Assert.Contains("テストサイト", text);
         Assert.Contains("© 2026", text);
-        Assert.Equal("テスト作者", cut.Find(".fsk-footer a[href='https://example.test/']").TextContent);
+        Assert.Equal("テスト作者", cut.Find(".fbc-footer a[href='https://example.test/']").TextContent);
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public class SiteFooterTests : SiteKitTestContext
 
         var cut = RenderAt("");
 
-        var links = cut.FindAll("a.fsk-footer-social");
+        var links = cut.FindAll("a.fbc-footer-social");
         Assert.Single(links);
         Assert.Equal("GitHub", links[0].GetAttribute("aria-label"));
         Assert.Equal("noopener noreferrer", links[0].GetAttribute("rel"));
@@ -89,13 +89,13 @@ public class SiteFooterTests : SiteKitTestContext
     [Fact]
     public void EveryFooterTextLinkIsInTheLineThatThePhoneHitAreaRuleCovers()
     {
-        // スマホの当たり判定（kit の CSS: .fsk-footer a:not(.fsk-footer-social)::after）は、.fsk-footer-line の中の文字リンクに掛ける。
+        // スマホの当たり判定（kit の CSS: .fbc-footer a:not(.fbc-footer-social)::after）は、.fbc-footer-line の中の文字リンクに掛ける。
         // 問い合わせ・プライバシーポリシー・作者の 3 つが、すべてその中にある（外に出すと CSS の規則から外れる）
         var cut = RenderAt("");
 
-        var textLinks = cut.FindAll(".fsk-footer a:not(.fsk-footer-social)");
+        var textLinks = cut.FindAll(".fbc-footer a:not(.fbc-footer-social)");
         Assert.Equal(3, textLinks.Count);
-        Assert.All(textLinks, link => Assert.NotNull(link.Closest(".fsk-footer-line")));
+        Assert.All(textLinks, link => Assert.NotNull(link.Closest(".fbc-footer-line")));
     }
 
     [Fact]
@@ -105,7 +105,7 @@ public class SiteFooterTests : SiteKitTestContext
 
         var cut = RenderAt("");
 
-        Assert.Empty(cut.FindAll(".fsk-footer a[href^='https://']"));
-        Assert.Contains("テスト作者", cut.Find(".fsk-footer").TextContent);
+        Assert.Empty(cut.FindAll(".fbc-footer a[href^='https://']"));
+        Assert.Contains("テスト作者", cut.Find(".fbc-footer").TextContent);
     }
 }

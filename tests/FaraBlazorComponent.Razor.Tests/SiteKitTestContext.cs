@@ -1,20 +1,20 @@
 using Bunit;
-using FaraSiteKit.Core;
+using FaraBlazorComponent.Core;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FaraSiteKit.Razor.Tests;
+namespace FaraBlazorComponent.Razor.Tests;
 
 /// <summary>
 /// 部品のテストの共通の土台。JS は Loose（呼ばれたものは受け、設定していないものは既定値を返す）。
-/// サイトの設定（SiteOptions）は、テストごとに AddFaraSiteKit で入れる。
+/// サイトの設定（SiteOptions）は、テストごとに AddFaraBlazorComponent で入れる。
 /// </summary>
 public abstract class SiteKitTestContext : BunitContext, IAsyncLifetime
 {
     protected SiteKitTestContext()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        Services.AddFaraSiteKit(options =>
+        Services.AddFaraBlazorComponent(options =>
         {
             options.Name = "テストサイト";
             options.Author = "テスト作者";

@@ -1,89 +1,89 @@
 /* Fara のサイト共通の見た目（MudBlazor の上に重ねる部分だけ）。
-   色は :root の --fsk-* で決まる。サイトは、自分の :root（後から読む CSS）で同じ変数を上書きして、色を替えられる。
+   色は :root の --fbc-* で決まる。サイトは、自分の :root（後から読む CSS）で同じ変数を上書きして、色を替えられる。
    ライト（既定）とダーク（html の data-bs-theme="dark"）。テーマの属性は theme-init.js と SiteThemeState が付ける。 */
 
 :root {
-    --fsk-header-bg: linear-gradient(90deg, #140a26 0%, #241243 100%);
-    --fsk-header-accent: linear-gradient(90deg, #c084fc 0%, #e879f9 100%);
-    --fsk-header-track: rgba(192, 132, 252, 0.22);
-    --fsk-sidebar-bg: linear-gradient(180deg, rgba(20, 10, 38, 0.92) 0%, rgba(36, 18, 67, 0.92) 60%, rgba(45, 27, 78, 0.92) 100%);
-    --fsk-sidebar-text: #d7d7d7;
-    --fsk-body-bg: #f7f4fd;
-    --fsk-border: #d8cdf2;
-    --fsk-muted: #6b5f8a;
-    --fsk-field-bg: rgba(255, 255, 255, 0.7);
-    --fsk-brand: #7c3aed;
-    --fsk-grad: linear-gradient(120deg, #c084fc 0%, #e879f9 45%, #818cf8 100%);
-    --fsk-notice-bg: #f59e0b;
-    --fsk-notice-text: #1a0b33;
-    --fsk-maintenance-bg: #0c0616;
-    --fsk-maintenance-text: #f3edff;
-    --fsk-maintenance-muted: #b4a7d1;
+    --fbc-header-bg: linear-gradient(90deg, #140a26 0%, #241243 100%);
+    --fbc-header-accent: linear-gradient(90deg, #c084fc 0%, #e879f9 100%);
+    --fbc-header-track: rgba(192, 132, 252, 0.22);
+    --fbc-sidebar-bg: linear-gradient(180deg, rgba(20, 10, 38, 0.92) 0%, rgba(36, 18, 67, 0.92) 60%, rgba(45, 27, 78, 0.92) 100%);
+    --fbc-sidebar-text: #d7d7d7;
+    --fbc-body-bg: #f7f4fd;
+    --fbc-border: #d8cdf2;
+    --fbc-muted: #6b5f8a;
+    --fbc-field-bg: rgba(255, 255, 255, 0.7);
+    --fbc-brand: #7c3aed;
+    --fbc-grad: linear-gradient(120deg, #c084fc 0%, #e879f9 45%, #818cf8 100%);
+    --fbc-notice-bg: #f59e0b;
+    --fbc-notice-text: #1a0b33;
+    --fbc-maintenance-bg: #0c0616;
+    --fbc-maintenance-text: #f3edff;
+    --fbc-maintenance-muted: #b4a7d1;
 }
 
 :root[data-bs-theme="dark"] {
-    --fsk-body-bg: #0c0616;
-    --fsk-border: rgba(200, 170, 255, 0.16);
-    --fsk-muted: #b4a7d1;
-    --fsk-field-bg: rgba(26, 16, 48, 0.7);
-    --fsk-brand: #a855f7;
+    --fbc-body-bg: #0c0616;
+    --fbc-border: rgba(200, 170, 255, 0.16);
+    --fbc-muted: #b4a7d1;
+    --fbc-field-bg: rgba(26, 16, 48, 0.7);
+    --fbc-brand: #a855f7;
 }
 
 html,
 body {
     height: 100%;
-    background: var(--fsk-body-bg);
+    background: var(--fbc-body-bg);
 }
 
 /* 本文へ移動の先（main と見出し）は、プログラムでフォーカスするだけなので、枠を出さない */
-#fsk-main:focus,
+#fbc-main:focus,
 [tabindex="-1"]:focus:not(:focus-visible) {
     outline: none;
 }
 
 /* フォーカスの枠（キーボードの利用者向け）。MudBlazor の reset（a:focus-visible の outline: none）に負けないように、詳細度を上げる。
-   色は --fsk-focus（既定はヘッダーで見やすい淡い紫。本文の「本文へ移動」の色はサイトの :root で替えられる） */
-.fsk-header :is(a, button):focus-visible,
-.fsk-skip-link:focus-visible {
-    outline: 2px solid var(--fsk-focus, #e9d5ff);
+   色は --fbc-focus（既定はヘッダーで見やすい淡い紫。本文の「本文へ移動」の色はサイトの :root で替えられる） */
+.fbc-header :is(a, button):focus-visible,
+.fbc-skip-link:focus-visible {
+    outline: 2px solid var(--fbc-focus, #e9d5ff);
     outline-offset: 2px;
 }
 
 /* ヘッダーの検索入力（サイトが SearchBox に置く）。枠線の色の変化（MudBlazor の .mud-focused）と二重にならないよう、
    入力そのものの outline だけを足す（input は outline を消されていることがあるので、詳細度を上げて出す） */
-.fsk-header :is(input, textarea):focus-visible {
-    outline: 2px solid var(--fsk-focus, #e9d5ff);
+.fbc-header :is(input, textarea):focus-visible {
+    outline: 2px solid var(--fbc-focus, #e9d5ff);
     outline-offset: 2px;
 }
 
 /* ページ全体の既定のフォーカスの枠。MudBlazor の reset（a:focus-visible・.mud-nav-link:focus の outline: none）に負けない詳細度（html を足す）。
    サイトのボタン・リンク・サイドバーの項目・カード内のリンクの枠を出す。入力欄（input・textarea・select）は MudBlazor が枠線の色で示すので対象外。
-   色は --fsk-focus（既定は暗い紫の上で見える淡い紫）。 */
+   色は --fbc-focus（既定は暗い紫の上で見える淡い紫）。 */
 html a:focus-visible,
 html button:focus-visible,
 html [role="button"]:focus-visible,
 html [tabindex]:focus-visible,
-html .fsk-nav :is(a, button):focus-visible,
+html .fbc-nav :is(a, button):focus-visible,
 html .mud-nav-link:focus-visible {
-    outline: 2px solid var(--fsk-focus, #e9d5ff);
+    outline: 2px solid var(--fbc-focus, #e9d5ff);
     outline-offset: 2px;
 }
 
 /* 報告の受付停止の文（MudAlert の警告）。白地で 4.5:1 以上になる色（既定の橙は 3:1 未満）。ダークは明るい橙 */
 :root {
-    --fsk-warning-text: #9a5b00;
+    --fbc-warning-text: #9a5b00;
 }
 
 :root[data-bs-theme="dark"] {
-    --fsk-warning-text: #ffb74d;
+    --fbc-warning-text: #ffb74d;
 }
 
-.fsk-report-unavailable.mud-alert {
-    color: var(--fsk-warning-text);
+.fbc-report-unavailable.mud-alert {
+    color: var(--fbc-warning-text);
 }
 
 /* 「本文へ移動」（キーボードの利用者向け）。普段は画面の外に置き、Tab で出る */
-.fsk-skip-link {
+.fbc-skip-link {
     position: absolute;
     left: 0.5rem;
     top: -4rem;
@@ -96,34 +96,34 @@ html .mud-nav-link:focus-visible {
     text-decoration: none;
 }
 
-.fsk-skip-link:focus {
+.fbc-skip-link:focus {
     top: 0.5rem;
 }
 
 /* ---- レイアウト（SiteLayout）---- */
 
-.fsk-page.mud-layout {
+.fbc-page.mud-layout {
     position: relative;
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
 }
 
-.fsk-header.mud-appbar {
+.fbc-header.mud-appbar {
     height: 3.5rem;
     z-index: 1040;
     color: #fff;
-    background: var(--fsk-header-bg);
+    background: var(--fbc-header-bg);
 }
 
-.fsk-header .mud-toolbar {
+.fbc-header .mud-toolbar {
     height: 3.5rem;
     min-height: 3.5rem;
     gap: 12px;
     padding: 0 12px;
 }
 
-.fsk-header .fsk-menu-toggle {
+.fbc-header .fbc-menu-toggle {
     flex: 0 0 auto;
     width: 40px;
     height: 40px;
@@ -133,11 +133,11 @@ html .mud-nav-link:focus-visible {
     background-color: rgba(255, 255, 255, 0.08);
 }
 
-.fsk-header .fsk-menu-toggle:hover {
+.fbc-header .fbc-menu-toggle:hover {
     background-color: rgba(255, 255, 255, 0.2);
 }
 
-.fsk-brand {
+.fbc-brand {
     color: #fff;
     font-weight: 700;
     font-size: 1.1rem;
@@ -145,13 +145,13 @@ html .mud-nav-link:focus-visible {
     white-space: nowrap;
 }
 
-.fsk-brand:hover {
+.fbc-brand:hover {
     color: #fff;
 }
 
 /* スマホのヘッダー: 検索ボタン（44px）が入る分だけ、名前を縮める（入りきらないところは …） */
 @media (max-width: 767.98px) {
-    .fsk-brand {
+    .fbc-brand {
         flex: 1 1 auto;
         min-width: 0;
         font-size: 0.9rem;
@@ -159,19 +159,19 @@ html .mud-nav-link:focus-visible {
         text-overflow: ellipsis;
     }
 
-    .fsk-header .mud-toolbar {
+    .fbc-header .mud-toolbar {
         gap: 8px;
     }
 }
 
 @media (max-width: 380px) {
-    .fsk-brand {
+    .fbc-brand {
         font-size: 0.84rem;
     }
 }
 
 /* スマホの検索ボタン（タップの大きさは 44px） */
-.fsk-header .fsk-search-toggle {
+.fbc-header .fbc-search-toggle {
     flex: 0 0 auto;
     width: 44px;
     height: 44px;
@@ -181,88 +181,88 @@ html .mud-nav-link:focus-visible {
     background-color: rgba(255, 255, 255, 0.08);
 }
 
-.fsk-header .fsk-search-toggle:hover {
+.fbc-header .fbc-search-toggle:hover {
     background-color: rgba(255, 255, 255, 0.2);
 }
 
-.fsk-header :focus-visible {
+.fbc-header :focus-visible {
     outline-color: #e9d5ff;
 }
 
 /* ヘッダーの下端の線 = ページを読んだ量（scroll-progress.js が --scroll-progress に 0〜1 を入れる）。見るだけの表示 */
-.fsk-scroll-progress {
+.fbc-scroll-progress {
     position: absolute;
     left: 0;
     bottom: 0;
     width: 100%;
     height: 2px;
-    background: var(--fsk-header-track);
+    background: var(--fbc-header-track);
     pointer-events: none;
 }
 
-.fsk-scroll-progress::before {
+.fbc-scroll-progress::before {
     content: "";
     position: absolute;
     inset: 0;
-    background: var(--fsk-header-accent);
+    background: var(--fbc-header-accent);
     transform-origin: left;
     transform: scaleX(var(--scroll-progress, 0));
 }
 
 @media (prefers-reduced-motion: no-preference) {
-    .fsk-scroll-progress::before {
+    .fbc-scroll-progress::before {
         transition: transform 0.12s linear;
     }
 }
 
 /* サイドバー（PC は Mini。隠している間は、アイコンだけの細い列） */
-.fsk-sidebar.mud-drawer {
-    color: var(--fsk-sidebar-text);
+.fbc-sidebar.mud-drawer {
+    color: var(--fbc-sidebar-text);
     background-color: #1a0d33;
-    background-image: var(--fsk-sidebar-bg);
+    background-image: var(--fbc-sidebar-bg);
     border-right: 1px solid rgba(200, 170, 255, 0.14);
 }
 
-.fsk-sidebar .mud-nav-link {
+.fbc-sidebar .mud-nav-link {
     color: #ece6f7;
     border-radius: 4px;
     font-size: 0.9rem;
 }
 
-.fsk-sidebar .mud-nav-link:hover {
+.fbc-sidebar .mud-nav-link:hover {
     background-color: rgba(255, 255, 255, 0.1);
     color: #fff;
 }
 
-.fsk-sidebar .mud-nav-link.active {
+.fbc-sidebar .mud-nav-link.active {
     background-color: rgba(255, 255, 255, 0.25);
     color: #fff;
 }
 
-.fsk-sidebar .mud-nav-link .mud-icon-root,
-.fsk-sidebar .mud-nav-link .mud-nav-link-icon {
+.fbc-sidebar .mud-nav-link .mud-icon-root,
+.fbc-sidebar .mud-nav-link .mud-nav-link-icon {
     color: #fff !important;
 }
 
-.fsk-sidebar .mud-nav-link.active .mud-icon-root,
-.fsk-sidebar .mud-nav-link.active .mud-nav-link-icon {
+.fbc-sidebar .mud-nav-link.active .mud-icon-root,
+.fbc-sidebar .mud-nav-link.active .mud-nav-link-icon {
     color: #f3e8ff !important;
 }
 
-.fsk-sidebar .mud-nav-link-disabled {
+.fbc-sidebar .mud-nav-link-disabled {
     opacity: 0.4;
     cursor: not-allowed;
 }
 
 /* スマホのメニューの閉じるボタン（ドロワーの一番上。位置はヘッダーのハンバーガーと同じ。ドロワーがヘッダーの左側を覆うため、ハンバーガーは使えない） */
-.fsk-drawer-head {
+.fbc-drawer-head {
     display: flex;
     align-items: center;
     height: 3.5rem;
     padding: 0 12px;
 }
 
-.fsk-drawer-close.mud-icon-button {
+.fbc-drawer-close.mud-icon-button {
     width: 44px;
     height: 44px;
     padding: 0;
@@ -272,12 +272,12 @@ html .mud-nav-link:focus-visible {
     background-color: rgba(255, 255, 255, 0.08);
 }
 
-.fsk-drawer-close.mud-icon-button:hover {
+.fbc-drawer-close.mud-icon-button:hover {
     background-color: rgba(255, 255, 255, 0.2);
 }
 
 /* グループの見出し。細い列のときは文字だけ消して、高さは残す（アイコンが動かない） */
-.fsk-sidebar .fsk-nav-section {
+.fbc-sidebar .fbc-nav-section {
     padding: 0 1rem;
     margin-top: 0.4rem;
     margin-bottom: 0.2rem;
@@ -289,20 +289,20 @@ html .mud-nav-link:focus-visible {
     overflow: hidden;
 }
 
-.fsk-sidebar.mud-drawer--closed:not(:hover) .fsk-nav-section,
-.fsk-sidebar.mud-drawer-mini:not(.mud-drawer--open):not(:hover) .fsk-nav-section {
+.fbc-sidebar.mud-drawer--closed:not(:hover) .fbc-nav-section,
+.fbc-sidebar.mud-drawer-mini:not(.mud-drawer--open):not(:hover) .fbc-nav-section {
     opacity: 0;
 }
 
-/* ページ全体は画面の高さに収める（PC もスマホも同じ）。ヘッダーとフッターは動かず、本文の領域（.fsk-content・.fsk-pane-scroll）だけがスクロールする */
+/* ページ全体は画面の高さに収める（PC もスマホも同じ）。ヘッダーとフッターは動かず、本文の領域（.fbc-content・.fbc-pane-scroll）だけがスクロールする */
 /* PC: ページ全体はスクロールさせず、画面の高さに収める。一覧や長い本文の中だけがスクロールする */
-.fsk-page.mud-layout {
+.fbc-page.mud-layout {
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
 }
 
-.fsk-page .mud-main-content {
+.fbc-page .mud-main-content {
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -310,7 +310,7 @@ html .mud-nav-link:focus-visible {
     min-height: 0;
 }
 
-.fsk-page .mud-main-content > main {
+.fbc-page .mud-main-content > main {
     flex: 1;
     min-width: 0;
     min-height: 0;
@@ -318,7 +318,7 @@ html .mud-nav-link:focus-visible {
     flex-direction: column;
 }
 
-.fsk-content {
+.fbc-content {
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
@@ -327,22 +327,22 @@ html .mud-nav-link:focus-visible {
     padding-bottom: 1rem;
 }
 
-.fsk-content > * {
+.fbc-content > * {
     flex-shrink: 0;
 }
 
 /* 隠している間は、細い列にマウスを乗せて広げても、中身は動かさない（広げた分は、上にかぶせる） */
-html.fsk-sidebar-hidden .fsk-page .mud-main-content {
+html.fbc-sidebar-hidden .fbc-page .mud-main-content {
     margin-left: var(--mud-drawer-width-mini-left) !important;
 }
 
 /* サイドバーを使わない構成（ShowDrawer=false）は、保存された開閉の値に関係なく、本文を左に詰める */
-html .fsk-page.fsk-no-drawer .mud-main-content {
+html .fbc-page.fbc-no-drawer .mud-main-content {
     margin-left: 0 !important;
 }
 
 /* 上部ナビ（ShowDrawer=false）。ヘッダーに横に並ぶ。スマホで幅が足りないときは、横にスクロールする */
-.fsk-topnav-bar {
+.fbc-topnav-bar {
     display: flex;
     align-items: center;
     gap: 0.25rem;
@@ -351,11 +351,11 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
     scrollbar-width: none;
 }
 
-.fsk-topnav-bar::-webkit-scrollbar {
+.fbc-topnav-bar::-webkit-scrollbar {
     display: none;
 }
 
-.fsk-topnav-link {
+.fbc-topnav-link {
     flex: 0 0 auto;
     padding: 0.35rem 0.7rem;
     border-radius: 6px;
@@ -365,26 +365,26 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
     white-space: nowrap;
 }
 
-.fsk-topnav-link:hover,
-.fsk-topnav-link[aria-current="page"] {
+.fbc-topnav-link:hover,
+.fbc-topnav-link[aria-current="page"] {
     background: rgba(255, 255, 255, 0.14);
 }
 
 /* ハンバーガーのメニューに入った上部ナビ（スマホ）は、縦に並べる */
-.fsk-topnav-drawer {
+.fbc-topnav-drawer {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
     padding: 0.75rem;
 }
 
-.fsk-topnav-drawer .fsk-topnav-link {
-    color: var(--fsk-sidebar-text);
+.fbc-topnav-drawer .fbc-topnav-link {
+    color: var(--fbc-sidebar-text);
     padding: 0.6rem 0.75rem;
 }
 
 /* 枠の中だけがスクロールする（問い合わせなどの画面の枠） */
-.fsk-pane-scroll {
+.fbc-pane-scroll {
     flex: 1 1 0;
     min-height: 0;
     overflow-y: auto;
@@ -392,30 +392,30 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
     scrollbar-gutter: stable;
 }
 
-.fsk-page-pane {
+.fbc-page-pane {
     scrollbar-gutter: stable both-edges;
 }
 
 
 @media (max-width: 767.98px) {
-    .fsk-page .mud-main-content > main {
+    .fbc-page .mud-main-content > main {
         width: 100%;
     }
 }
 
-.fsk-content {
+.fbc-content {
     padding-top: 1.1rem;
     padding-left: 1rem;
     padding-right: 1rem;
 }
 
 /* スマホの検索欄（ヘッダーの検索ボタンで、ヘッダーの下に開く。中の検索部品はサイトが置く）。閉じているあいだは出さない */
-.fsk-search-sheet {
+.fbc-search-sheet {
     display: none;
 }
 
 @media (max-width: 767.98px) {
-    html.fsk-search-open .fsk-search-sheet {
+    html.fbc-search-open .fbc-search-sheet {
         display: block;
         position: fixed;
         top: 3.5rem;
@@ -423,75 +423,75 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
         right: 0;
         z-index: 1035;
         padding: 0.6rem 0.8rem;
-        background: var(--fsk-header-bg);
+        background: var(--fbc-header-bg);
     }
 }
 
 /* スマホはページ全体をスクロールさせる（SiteLayout の MobilePageScroll="true"）。
    既定は、スマホでもページ全体を画面の高さに収めて、本文の中だけをスクロールさせる。入れ子のスクロールが操作しにくいサイト向けの選択肢。ヘッダーは固定のまま、フッターはページの最後に出る */
 @media (max-width: 767.98px) {
-    html:has(.fsk-page-scroll),
-    html:has(.fsk-page-scroll) body {
+    html:has(.fbc-page-scroll),
+    html:has(.fbc-page-scroll) body {
         height: auto;
     }
 
-    .fsk-page.fsk-page-scroll.mud-layout {
+    .fbc-page.fbc-page-scroll.mud-layout {
         height: auto;
         min-height: 100vh;
         min-height: 100dvh;
         overflow: visible;
     }
 
-    .fsk-page.fsk-page-scroll .mud-main-content {
+    .fbc-page.fbc-page-scroll .mud-main-content {
         display: block;
         height: auto;
     }
 
-    .fsk-page.fsk-page-scroll .mud-main-content > main {
+    .fbc-page.fbc-page-scroll .mud-main-content > main {
         display: block;
     }
 
-    .fsk-page.fsk-page-scroll .fsk-content {
+    .fbc-page.fbc-page-scroll .fbc-content {
         display: block;
         overflow-y: visible;
         padding-bottom: 0;
     }
 
-    .fsk-page.fsk-page-scroll .fsk-pane-scroll {
+    .fbc-page.fbc-page-scroll .fbc-pane-scroll {
         flex: none;
         overflow: visible;
         scrollbar-gutter: auto;
     }
 
-    .fsk-page.fsk-page-scroll .fsk-page-pane {
+    .fbc-page.fbc-page-scroll .fbc-page-pane {
         scrollbar-gutter: auto;
     }
 
     /* 細い列に隠す設定（PC）は、スマホでは使わない（スマホは一時的なメニュー） */
-    html.fsk-sidebar-hidden .fsk-page.fsk-page-scroll .mud-main-content {
+    html.fbc-sidebar-hidden .fbc-page.fbc-page-scroll .mud-main-content {
         margin-left: 0 !important;
     }
 }
 
 /* スマホ（600px 未満）のタップの大きさ（WCAG 2.5.5 の 44px）。見た目の高さは変えず、padding と負の margin で当たり判定を広げる */
 @media (max-width: 599.98px) {
-    .fsk-header .fsk-menu-toggle {
+    .fbc-header .fbc-menu-toggle {
         width: 44px;
         height: 44px;
     }
 
-    a.fsk-brand {
+    a.fbc-brand {
         padding-block: 12px;
         margin-block: -12px;
     }
 
-    .fsk-theme-switch .mud-switch {
+    .fbc-theme-switch .mud-switch {
         padding: 10px;
         margin: -10px;
     }
 
     /* ドロワーの中の文字のボタン（ThemeSwitch AsButton。見た目は変えず、タップの高さだけ 44px） */
-    .fsk-theme-button {
+    .fbc-theme-button {
         min-height: 44px;
     }
 }
@@ -499,16 +499,16 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
 /* タブレットまで（1024px 以下）の報告フォームの入力欄と送信ボタン（見た目の幅・色は変えず、高さだけ 44px）。
    768〜1440 の幅でも、送信ボタン（既定 36.5px）と入力欄（40px）が小さいままにならないように */
 @media (max-width: 1024px) {
-    .fsk-report-card .fsk-select input,
-    .fsk-report-card .fsk-field input,
-    .fsk-report-card #report-category,
-    .fsk-report-card #report-contact {
+    .fbc-report-card .fbc-select input,
+    .fbc-report-card .fbc-field input,
+    .fbc-report-card #report-category,
+    .fbc-report-card #report-contact {
         height: 44px;
         min-height: 44px;
         box-sizing: border-box;
     }
 
-    .fsk-report-submit {
+    .fbc-report-submit {
         min-height: 44px;
     }
 }
@@ -516,80 +516,80 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
 /* ---- 内容の列・報告フォーム ---- */
 
 /* 画面の題名（見出しの下に区切り線）。カードは薄い枠で囲む */
-.fsk-page-header {
+.fbc-page-header {
     margin-bottom: 1rem;
     padding-bottom: 0.6rem;
-    border-bottom: 1px solid var(--fsk-border);
+    border-bottom: 1px solid var(--fbc-border);
 }
 
-.fsk-page-header h1,
-.fsk-page-header h3 {
+.fbc-page-header h1,
+.fbc-page-header h3 {
     margin-bottom: 0.25rem;
 }
 
 /* 題名（ReportFormView）。見出しのレベルを h1 にしても、見た目は従来の h3 と同じ（大きさ・太さ・余白） */
-.fsk-page-header .fsk-page-title {
+.fbc-page-header .fbc-page-title {
     margin: 1em 0 0.25rem;
     font-size: 1.17em;
     font-weight: 700;
 }
 
-.fsk-card {
-    --fsk-card-spacer: 1rem;
+.fbc-card {
+    --fbc-card-spacer: 1rem;
     position: relative;
     display: flex;
     flex-direction: column;
     min-width: 0;
     word-wrap: break-word;
     background-clip: border-box;
-    border: 1px solid var(--fsk-border);
+    border: 1px solid var(--fbc-border);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-.fsk-card-body {
+.fbc-card-body {
     flex: 1 1 auto;
-    padding: var(--fsk-card-spacer);
+    padding: var(--fbc-card-spacer);
 }
 
 /* 入力欄のまとまり（ラベル + 欄）と、小さな補助のクラス（ReportFormView が使う） */
-.fsk-form-label {
+.fbc-form-label {
     display: inline-block;
     margin-bottom: 0.2rem;
     font-size: 0.85rem;
     font-weight: 600;
 }
 
-.fsk-form-group,
-.fsk-form-group.fsk-mb-3 {
+.fbc-form-group,
+.fbc-form-group.fbc-mb-3 {
     margin-bottom: 0.75rem !important;
 }
 
-.fsk-mb-0 { margin-bottom: 0 !important; }
-.fsk-mb-1 { margin-bottom: 0.25rem !important; }
-.fsk-mb-3 { margin-bottom: 1rem !important; }
-.fsk-mt-3 { margin-top: 1rem !important; }
+.fbc-mb-0 { margin-bottom: 0 !important; }
+.fbc-mb-1 { margin-bottom: 0.25rem !important; }
+.fbc-mb-3 { margin-bottom: 1rem !important; }
+.fbc-mt-3 { margin-top: 1rem !important; }
 
-.fsk-small {
+.fbc-small {
     font-size: 0.875em;
 }
 
-.fsk-muted {
-    color: var(--fsk-muted) !important;
+.fbc-muted {
+    color: var(--fbc-muted) !important;
 }
 
 /* 欄の補助の文字（ReportFormView の文字数）。ラベル（0.85rem）の中の small は既定で 11.3px になるので、12px 以上にする */
-small.fsk-muted {
+small.fbc-muted {
     font-size: 0.75rem;
 }
 
 /* ライト／ダークのスイッチ: ダークのとき、つまみ（紫）の上のアイコンを白にする */
-.fsk-theme-switch .mud-switch-base.mud-checked [class*="mud-switch-thumb"] svg {
+.fbc-theme-switch .mud-switch-base.mud-checked [class*="mud-switch-thumb"] svg {
     color: #fff !important;
     fill: #fff !important;
 }
 
 /* 内容の列（見出し・説明・カード）は読みやすい幅で、横の中央に置く。入力のページ（問い合わせなど）の既定の幅 */
-.fsk-page-column {
+.fbc-page-column {
     width: 100%;
     max-width: 46rem;
     margin-left: auto;
@@ -597,21 +597,21 @@ small.fsk-muted {
 }
 
 /* 長文のページ（プライバシーポリシー・権利表記など）は、PC で横幅を広く使う */
-.fsk-page-column.fsk-page-column--wide {
+.fbc-page-column.fbc-page-column--wide {
     max-width: 72rem;
 }
 
-.fsk-page-card {
+.fbc-page-card {
     margin-left: auto;
     margin-right: auto;
 }
 
-.fsk-report-card {
+.fbc-report-card {
     max-width: 46rem;
 }
 
 /* ボット対策の罠（人には見えない。Tab の対象にもしない。読み上げは aria-hidden で外す） */
-.fsk-report-trap {
+.fbc-report-trap {
     position: absolute;
     left: -10000px;
     width: 1px;
@@ -619,49 +619,49 @@ small.fsk-muted {
     overflow: hidden;
 }
 
-.fsk-field.mud-input-control {
+.fbc-field.mud-input-control {
     margin: 0 !important;
 }
 
-.fsk-field .mud-input.mud-input-outlined,
-.fsk-select .mud-input.mud-input-outlined {
-    background: var(--fsk-field-bg);
+.fbc-field .mud-input.mud-input-outlined,
+.fbc-select .mud-input.mud-input-outlined {
+    background: var(--fbc-field-bg);
 }
 
 /* ---- フッター（サイト名 | 問い合わせ | プライバシーポリシー | © 年 作者 ＋ SNS） ---- */
 
-.fsk-footer {
+.fbc-footer {
     flex: none;
     box-sizing: border-box;
     padding: 0.45rem 1rem calc(0.55rem + env(safe-area-inset-bottom, 0px));
-    border-top: 1px solid var(--fsk-border);
+    border-top: 1px solid var(--fbc-border);
     font-size: 0.78rem;
-    color: var(--fsk-muted);
+    color: var(--fbc-muted);
     text-align: center;
 }
 
-.fsk-footer a {
+.fbc-footer a {
     color: inherit;
     text-decoration: underline;
     text-underline-offset: 2px;
 }
 
-.fsk-footer a:hover {
-    color: var(--fsk-brand);
+.fbc-footer a:hover {
+    color: var(--fbc-brand);
 }
 
-.fsk-footer-line {
+.fbc-footer-line {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 0.15rem 0.6rem;
 }
 
-.fsk-footer-sep {
+.fbc-footer-sep {
     opacity: 0.5;
 }
 
-.fsk-footer-socials {
+.fbc-footer-socials {
     display: inline-flex;
     gap: 0.35rem;
     margin-left: 0.2rem;
@@ -670,33 +670,33 @@ small.fsk-muted {
 
 /* スマホ: 折り返したとき、行頭・行末に区切りの | を出さない。項目は途中で改行しない */
 @media (max-width: 767.98px) {
-    .fsk-footer-line {
+    .fbc-footer-line {
         gap: 0.35rem 0.9rem;
     }
 
-    .fsk-footer-sep {
+    .fbc-footer-sep {
         display: none;
     }
 
-    .fsk-footer-line > * {
+    .fbc-footer-line > * {
         white-space: nowrap;
     }
 }
 
 /* SNS のアイコン（白い図形を、サービス色の地に置く）。当たり判定は 44px 四方 */
-a.fsk-footer-social {
+a.fbc-footer-social {
     position: relative;
     display: inline-grid;
     place-items: center;
     width: 22px;
     height: 22px;
     border-radius: 6px;
-    background: var(--brand, var(--fsk-brand));
+    background: var(--brand, var(--fbc-brand));
     color: #fff;
     text-decoration: none;
 }
 
-a.fsk-footer-social::after {
+a.fbc-footer-social::after {
     content: "";
     position: absolute;
     left: 50%;
@@ -706,33 +706,33 @@ a.fsk-footer-social::after {
     transform: translate(-50%, -50%);
 }
 
-a.fsk-footer-social:hover {
+a.fbc-footer-social:hover {
     color: #fff;
-    box-shadow: 0 3px 10px -3px var(--brand, var(--fsk-brand));
+    box-shadow: 0 3px 10px -3px var(--brand, var(--fbc-brand));
 }
 
-a.fsk-footer-social:focus-visible {
-    outline: 2px solid var(--fsk-brand);
+a.fbc-footer-social:focus-visible {
+    outline: 2px solid var(--fbc-brand);
     outline-offset: 2px;
 }
 
 /* フッターの文字リンク（問い合わせ・プライバシーポリシー）の当たり判定。見た目の高さは変えず、padding と負の margin で 44px 近くまで広げる（行間は崩れない）。
    全幅で効く（PC の 1440px でも 22px 高にならない）。SNS のアイコンは別（::after の 44px） */
-.fsk-footer a:not(.fsk-footer-social) {
+.fbc-footer a:not(.fbc-footer-social) {
     padding-block: 13px;
     margin-block: -13px;
 }
 
 /* タブレットまで（1024px 以下）のタップの大きさ。本文中の小さなリンク（プライバシーポリシー）は、
    見た目の高さは変えず、padding で当たり判定を広げる（行間は崩れない）。
-   このブロックは .fsk-footer-socials の既定の gap より後に書く（同じ詳細度で上書きするため） */
+   このブロックは .fbc-footer-socials の既定の gap より後に書く（同じ詳細度で上書きするため） */
 @media (max-width: 1024px) {
-    .fsk-small a {
+    .fbc-small a {
         padding-block: 13px;
     }
 
     /* SNS のアイコンの当たり判定（44px。::after）が隣と重ならないよう、間隔を 44px - 22px にする */
-    .fsk-footer-socials {
+    .fbc-footer-socials {
         gap: 22px;
     }
 }
@@ -742,26 +742,26 @@ a.fsk-footer-social:focus-visible {
    行と行の中心どうしは 44px 以上離す（上の行の判定が下の行に重ならない）。行の高さを 22px に固定し（サイトの line-height に左右されない）、行間を 22px にする。
    中心どうしは 22 + 22 = 44px。フッターは 2 段（名前・問い合わせ・プライバシーポリシー ／ © と SNS）のまま、高さを詰める（1 段は 360px に収まらないため。docs/changelog.md） */
 @media (max-width: 599.98px) {
-    .fsk-footer {
+    .fbc-footer {
         padding-top: 0.5rem;
         padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
     }
 
-    .fsk-footer-line {
+    .fbc-footer-line {
         row-gap: 22px;
     }
 
-    .fsk-footer-line > * {
+    .fbc-footer-line > * {
         line-height: 22px;
     }
 
-    .fsk-footer a:not(.fsk-footer-social) {
+    .fbc-footer a:not(.fbc-footer-social) {
         position: relative;
         padding-block: 0;
         margin-block: 0;
     }
 
-    .fsk-footer a:not(.fsk-footer-social)::after {
+    .fbc-footer a:not(.fbc-footer-social)::after {
         content: "";
         position: absolute;
         top: 50%;
@@ -772,7 +772,7 @@ a.fsk-footer-social:focus-visible {
     }
 
     /* 作者名の判定（幅が 44px に届かないと広がる）が、右の SNS の判定に重ならないよう、間隔を少し足す */
-    .fsk-footer-socials {
+    .fbc-footer-socials {
         margin-left: 0.5rem;
     }
 }
@@ -780,11 +780,11 @@ a.fsk-footer-social:focus-visible {
 /* ---- メンテナンス ---- */
 
 /* 「更新予定」のお知らせの帯。ヘッダーの真下に固定する（ヘッダーの高さは --mud-appbar-height） */
-.fsk-notice {
+.fbc-notice {
     flex: none;
     padding: 0.5rem 1rem;
-    background: var(--fsk-notice-bg);
-    color: var(--fsk-notice-text);
+    background: var(--fbc-notice-bg);
+    color: var(--fbc-notice-text);
     font-size: 0.9rem;
     font-weight: 700;
     text-align: center;
@@ -793,12 +793,12 @@ a.fsk-footer-social:focus-visible {
     z-index: 1030;
 }
 
-.fsk-notice-title {
+.fbc-notice-title {
     display: block;
 }
 
 /* メンテナンス画面（MAINTENANCE_MODE=true）。アプリの代わりに、この画面だけを出す */
-.fsk-maintenance {
+.fbc-maintenance {
     min-height: 100vh;
     min-height: 100dvh;
     display: grid;
@@ -806,44 +806,44 @@ a.fsk-footer-social:focus-visible {
     justify-items: center;
     padding: 24px;
     box-sizing: border-box;
-    background: var(--fsk-maintenance-bg);
-    color: var(--fsk-maintenance-text);
+    background: var(--fbc-maintenance-bg);
+    color: var(--fbc-maintenance-text);
     text-align: center;
     line-height: 1.8;
 }
 
-.fsk-maintenance h1 {
+.fbc-maintenance h1 {
     font-size: 1.5rem;
     color: #b39ddb;
 }
 
-.fsk-maintenance p {
-    color: var(--fsk-maintenance-muted);
+.fbc-maintenance p {
+    color: var(--fbc-maintenance-muted);
     margin: 0 0 0.5rem;
 }
 
-.fsk-maintenance .fsk-maintenance-schedule {
-    color: var(--fsk-maintenance-text);
+.fbc-maintenance .fbc-maintenance-schedule {
+    color: var(--fbc-maintenance-text);
     font-weight: 700;
 }
 
-.fsk-maintenance .fsk-maintenance-link {
+.fbc-maintenance .fbc-maintenance-link {
     display: inline-block;
     margin-top: 8px;
     padding: 8px 20px;
     border-radius: 99px;
-    background: var(--fsk-brand);
+    background: var(--fbc-brand);
     color: #fff;
     text-decoration: none;
     font-weight: 700;
 }
 
-/* ---- 日本語の本文の改行（.fsk-page-column の中）。語の途中で切らず、句の単位で折り返す。対応しないブラウザでは通常の折り返し ---- */
-.fsk-page-column,
-.fsk-page-column p,
-.fsk-page-column li,
-.fsk-page-column dd,
-.fsk-page-column td {
+/* ---- 日本語の本文の改行（.fbc-page-column の中）。語の途中で切らず、句の単位で折り返す。対応しないブラウザでは通常の折り返し ---- */
+.fbc-page-column,
+.fbc-page-column p,
+.fbc-page-column li,
+.fbc-page-column dd,
+.fbc-page-column td {
     word-break: normal;
     word-break: auto-phrase;
     line-break: strict;
@@ -852,12 +852,12 @@ a.fsk-footer-social:focus-visible {
 }
 
 /* 日付・数値・短い語のまとまりを、途中で切らない */
-.fsk-nowrap {
+.fbc-nowrap {
     white-space: nowrap;
 }
 
-/* ---- 404（ページが見つからない）。FaraSiteKit.Razor の NotFoundView ---- */
-.fsk-not-found {
+/* ---- 404（ページが見つからない）。FaraBlazorComponent.Razor の NotFoundView ---- */
+.fbc-not-found {
     display: grid;
     justify-items: center;
     gap: 0.5rem;
@@ -865,28 +865,28 @@ a.fsk-footer-social:focus-visible {
     text-align: center;
 }
 
-.fsk-not-found-code {
+.fbc-not-found-code {
     margin: 0;
     font-size: clamp(96px, 20vw, 180px);
     font-weight: 800;
     line-height: 1;
-    background: var(--fsk-grad);
+    background: var(--fbc-grad);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
 }
 
-.fsk-not-found h1 {
+.fbc-not-found h1 {
     margin: 0;
     font-size: 1.5rem;
 }
 
-.fsk-not-found-lead {
+.fbc-not-found-lead {
     margin: 0 0 0.75rem;
-    color: var(--fsk-muted);
+    color: var(--fbc-muted);
 }
 
-.fsk-btn-primary.mud-button-root {
+.fbc-btn-primary.mud-button-root {
     padding: 0.6rem 1.4rem;
     border-radius: 999px;
     text-transform: none;

@@ -1,4 +1,4 @@
-namespace FaraSiteKit.Core;
+namespace FaraBlazorComponent.Core;
 
 /// <summary>
 /// 確認用サイトで開いているときは、fara-labs.com 配下のリンクを確認用の URL に置き換える。

@@ -1,9 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FaraSiteKit.Core;
+using FaraBlazorComponent.Core;
 using Microsoft.JSInterop;
 
-namespace FaraSiteKit.Razor;
+namespace FaraBlazorComponent.Razor;
 
 /// <summary>
 /// ライト／ダークの状態。localStorage の SiteOptions.StorageKey（JSON。プロパティ "Theme" に "light" か "dark"）に保存する。

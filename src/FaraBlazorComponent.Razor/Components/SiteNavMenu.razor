@@ -4,7 +4,7 @@
    サイドバーの折りたたみ（PC の細い列）は SiteLayout の Mini ドロワーが行う *@
 @inject NavigationManager Nav
 
-<MudNavMenu Class="fsk-nav">
+<MudNavMenu Class="fbc-nav">
     @if (Top is not null)
     {
         @Top
@@ -13,7 +13,7 @@
     {
         @if (!string.IsNullOrEmpty(group.Title))
         {
-            <div class="fsk-nav-section">@group.Title</div>
+            <div class="fbc-nav-section">@group.Title</div>
         }
         @foreach (var item in group.Items)
         {

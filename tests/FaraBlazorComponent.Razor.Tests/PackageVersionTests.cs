@@ -1,7 +1,7 @@
 using MudBlazor;
 using Xunit;
 
-namespace FaraSiteKit.Razor.Tests;
+namespace FaraBlazorComponent.Razor.Tests;
 
 /// <summary>依存（MudBlazor）の版を確かめる。計画（9.11.0）から外れたら、ここで気づく。</summary>
 public class PackageVersionTests

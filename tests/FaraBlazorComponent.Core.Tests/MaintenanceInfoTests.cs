@@ -1,8 +1,8 @@
 using System.Net;
-using FaraSiteKit.Core;
+using FaraBlazorComponent.Core;
 using Xunit;
 
-namespace FaraSiteKit.Core.Tests;
+namespace FaraBlazorComponent.Core.Tests;
 
 /// <summary>メンテナンスの状態（Worker の変数 MAINTENANCE_MODE / MAINTENANCE_MESSAGE）の読み取り（MaintenanceInfo）。読めなければ通常として扱う。</summary>
 public class MaintenanceInfoTests

@@ -1,5 +1,5 @@
 // レイアウトの自動計測（kit 共通）。各サイトは、設定（layout-check.config.mjs）と、配信中のサイトの URL を渡して使う。
-//   import { runLayoutCheck } from "../external/fara-site-kit/tools/layout-check/index.mjs";
+//   import { runLayoutCheck } from "../external/fara-blazor-component/tools/layout-check/index.mjs";
 // 依存は playwright-core のみ（各サイトの devDependency）。読み込みは実行のときだけ行うので、判定の関数（rules.mjs）は依存なしで使える。
 // 使い方と設定の例は docs/layout-check.md。
 

@@ -5,7 +5,7 @@
 @foreach (var social in Site.VisibleSocial.Where(s => IsSafeUrl(s.Url)))
 {
     var service = SocialServices.Find(social.Service);
-    <a class="fsk-footer-social fsk-service-@social.Service" href="@social.Url" target="_blank" rel="noopener noreferrer"
+    <a class="fbc-footer-social fbc-service-@social.Service" href="@social.Url" target="_blank" rel="noopener noreferrer"
        aria-label="@service.Label" title="@service.Label" style="--brand: @service.Color">
         <SocialIcon Name="@social.Service" Size="13" />
     </a>
