@@ -64,7 +64,7 @@
             {
                 <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" NoIcon="true" Class="fsk-mb-3" role="alert">@error</MudAlert>
             }
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SendAsync" Disabled="@(sending || disabled)">@(sending ? "送信中…" : "送信する")</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SendAsync" Disabled="@(sending || disabled)" Class="fsk-report-submit">@(sending ? "送信中…" : "送信する")</MudButton>
             <p class="fsk-small fsk-muted fsk-mt-3 fsk-mb-0">送信すると、<a href="@Site.PrivacyPath">プライバシーポリシー</a>に書いたとおり、内容が作者に通知されます。個人情報（パスワード・アクセスキーなど）は書かないでください。</p>
         }
     </MudCardContent>

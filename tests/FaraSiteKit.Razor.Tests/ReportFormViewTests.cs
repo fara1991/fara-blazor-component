@@ -65,6 +65,14 @@ public class ReportFormViewTests : SiteKitTestContext
     }
 
     [Fact]
+    public void TheSubmitButtonHasTheClassThatGivesPhonesA44PxTapTarget()
+    {
+        var cut = RenderForm();
+
+        Assert.Contains("fsk-report-submit", cut.Find("button.mud-button-filled").ClassName);
+    }
+
+    [Fact]
     public void TheContentPanelUsesTheCenteredColumnClasses()
     {
         var cut = RenderForm();
