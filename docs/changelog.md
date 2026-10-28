@@ -2,6 +2,22 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 0.5.2
+
+2026-10-29。
+3 回目のレビュー指摘の修正。公開 API（部品のパラメータ・CSS のクラス名・Worker の入出力）は変えない。**挙動が変わる点**: (1) `MaintenanceInfo.LoadAsync` は、通信の失敗・時間切れ（`HttpRequestException`・`TaskCanceledException`）は従来どおり通常として黙って扱い、それ以外の例外は通常として扱うが、型名だけを `Console.Error` に出す（従来は何も出なかった）。(2) 報告の受け口（`worker/report.js`）の通信の例外のログは、名前と、URL・トークンを伏せたメッセージになる（従来は名前だけ）。
+
+- 例外の処理（レビュー指摘）: `SiteLayout.razor` に残っていた型のない空の `catch { }`（4 か所）を、`JSException`・`JSDisconnectedException` だけを受ける形にした（v0.5.0 の見落とし）。`src/` の `.razor`・`.cs` に型のない `catch {` が残らないことをテスト（`NoBareCatchBlocksAreLeftInTheRazorOrCoreSources`）で確かめる。JS（`wwwroot/js`）の `catch (e) { /* ... */ }` は型の無い書き方で、理由のコメントつきの意図した無視（turnstile の reset など）。
+- `MaintenanceInfo.LoadAsync`（レビュー指摘）: 例外の捕捉を `HttpRequestException`・`TaskCanceledException`・`JsonException` に絞った。それ以外は通常として扱い、型名だけを `Console.Error` に残す（起動時にログで見えるように。メッセージは出さない）。テスト 2 件を足した（型名だけが出ること・通信の失敗と時間切れでは何も出ないこと）。
+- Worker（レビュー指摘）: `worker/error-summary.js` を足した（`errorSummary(error)`）。名前とメッセージを出し、URL・`Bearer`・`token=`／`token:`・24 字以上の英数字の連続を伏せ、200 字で切る。Error 以外の値も同じ規則に通し、文字列にできない値（Symbol）は中身を出さない。portfolio の `worker/index.js` の実装を元にした。`worker/report.js` の通信の例外のログは、この関数を使う。サイトの Worker は `import { errorSummary } from "../external/fara-site-kit/worker/error-summary.js"` で使える（`docs/usage.md` の 2）。
+- ドキュメント（レビュー指摘）: `worker/maintenance.js` の先頭コメントの「5 つのリポジトリに同じ内容を置いている」を、「各サイトは kit の `worker/` を submodule から読む（コピーを持つサイトもある）」に直した。
+- アクセシビリティ・CSS（レビュー指摘）: ページ全体の既定のフォーカスの枠を足した（`html a:focus-visible`・`html button:focus-visible`・`html [role="button"]:focus-visible`・`html [tabindex]:focus-visible`・サイドバーの `.mud-nav-link:focus-visible`。MudBlazor の reset に負けない詳細度。色は `--fsk-focus`）。入力欄（input・textarea・select）は対象外（MudBlazor が枠線の色で示す）。
+- 色（レビュー指摘）: 報告の受付停止の文（`ReportFormView` の警告。class `fsk-report-unavailable`）の文字色を、変数 `--fsk-warning-text` で決めるようにした。白地での既定の橙（`#d68100`・約 3.0:1）は、4.5:1 以上の `#9a5b00`（白地 5.43:1、本文の背景 4.99:1）にし、ダークは `#ffb74d`（`#1a1030` で 10.45:1）。
+- ドロワー（レイアウトレビュー）: スマホで閉じているサイドバー（`MudDrawer`）に `inert` を付けた（画面の外の項目が Tab で止まらず、支援技術からも外れる）。開くと外れ、Esc で閉じると付く（フォーカスはメニューボタンへ戻る）。PC（常に見える列）では付けない。`MudDrawer` の `UserAttributes` で付ける（閉じた状態も DOM に残るため、版に依存しない属性で止める）。テスト 3 件（SiteLayoutTests）。サイドバーの `id` は `UserAttributes` に移した（`#fsk-sidebar` は変わらない）。
+- 報告フォームの 44px（レイアウトレビュー）: 送信ボタン・入力欄の高さ 44px を、600px 未満から **1024px 以下**に広げた（768〜1440 でも小さいままにしない。見た目の幅・色は変えない）。
+- フッターのリンク（レイアウトレビュー）: 問い合わせ・プライバシーポリシーの当たり判定の拡大（padding-block・負の margin）を、1024px 以下だけでなく全幅にした（見た目は変えない）。SNS の間隔は従来どおり 1024px 以下の 22px。portfolio の `.fsk-footer-socials { gap: 6px }` による上書きは portfolio 側で直す（kit では触らない）。
+- テスト: `worker/error-summary.test.mjs`（トークンだけの文字列・`token:`・URL つき・長いメッセージ・Error 以外の値・Symbol）、`worker/report.test.mjs`（Discord・Turnstile の通信の例外のログに秘密が出ない）、`MaintenanceInfoTests`（ログの型名だけ・通信の失敗で何も出ないこと）、`StaticAssetTests`（ページ全体のフォーカスの枠・受付停止の文の対比・型のない `catch {` が無いこと）。
+
 ## 0.5.1
 
 2026-10-28。

@@ -89,6 +89,50 @@ public class MaintenanceInfoTests
     }
 
     [Fact]
+    public async Task Load_logs_only_the_type_name_of_an_unexpected_exception()
+    {
+        var handler = new FakeHandler((_, _) => throw new InvalidOperationException("secret-detail-xyz"));
+        var stderr = new StringWriter();
+        var original = Console.Error;
+        Console.SetError(stderr);
+        try
+        {
+            Assert.Equal(MaintenanceInfo.Off, await MaintenanceInfo.LoadAsync(Client(handler)));
+        }
+        finally
+        {
+            Console.SetError(original);
+        }
+        var logged = stderr.ToString();
+        Assert.Contains("InvalidOperationException", logged);
+        Assert.DoesNotContain("secret-detail-xyz", logged);
+    }
+
+    [Fact]
+    public async Task Load_does_not_log_a_network_failure_or_a_timeout()
+    {
+        var failing = new FakeHandler((_, _) => throw new HttpRequestException("offline"));
+        var slow = new FakeHandler(async (_, ct) =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(30), ct);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+        var stderr = new StringWriter();
+        var original = Console.Error;
+        Console.SetError(stderr);
+        try
+        {
+            Assert.Equal(MaintenanceInfo.Off, await MaintenanceInfo.LoadAsync(Client(failing)));
+            Assert.Equal(MaintenanceInfo.Off, await MaintenanceInfo.LoadAsync(Client(slow), TimeSpan.FromMilliseconds(50)));
+        }
+        finally
+        {
+            Console.SetError(original);
+        }
+        Assert.Equal("", stderr.ToString());
+    }
+
+    [Fact]
     public async Task Load_treats_an_unexpected_exception_as_normal()
     {
         var handler = new FakeHandler((_, _) => throw new InvalidOperationException("unexpected"));

@@ -19,6 +19,14 @@ import { handleReport } from "../external/fara-site-kit/worker/report.js";
 import { getMaintenance, maintenanceResponse } from "../external/fara-site-kit/worker/maintenance.js";
 ```
 
+例外をログに出すときは、kit の `error-summary.js` の `errorSummary` を使う（サイトごとのコピーは持たない。報告と同じ規則）。名前とメッセージを出し、URL（Webhook の URL を含む）・Bearer・`token=`／`token:`・24 字以上の英数字の連続を伏せ、200 字で切る。Error 以外の値も文字列にして同じ規則に通す。
+
+```js
+import { errorSummary } from "../external/fara-site-kit/worker/error-summary.js";
+
+console.error(`報告の受け口で例外: ${errorSummary(error)}`);
+```
+
 - wrangler は、サブモジュールの中のファイルもバンドルする（`wrangler deploy --dry-run` で確認する）。
 - サイトの `package.json` のテストは、kit のテストファイルを指す（例: `node --test external/fara-site-kit/worker/report.test.mjs`）。
 
