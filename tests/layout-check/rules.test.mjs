@@ -15,6 +15,7 @@ import {
   isInlineLink,
   isOffscreen,
   normalizeConfig,
+  statusOk,
   tapHalfOffset,
   tapTargetOk,
   validateExclusions,
@@ -23,10 +24,12 @@ import {
 const base = { baseURL: "http://localhost:8820", pages: ["/"] };
 const style = (over = {}) => ({ outlineStyle: "none", outlineWidth: 0, boxShadow: "none", borderColors: ["a", "b", "c", "d"], ...over });
 
-test("tapHalfOffset は 44px の箱の中心から ±21.5（画素の中心どうし）", () => {
+test("tapHalfOffset は 44px なら中心から ±20（隣と 44px 間隔の境目 22px より内側）", () => {
   assert.equal(TAP_MIN_SIZE, 44);
-  assert.equal(tapHalfOffset(44), 21.5);
-  assert.equal(tapHalfOffset(48), 23.5);
+  assert.equal(tapHalfOffset(44), 20);
+  assert.equal(tapHalfOffset(48), 22);
+  // 隣の要素の 44px の箱は、中心から 22px 手前から始まる（間隔 44 の場合）。±20 の点は、それより内側
+  assert.equal(tapHalfOffset(44) < 44 - 22, true);
 });
 
 test("押せる範囲: 上下左右の点がすべて自分に当たれば OK、1 つでも外れたら NG", () => {
@@ -42,11 +45,18 @@ test("押せる範囲: 上下左右の点がすべて自分に当たれば OK、
 });
 
 test("文中のリンク（inline で前後に文字がある）は押せる範囲の判定から外す", () => {
-  assert.equal(isInlineLink({ display: "inline", hasTextBefore: true, hasTextAfter: false }), true);
-  assert.equal(isInlineLink({ display: "inline", hasTextBefore: false, hasTextAfter: true }), true);
-  assert.equal(isInlineLink({ display: "inline", hasTextBefore: false, hasTextAfter: false }), false);
-  assert.equal(isInlineLink({ display: "inline-block", hasTextBefore: true, hasTextAfter: true }), false);
-  assert.equal(isInlineLink({ display: "block", hasTextBefore: true, hasTextAfter: true }), false);
+  const paragraph = { display: "inline", hasTextBefore: true, hasTextAfter: false, inParagraph: true };
+  assert.equal(isInlineLink(paragraph), true);
+  assert.equal(isInlineLink({ ...paragraph, hasTextBefore: false, hasTextAfter: true }), true);
+  assert.equal(isInlineLink({ ...paragraph, hasTextBefore: false, hasTextAfter: false }), false, "前後に文字が無い");
+  assert.equal(isInlineLink({ ...paragraph, display: "inline-block" }), false);
+  assert.equal(isInlineLink({ ...paragraph, display: "block" }), false);
+});
+
+test("表のセル（段落でない）の中のリンクは、文字が横にあっても文中のリンクとして外さない", () => {
+  // 「詳細は [ここ]」のような表のセル。文字が横にあるが、段落ではない
+  assert.equal(isInlineLink({ display: "inline", hasTextBefore: true, hasTextAfter: false, inParagraph: false }), false);
+  assert.equal(isInlineLink({ display: "inline", hasTextBefore: false, hasTextAfter: false, inParagraph: false }), false);
 });
 
 test("文字の大きさ: 12px 以上が OK（既定）、未満と測れない値は NG", () => {
@@ -108,8 +118,8 @@ test("normalizeConfig: 既定値・ページの省略形・ルールの既定の
   const config = normalizeConfig({ ...base, pages: ["/", { path: "/works" }] });
   assert.deepEqual(config.viewports, [...DEFAULT_VIEWPORTS]);
   assert.deepEqual(config.pages, [
-    { path: "/", name: "/" },
-    { path: "/works", name: "/works" },
+    { path: "/", name: "/", allowStatus: [] },
+    { path: "/works", name: "/works", allowStatus: [] },
   ]);
   assert.equal(config.baseURL, "http://localhost:8820");
   assert.equal(config.rules["menu-esc"], false, "buttonSelector が無いと menu-esc は off");
@@ -136,6 +146,30 @@ test("normalizeConfig: 不正な設定は LayoutCheckConfigError", () => {
   assert.throws(() => normalizeConfig({ ...base, rules: { "menu-esc": true } }), /buttonSelector/);
   assert.throws(() => normalizeConfig({ ...base, exclusions: [{ rule: "tap-target", selector: "#x" }] }), /reason/);
   assert.throws(() => normalizeConfig({ ...base, timeoutMs: -1 }), /timeoutMs/);
+});
+
+test("reducedMotion（既定 true）と includeDisabled（既定 false）の既定値と検査", () => {
+  const config = normalizeConfig(base);
+  assert.equal(config.reducedMotion, true);
+  assert.equal(config.includeDisabled, false);
+  assert.equal(normalizeConfig({ ...base, reducedMotion: false, includeDisabled: true }).reducedMotion, false);
+  assert.throws(() => normalizeConfig({ ...base, reducedMotion: "reduce" }), /reducedMotion/);
+  assert.throws(() => normalizeConfig({ ...base, includeDisabled: 1 }), /includeDisabled/);
+});
+
+test("allowStatus: ページごとに許すステータス。省くと空（2xx だけ）、不正な値は設定エラー", () => {
+  const config = normalizeConfig({ ...base, pages: ["/", { path: "/missing", name: "404", allowStatus: [404] }] });
+  assert.deepEqual(config.pages.map((p) => p.allowStatus), [[], [404]]);
+  assert.throws(() => normalizeConfig({ ...base, pages: [{ path: "/x", allowStatus: "404" }] }), /allowStatus/);
+  assert.throws(() => normalizeConfig({ ...base, pages: [{ path: "/x", allowStatus: [99] }] }), /allowStatus/);
+});
+
+test("statusOk: 2xx は OK。それ以外は allowStatus に書いたものだけ OK", () => {
+  assert.equal(statusOk(200), true);
+  assert.equal(statusOk(204), true);
+  assert.equal(statusOk(404), false, "許していない 404 は NG");
+  assert.equal(statusOk(404, [404]), true);
+  assert.equal(statusOk(500, [404]), false);
 });
 
 test("違反の 1 行表示", () => {

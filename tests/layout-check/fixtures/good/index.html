@@ -14,6 +14,7 @@
   .drawer a { display: block; min-height: 44px; line-height: 44px; padding: 0 16px; color: #f5f5f5; }
   main { padding: 16px; }
   main p { font-size: 14px; }
+  .cell-action { display: block; min-width: 44px; min-height: 44px; line-height: 44px; }
   .action { min-width: 44px; min-height: 44px; font-size: 16px; }
   footer { padding: 16px; }
   footer a { display: inline-block; min-height: 44px; line-height: 44px; padding: 0 8px; color: #f5f5f5; }
@@ -32,6 +33,8 @@
   <h1>正しい例</h1>
   <p>本文の <a href="#inline">リンク</a> の続き（文中のリンクは、押せる範囲の判定から外す）。</p>
   <button class="action" type="button">送信</button>
+  <!-- 表のセルの中のリンク（文字が無く、リンクだけの 44px の判定）。違反にしない -->
+  <table><tr><td><a class="cell-action" href="#cell">詳細</a></td></tr></table>
 </main>
 <footer><a href="#privacy">プライバシー</a></footer>
 <script>
