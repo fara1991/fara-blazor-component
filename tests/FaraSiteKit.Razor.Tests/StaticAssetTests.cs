@@ -53,6 +53,19 @@ public class StaticAssetTests
         Assert.Contains($"data-sidebar-key=\"{options.SidebarKey}\"", template);
     }
 
+    [Fact]
+    public void FocusRingsAndTapTargetsAreInTheStylesheetWithEnoughSpecificity()
+    {
+        var css = ReadRazorFile("wwwroot/css/fara-site-kit.css");
+
+        // MudBlazor の reset（a:focus-visible の outline: none）に負けない詳細度で、キーボードの枠を出す
+        Assert.Contains(".fsk-header :is(a, button):focus-visible", css);
+        Assert.Contains(".fsk-skip-link:focus-visible", css);
+        // スマホの当たり判定（44px）と、ラベルの中の補助の文字（12px 以上）
+        Assert.Contains("@media (max-width: 599.98px)", css);
+        Assert.Contains("small.fsk-muted", css);
+    }
+
     [Theory]
     [InlineData("fsk-page")]
     [InlineData("fsk-header")]

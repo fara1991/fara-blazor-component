@@ -41,6 +41,14 @@ body {
     outline: none;
 }
 
+/* フォーカスの枠（キーボードの利用者向け）。MudBlazor の reset（a:focus-visible の outline: none）に負けないように、詳細度を上げる。
+   色は --fsk-focus（既定はヘッダーで見やすい淡い紫。本文の「本文へ移動」の色はサイトの :root で替えられる） */
+.fsk-header :is(a, button):focus-visible,
+.fsk-skip-link:focus-visible {
+    outline: 2px solid var(--fsk-focus, #e9d5ff);
+    outline-offset: 2px;
+}
+
 /* 「本文へ移動」（キーボードの利用者向け）。普段は画面の外に置き、Tab で出る */
 .fsk-skip-link {
     position: absolute;
@@ -410,6 +418,29 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
     }
 }
 
+/* スマホ（600px 未満）のタップの大きさ（WCAG 2.5.5 の 44px）。見た目の高さは変えず、padding と負の margin で当たり判定を広げる */
+@media (max-width: 599.98px) {
+    .fsk-header .fsk-menu-toggle {
+        width: 44px;
+        height: 44px;
+    }
+
+    a.fsk-brand {
+        padding-block: 12px;
+        margin-block: -12px;
+    }
+
+    .fsk-theme-switch .mud-switch {
+        padding: 10px;
+        margin: -10px;
+    }
+
+    .fsk-footer a {
+        padding-block: 10px;
+        margin-block: -10px;
+    }
+}
+
 /* ---- 内容の列・報告フォーム ---- */
 
 /* 画面の題名（見出しの下に区切り線）。カードは薄い枠で囲む */
@@ -422,6 +453,13 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
 .fsk-page-header h1,
 .fsk-page-header h3 {
     margin-bottom: 0.25rem;
+}
+
+/* 題名（ReportFormView）。見出しのレベルを h1 にしても、見た目は従来の h3 と同じ（大きさ・太さ・余白） */
+.fsk-page-header .fsk-page-title {
+    margin: 1em 0 0.25rem;
+    font-size: 1.17em;
+    font-weight: 700;
 }
 
 .fsk-card {
@@ -465,6 +503,11 @@ html .fsk-page.fsk-no-drawer .mud-main-content {
 
 .fsk-muted {
     color: var(--fsk-muted) !important;
+}
+
+/* 欄の補助の文字（ReportFormView の文字数）。ラベル（0.85rem）の中の small は既定で 11.3px になるので、12px 以上にする */
+small.fsk-muted {
+    font-size: 0.75rem;
 }
 
 /* ライト／ダークのスイッチ: ダークのとき、つまみ（紫）の上のアイコンを白にする */
