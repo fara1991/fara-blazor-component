@@ -2,8 +2,9 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
-## 未リリース
+## 0.5.2
 
+2026-10-29。
 3 回目のレビュー指摘の修正。公開 API（部品のパラメータ・CSS のクラス名・Worker の入出力）は変えない。**挙動が変わる点**: (1) `MaintenanceInfo.LoadAsync` は、通信の失敗・時間切れ（`HttpRequestException`・`TaskCanceledException`）は従来どおり通常として黙って扱い、それ以外の例外は通常として扱うが、型名だけを `Console.Error` に出す（従来は何も出なかった）。(2) 報告の受け口（`worker/report.js`）の通信の例外のログは、名前と、URL・トークンを伏せたメッセージになる（従来は名前だけ）。
 
 - 例外の処理（レビュー指摘）: `SiteLayout.razor` に残っていた型のない空の `catch { }`（4 か所）を、`JSException`・`JSDisconnectedException` だけを受ける形にした（v0.5.0 の見落とし）。`src/` の `.razor`・`.cs` に型のない `catch {` が残らないことをテスト（`NoBareCatchBlocksAreLeftInTheRazorOrCoreSources`）で確かめる。JS（`wwwroot/js`）の `catch (e) { /* ... */ }` は型の無い書き方で、理由のコメントつきの意図した無視（turnstile の reset など）。
