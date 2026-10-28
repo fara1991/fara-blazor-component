@@ -103,7 +103,10 @@ function measureFonts({ ignore, excluded }) {
  */
 function measureTaps({ selector, half, excluded }) {
   const out = [];
-  const inViewport = (x, y) => x >= 0 && y >= 0 && x < window.innerWidth && y < window.innerHeight;
+  // 画面の端の外（elementFromPoint が null を返す点）は測らない。ページの末尾で要素を中央に寄せられないときに起きる。
+  const width = document.documentElement.clientWidth;
+  const height = document.documentElement.clientHeight;
+  const inViewport = (x, y) => x >= 0 && y >= 0 && x < width && y < height;
   for (const el of document.querySelectorAll(selector)) {
     if (el.getClientRects().length === 0) continue;
     el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
@@ -112,9 +115,8 @@ function measureTaps({ selector, half, excluded }) {
     const cx = (r.left + r.right) / 2;
     const cy = (r.top + r.bottom) / 2;
     const points = [[cx, cy], [cx - half, cy], [cx + half, cy], [cx, cy - half], [cx, cy + half]].map(([x, y]) => {
-      const tested = inViewport(x, y);
-      const hit = tested && el.contains(document.elementFromPoint(x, y));
-      return { tested, hit };
+      const at = inViewport(x, y) ? document.elementFromPoint(x, y) : null;
+      return { tested: at !== null, hit: at !== null && el.contains(at) };
     });
     out.push({
       selector: window.__layoutCheck.describe(el),

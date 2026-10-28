@@ -2,11 +2,20 @@
 
   <!--
     kit の C# の静的解析（ラチェット）。ルールの中身と理由は tools/lint/dotnet.editorconfig と docs/lint.md。
-    この props は kit の中のプロジェクトだけに効く（サイトのプロジェクトは、サイト自身の Directory.Build.props を使う）。
-    サイトが同じルールを使うときは、docs/lint.md の「各サイトへの取り込み」を見る。
+    この props は kit の中のプロジェクトだけに効く（kit を取り込んだサイトの Directory.Build.props は、kit のプロジェクトには読まれない。
+    MSBuild は、プロジェクトから一番近い 1 つだけを読むため）。サイトが同じルールを使うときは、docs/lint.md の「各サイトへの取り込み」を見る。
   -->
 
+  <!--
+    Windows (Visual Studio) と WSL の dotnet で同じフォルダーをビルドすると、obj の復元結果を互いに上書きしてしまう。
+    Windows 以外では別フォルダーに出力する（pokemon・album の Directory.Build.props と同じ。kit のプロジェクトを、サイトの ProjectReference で WSL からビルドするため）。
+  -->
+  <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
+    <BaseIntermediateOutputPath>$(MSBuildProjectDirectory)/obj.unix/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildProjectDirectory)/bin.unix/</BaseOutputPath>
+  </PropertyGroup>
   <PropertyGroup>
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj/**;bin/**;obj.unix/**;bin.unix/**</DefaultItemExcludes>
     <!-- IDE の規則（IDE0059 など）を dotnet build でも検査する -->
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>

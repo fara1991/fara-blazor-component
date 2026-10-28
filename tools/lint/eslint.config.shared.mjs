@@ -37,9 +37,13 @@ const ENVIRONMENTS = {
   browser: globals.browser,
 };
 
-/** 全体の無視（依存・生成物・ビルドの出力）。 */
+/**
+ * 全体の無視（依存・生成物・ビルドの出力）。
+ * external/** は、サイトに取り込んだ kit（submodule）。kit は自分の CI で lint するので、サイトの lint の対象から外す
+ * （kit の JS には、画面・Worker・Node それぞれの環境のグローバルが要るため、サイトの設定では誤った違反になる）。
+ */
 export const sharedIgnores = {
-  ignores: ["**/node_modules/**", "**/bin/**", "**/obj/**", "**/publish/**", "**/artifacts/**", ".wrangler/**"],
+  ignores: ["**/node_modules/**", "**/bin/**", "**/obj/**", "**/publish/**", "**/artifacts/**", ".wrangler/**", "external/**"],
 };
 
 /**

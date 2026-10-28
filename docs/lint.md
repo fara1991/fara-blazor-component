@@ -62,6 +62,7 @@
 3. `npm run lint` を CI に足す（kit の `lint` job と同じ。`npm ci` の後に `npm run lint`）。
 
 **注意**: 共通設定は `globals` を import する。import はファイルの場所から探すので、**サイトの node_modules に `globals` が要る**（kit の devDependency は、submodule 側には入らない）。
+共通設定は `external/**`（取り込んだ kit）を lint の対象から外している。kit の JS は kit の CI で lint する（画面・Worker・Node で必要なグローバルが違うため、サイトの設定では誤った違反になる）。
 
 ## 2. C#（アナライザー）
 
