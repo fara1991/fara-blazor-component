@@ -13,7 +13,7 @@ const TIP = "a".repeat(40);
 const OK = "on:\n  workflow_dispatch:\n    inputs:\n      maintenance_mode:\n        type: choice\n      maintenance_message:\n        type: string\n";
 /** 入力の無い古いワークフロー（run の中に文字列があっても、入力とは数えない）。 */
 const OLD = "name: old\non: push\njobs:\n  a:\n    steps:\n      - run: echo maintenance_mode\n";
-const REPOS = { pokemon: "fara1991/fara-pokemon-battle-assistant", avatar: "fara1991/fara-avatar-modding-guide", bot: "fara1991/fara-bot-moderator", portfolio: "fara1991/fara-portfolio-site" };
+const REPOS = { pokemon: "fara1991/fara-pokemon-battle-assistant", avatar: "fara1991/fara-avatar-modding-guide", bot: "fara1991/fara-bot-moderator", portfolio: "fara1991/fara-labs" };
 const base = { RUN_REF: "refs/heads/master", TARGET_DEVELOP: "true", TARGET_MASTER: "false", MAINTENANCE_MODE_INPUT: "notice", MAINTENANCE_MESSAGE_INPUT: "" };
 
 /**
