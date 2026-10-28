@@ -228,7 +228,7 @@ public class ReportFormViewTests : SiteKitTestContext
 
         cut.Find("button.mud-button-filled").Click();
 
-        cut.WaitForAssertion(() => Assert.Contains("1 日の送信の上限に達しました", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("1 日の送信上限（3 回）に達しました。明日もう一度お試しください。", cut.Markup));
     }
 
     [Fact]

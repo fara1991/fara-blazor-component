@@ -17,11 +17,13 @@
 // 報告の本文は個人情報になりうるので、保存しない（Discord に送るだけ）。
 // 1 日の回数の制限（REPORT_LIMITER のバインディングがあるサイトだけ。report-rate-limit.js）: Turnstile を通った送信の試みを、送信元（CF-Connecting-IP）ごとに
 // 1 日 3 回まで数える。超えたら 429（Retry-After は次の JST 0 時まで）。数えるのは、短縮ハッシュと回数だけ（IP は保存しない）。
-// 数えられない（IP が無い・DO の例外）ときは制限せず送る（fail-open。Turnstile が残っている）。
+// Discord への送信が失敗したときは、数えた 1 回を戻す（届いていない分で枠を使い切らない）。戻しの失敗は応答を変えない（ログだけ）。
+// 鍵は TURNSTILE_SECRET から用途ラベル付きで導く（HMAC）。秘密鍵を変えると、識別子が変わって計数はリセットされる。
+// 数えられない（IP・秘密鍵が無い、DO の例外）ときは制限せず送る（fail-open。Turnstile が残っている）。
 
 import { cleanText as clean } from "./text.js";
 import { errorSummary } from "./error-summary.js";
-import { REPORT_DAILY_LIMIT, clientHash, hitReportLimiter, jstDay, secondsUntilNextJstMidnight } from "./report-rate-limit.js";
+import { REPORT_DAILY_LIMIT, clientHash, hitReportLimiter, jstDay, releaseReportLimiter, secondsUntilNextJstMidnight } from "./report-rate-limit.js";
 
 /**
  * 本文のバイト数の上限（Content-Length の宣言も、実際に読んだ量も）。32 KB。
@@ -96,29 +98,47 @@ export function isConfigured(env) {
   return Boolean(env.TURNSTILE_SITE_KEY && env.TURNSTILE_SECRET && env.DISCORD_WEBHOOK_URL);
 }
 
+const NO_LIMIT = { response: null, release: null };
+
 /**
- * 送信元の 1 日の回数を数える。上限に達していれば 429 の応答を返す。数えられないとき（IP が無い・DO の例外）は null を返し、送信は通す（fail-open）。
- * ログには IP・ハッシュ・DO の内部の値を出さない（errorSummary の要約だけ）。
+ * 送信元の 1 日の回数を数える（Turnstile を通った送信の試みだけ）。戻り値 { response, release }。
+ * - 上限に達している: response に 429 を入れる（release は null）。
+ * - 数えた: response は null。release は、Discord への送信が失敗したときに呼ぶ戻し（失敗しても例外を投げない）。
+ * - 数えられない（IP や秘密鍵が無い・DO の例外）: どちらも null（fail-open）。
+ * ログには IP・ハッシュ・秘密鍵・DO の内部の値を出さない（errorSummary の要約だけ）。
  * @param {Request} request
  * @param {Record<string, any>} env
  * @param {Date} now
- * @returns {Promise<Response | null>}
+ * @returns {Promise<{ response: Response | null, release: (() => Promise<void>) | null }>}
  */
 async function checkDailyLimit(request, env, now) {
   const ip = request.headers.get("CF-Connecting-IP");
   if (!ip) {
     console.warn("report: daily limit skipped, no CF-Connecting-IP");
-    return null;
+    return NO_LIMIT;
   }
+  if (!env.TURNSTILE_SECRET) {
+    console.error("report: daily limit unavailable (no key), sending anyway");
+    return NO_LIMIT;
+  }
+  const day = jstDay(now);
+  let hash;
   try {
-    const day = jstDay(now);
-    const { allowed } = await hitReportLimiter(env.REPORT_LIMITER, { day, hash: await clientHash(ip, day), limit: REPORT_DAILY_LIMIT });
-    if (allowed) return null;
+    hash = await clientHash(env.TURNSTILE_SECRET, ip, day);
+    const { allowed } = await hitReportLimiter(env.REPORT_LIMITER, { day, hash, limit: REPORT_DAILY_LIMIT });
+    if (!allowed) return { response: json(429, { error: "rate_limited", message: RATE_LIMITED_MESSAGE }, { "Retry-After": String(secondsUntilNextJstMidnight(now)) }), release: null };
   } catch (error) {
     console.error("report: daily limit unavailable, sending anyway", errorSummary(error));
-    return null;
+    return NO_LIMIT;
   }
-  return json(429, { error: "rate_limited", message: RATE_LIMITED_MESSAGE }, { "Retry-After": String(secondsUntilNextJstMidnight(now)) });
+  const release = async () => {
+    try {
+      await releaseReportLimiter(env.REPORT_LIMITER, { day, hash });
+    } catch (error) {
+      console.error("report: daily limit release failed", errorSummary(error));
+    }
+  };
+  return { response: null, release };
 }
 
 /**
@@ -194,10 +214,8 @@ export async function handleReport(request, env, siteName, deps = {}) {
 
   const now = deps.now?.() ?? new Date();
   // 1 日の回数（Turnstile を通った送信の試みだけを数える。REPORT_LIMITER が無いサイトでは何もしない）
-  if (env.REPORT_LIMITER) {
-    const limited = await checkDailyLimit(request, env, now);
-    if (limited) return limited;
-  }
+  const limit = env.REPORT_LIMITER ? await checkDailyLimit(request, env, now) : NO_LIMIT;
+  if (limit.response) return limit.response;
 
   // Discord へ。@everyone などのメンションは無効にする
   const fields = [{ name: "種類", value: CATEGORIES[category], inline: true }];
@@ -220,10 +238,12 @@ export async function handleReport(request, env, siteName, deps = {}) {
     const res = await doFetch(env.DISCORD_WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!res.ok) {
       console.error("report: discord webhook failed, status", res.status);
+      await limit.release?.();
       return json(502, { error: "notify_failed", message: "送信に失敗しました。しばらくしてからもう一度お試しください" });
     }
   } catch (error) {
     console.error("report: discord webhook request failed", errorSummary(error));
+    await limit.release?.();
     return json(502, { error: "notify_failed", message: "送信に失敗しました。しばらくしてからもう一度お試しください" });
   }
   return json(200, { ok: true });

@@ -45,7 +45,7 @@ Worker の変数（ダッシュボードの「変数とシークレット」、�
 
 ### 2.2 報告の回数制限（1 日 3 回まで・送信元ごと）
 
-報告の受け口（`handleReport`）は、Turnstile を通った送信の試みを、送信元（Cloudflare の `CF-Connecting-IP`）ごとに **1 日 3 回まで** 数える。超えたら 429（`{"error":"rate_limited","message":"…"}`・`Retry-After` は次の JST 0 時までの秒）。数えるのは Discord へ送る直前の 1 回だけで、Turnstile の失敗・本文の不正・罠の欄で弾いたものは数えない。
+報告の受け口（`handleReport`）は、Turnstile を通った送信の試みを、送信元（Cloudflare の `CF-Connecting-IP`）ごとに **1 日 3 回まで** 数える。超えたら 429（`{"error":"rate_limited","message":"1 日の送信上限（3 回）に達しました。明日もう一度お試しください。"}`・`Retry-After` は次の JST 0 時までの秒）。数えるのは、Discord へ送る直前の 1 回。Turnstile の失敗・本文の不正・罠の欄で弾いたものは数えない。**Discord への送信が失敗したときは、数えた 1 回を戻す**（届いていない分で枠を使い切らない）。
 
 **有効化の手順（opt-in）**: 次の 2 つを、サイトの Worker に入れる。バインディングが無いサイトは、今までどおり（制限なし）。
 
@@ -53,7 +53,7 @@ Worker の変数（ダッシュボードの「変数とシークレット」、�
 ```js
 export { ReportRateLimiter } from "../external/fara-site-kit/worker/report-rate-limit.js";
 ```
-2. `wrangler.jsonc` に、バインディングと migrations を書く。`durable_objects` と `migrations` は環境（`env.develop`）を継承しないので、**本番とdevelop の両方に**書く。SQLite の DO（`new_sqlite_classes`）を使う（新しい DO はこの形で作る。プランごとの対応は Cloudflare の DO の docs で確かめる）。
+2. `wrangler.jsonc` に、バインディングと migrations を書く。`durable_objects` と `migrations` は環境（`env.develop`）を継承しないので、**本番と develop の両方に**書く。SQLite の DO（`new_sqlite_classes`）を使う（新しい DO はこの形で作る。プランごとの対応は Cloudflare の DO の docs で確かめる）。
 ```jsonc
 {
   "durable_objects": { "bindings": [{ "name": "REPORT_LIMITER", "class_name": "ReportRateLimiter" }] },
@@ -68,17 +68,28 @@ export { ReportRateLimiter } from "../external/fara-site-kit/worker/report-rate-
 ```
   - 既に `migrations` があるサイトは、tag を重複させず、新しい tag（例: `v2`）で `new_sqlite_classes` を足す。
   - 確認: `wrangler deploy --dry-run`（本番と develop）。`npm run preview` で、同じ IP から 4 回送って 4 回目が 429 になるかを見る。
+  - 公式 docs の確認: `storage.transaction()`・`alarm`・`list`・`delete`（128 件まで）は、Storage API の docs で確認した。input gate（storage 操作の間に他のイベントが入らない仕組み）の記載は、確認したページに見つからなかったため、要照合。並行性は transaction に頼っている。
 
 **数え方と保存（プライバシー）**:
-- 保存するのは、**短縮ハッシュと回数だけ**。ハッシュは `SHA-256(IP + 用途の文字列 + JST の日付)` の先頭 128 ビット（32 桁の hex）。IP そのものは保存しない・ログに出さない。
-- 日付（JST の暦日）ごとにキーを分ける。同じ IP でも日付が変われば別のハッシュになる。
-- **保存期間**: その日（JST）の分だけ。JST の次の 0 時に、Durable Object の alarm で前の日のキーを消す（日付が変わった時点で消える。alarm が遅れた分だけ、残る時間が延びる）。
-- **各サイトのプライバシーポリシーに追記が必要**: 「報告の送信の回数を制限するため、送信元の IP アドレスから作った短い識別子（ハッシュ）を、その日の間だけ保存し、日付が変わると消す」旨。IP アドレスそのものは保存しないこと。
+- 保存するのは、**送信元の識別子と回数だけ**。識別子は、Turnstile の秘密鍵（`TURNSTILE_SECRET`）から用途ラベル（`fara-site-kit/report-limit/v1`）付きの HMAC で導いた鍵で、`HMAC(鍵, IP + "
+" + JST の日付)` の先頭 128 ビット（32 桁の hex）。鍵が無いと同じ値は作れない（公開のソルトだけなら、IPv4 の全探索で逆算できてしまうため）。IP そのものは保存しない・ログに出さない。
+- 日付（JST の暦日）ごとにキーを分ける。同じ IP でも日付が変われば別の識別子になる。
+- **保存期間**: その日（JST）の分。JST の次の 0 時に、Durable Object の alarm で前の日のキーを消す。alarm が取りこぼされても、次の日の最初のリクエストで掃除する（日付が変わってから、次の掃除まで残る）。
+- **秘密鍵を変えると、識別子がすべて変わり、計数はリセットされる**（回数の枠が一度だけ戻る）。鍵の更新は、この点を承知のうえで行う。
+- **各サイトのプライバシーポリシーに追記が必要**: 「報告の送信の回数を制限するため、送信元の IP アドレスから作った、秘密の鍵つきの識別子（ハッシュ）を、その日の間だけ保存し、日付が変わると消す」旨。「匿名」とは書かない（識別子は送信元に結びつくため）。IP アドレスそのものは保存しないこと。
 - 報告の本文は従来どおり保存しない（Discord に送るだけ）。
 
-**DO が使えないとき（fail-open）**: 回数を数えられないとき（DO の例外・非 2xx・IP ヘッダーが無い）は、**制限せず送る**。理由: 問い合わせを取りこぼさないため。ボット対策は Turnstile が残っているので、回数の制限が無くても最低限の防御は効いている。DO の例外は `report: daily limit unavailable, sending anyway` としてログに残し、IP ヘッダーが無いときは `report: daily limit skipped, no CF-Connecting-IP` を出す（どちらも IP・ハッシュは出さない）。
+**運用上の注意（制約）**:
+- 1 サイトの中では、全部の送信が **1 つの Durable Object を通る**（固定名）。送信が多いと、ここが混み合う。個人のサイトの問い合わせの量では問題にならない想定。
+- alarm の掃除は `storage.list()` で、そのサイトが保存しているキーを一度に読む（1 日分の、送信元の数）。送信元が非常に多い日は、掃除が重くなる。
+- DO の課金・上限に達したり、DO が使えなくなると **fail-open（制限せず送る）**。Turnstile は残るので、ボット対策は効いている。
+- 同じ回線（CGNAT・共有 IP）の人は、枠を共有する。
+- IPv6 は /64 などの単位で丸めていない（1 人が別のアドレスを使うと、回避できる）。Turnstile は残る。
+- Discord 側の障害では、送信が失敗した分の枠は戻す（上の「戻す」）。戻しも失敗したときは、報告の応答は 502 のまま、ログに残す。
 
-**報告画面（ReportFormView）**: 429 のときは、Worker の `message`（「1 日の送信上限（3 回）に達しました。明日もう一度お試しください。」）をそのまま出す。本文が読めないときも「1 日の送信の上限に達しました。明日もう一度お試しください」を出す（汎用の失敗の文にはしない）。
+**DO が使えないとき・数えられないとき（fail-open）**: 回数を数えられないとき（DO の例外・非 2xx・IP ヘッダーが無い・秘密鍵が無い）は、**制限せず送る**。理由: 問い合わせを取りこぼさないため。ログには `report: daily limit unavailable, sending anyway`・`report: daily limit skipped, no CF-Connecting-IP`・`report: daily limit unavailable (no key), sending anyway` を出す（IP・識別子・鍵は出さない）。
+
+**報告画面（ReportFormView）**: 429 のときは、Worker の `message`（「1 日の送信上限（3 回）に達しました。明日もう一度お試しください。」）をそのまま出す。本文が読めないときも同じ文を出す（汎用の失敗の文にはしない）。
 
 ## 3. C# の共通コードを使う（`src/FaraSiteKit.Core`）
 

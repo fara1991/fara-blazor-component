@@ -4,7 +4,7 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 
 ## 未リリース
 
-- **報告の 1 日の送信回数の制限（opt-in）**: `worker/report-rate-limit.js`（Durable Object の `ReportRateLimiter`）を足し、`worker/report.js` が、バインディング `REPORT_LIMITER` があるサイトだけ、Turnstile を通った送信を送信元ごとに 1 日 3 回まで数える（超えたら 429・`Retry-After`）。保存するのは短縮ハッシュと回数で、JST の 0 時に消す。バインディングが無いサイトは従来どおり（挙動は変わらない）。DO が使えないときは fail-open（送る）。**サイト側の作業**: `worker/index.js` で `ReportRateLimiter` を export し、`wrangler.jsonc` に `durable_objects`・`migrations`（本番と develop の両方）を書く。プライバシーポリシーに、ハッシュの一時保存を追記する（docs/usage.md の 2.2）。
+- **報告の 1 日の送信回数の制限（opt-in）**: `worker/report-rate-limit.js`（Durable Object の `ReportRateLimiter`）を足し、`worker/report.js` が、バインディング `REPORT_LIMITER` があるサイトだけ、Turnstile を通った送信を送信元ごとに 1 日 3 回まで数える（超えたら 429・`Retry-After`）。送信元の識別子は、Turnstile の秘密鍵から導いた鍵による HMAC で、日付ごとに分ける。JST の 0 時に消す。Discord への送信が失敗したときは、数えた 1 回を戻す。バインディングが無いサイトは従来どおり（挙動は変わらない）。DO が使えないときは fail-open（送る）。**秘密鍵（TURNSTILE_SECRET）を変えると、計数はリセットされる。** **サイト側の作業**: `worker/index.js` で `ReportRateLimiter` を export し、`wrangler.jsonc` に `durable_objects`・`migrations`（本番と develop の両方）を書く。プライバシーポリシーに、送信元から作った識別子を当日の間だけ保存する旨を追記する（docs/usage.md の 2.2）。
 - ReportFormView: 429 のときの文を足した（Worker の message が無いときも、「1 日の送信の上限に達しました」と出す）。
 
 ## 0.7.0
