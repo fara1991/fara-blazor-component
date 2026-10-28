@@ -11,7 +11,7 @@ const JS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "src", 
 const load = (name) => readFileSync(join(JS_DIR, name), "utf8");
 
 /** クラス名の集合（classList の最小の形）。 */
-function classList(el) {
+function classList() {
     const set = new Set();
     return {
         add: (...names) => names.forEach((n) => set.add(n)),
