@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>layout-check: 下の項目とスクロール</title>
+<style>
+  /* 滑らかスクロール（条件なし。reducedMotion では止まらない。Tab の直後の途中位置を測らないことを確かめる） */
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font-family: sans-serif; font-size: 16px; line-height: 1.6; background: #1a1030; color: #f5f5f5; }
+  a:focus-visible, button:focus-visible { outline: 2px solid #ffd54f; outline-offset: 2px; }
+  header { padding: 0 16px; min-height: 56px; display: flex; align-items: center; }
+  header a { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; }
+  .spacer { height: 2400px; }
+  main { padding: 16px; }
+  .wide { display: block; min-height: 44px; line-height: 44px; padding: 0 16px; color: #f5f5f5; }
+  .action { min-width: 44px; min-height: 44px; font-size: 16px; }
+  /* 無効な要素（送信ボタンが入力の前などに無効になる）。小さくても、既定では数えない */
+  .small-disabled { width: 20px; height: 20px; padding: 0; border: 0; }
+  .aria-off { display: inline-block; width: 20px; height: 20px; }
+  .no-pointer { display: inline-block; width: 20px; height: 20px; pointer-events: none; }
+  footer { padding: 16px; }
+  footer a { display: inline-block; min-width: 44px; min-height: 44px; line-height: 44px; padding: 0 8px; color: #f5f5f5; }
+</style>
+</head>
+<body>
+<header>
+  <a href="#top">トップ</a>
+</header>
+<div class="spacer" aria-hidden="true"></div>
+<main>
+  <h1>下の項目</h1>
+  <a class="wide" href="#wide">下の項目（44px の高さ）</a>
+  <button class="action" type="button">送信</button>
+  <button class="small-disabled" type="button" disabled>無効</button>
+  <a class="aria-off" href="#aria" aria-disabled="true">無効（aria）</a>
+  <a class="no-pointer" href="#none">操作できない</a>
+</main>
+<footer>
+  <a href="#privacy">プライバシー</a>
+</footer>
+</body>
+</html>

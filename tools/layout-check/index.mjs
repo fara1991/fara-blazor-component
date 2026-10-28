@@ -42,7 +42,11 @@ export async function runLayoutCheck(rawConfig) {
   let runs = 0;
   try {
     for (const width of config.viewports) {
-      const context = await browser.newContext({ viewport: { width, height: config.viewportHeight } });
+      // reducedMotion 既定 true: prefers-reduced-motion の CSS（アニメーション・スムーススクロールの停止）を効かせて測る
+      const context = await browser.newContext({
+        viewport: { width, height: config.viewportHeight },
+        reducedMotion: config.reducedMotion ? "reduce" : "no-preference",
+      });
       try {
         for (const pageInfo of config.pages) {
           violations.push(...(await checkPageAtWidth({ context, config, pageInfo, width })));

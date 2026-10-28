@@ -2,6 +2,18 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 未リリース
+
+レイアウトの自動計測（`tools/layout-check/`）の精度。v0.6.0 を導入した 5 サイトの報告を直した。**挙動が変わる点**: (1) tap-target の判定が ±21.5px から **±20px** になった（40px 以上の箱が通る。隣と 44px 間隔の SNS の誤検出を避けるため）。(2) tap-target は無効な要素（`disabled`・`aria-disabled="true"`・`pointer-events: none`）を既定で数えない。(3) 表のセルの中のリンクは、文字が横にあっても文中のリンクとして外さない。(4) 計測の既定の `reducedMotion: true`。(5) 公開の kit の部品（CSS・C#・Worker）は変えない。
+
+- serve-static（`tools/layout-check/serve-static.mjs`）: 解決の順を「ファイル → `<パス>.html` → `<パス>/index.html`（無ければ `<フォルダ>.html`）」に直した。同名のフォルダがあるパス（`/worlds`・`/docs`）が 404 になっていた。末尾が `/` のパスはフォルダを先に見る。ルートの外のファイルは返さない（候補の検査）。`--not-found <file>` で、404 の本文をステータス 404 のまま返す。`--spa` で、存在しないパスを `index.html`（200）で返す。
+- 計測（`browser.mjs`）: 要素ごとに中央へ寄せて測り、測った後に元の位置（window と、途中の scroll の箱）へ戻す。Tab の直後は、スクロールが 2 フレーム止まるまで待つ（上限 1 秒）。`reducedMotion`（既定 true。ブラウザの `reducedMotion` に渡す）。
+- 設定の追加: `reducedMotion`（既定 true）・`includeDisabled`（既定 false）・`pages[].allowStatus`（例: `[404]`。2xx 以外で測るページを許す。許していないステータスは、従来どおり計測できないエラー）。
+- 判定の追加: 無効な要素を tap-target の対象から外す（`includeDisabled: true` で測る）。インライン除外は、段落（表のセルでない block の中）で、前後に文字があるリンクだけ。
+- 判定の定義の文書化（`docs/layout-check.md` の「判定の定義」）・「除外を外してよい条件」・「よくある除外」（パンくずは、サイトの側で直す）。
+- サンプル（`samples/MinimalSite`）に SNS（twitter）を 1 つ足した（隣り合うアイコンの判定を CI で確かめる）。
+- テスト: `tests/layout-check/serve-static.test.mjs`（解決順・404・SPA・CLI の引数。`npm test`）。統合テストに、`scroll`（下の項目・滑らかスクロール・無効な要素）・表のセルのリンク・`allowStatus` を足した。
+
 ## 0.6.0
 
 2026-10-29。

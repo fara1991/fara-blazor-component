@@ -15,6 +15,7 @@ builder.Services.AddFaraSiteKit(options =>
     options.PublishedYear = 2026;
     options.AuthorHomeUrl = "https://example.com/";
     options.Social.Add(new SiteSocialLink("github", "https://example.com/github"));
+    options.Social.Add(new SiteSocialLink("twitter", "https://example.com/twitter"));
 });
 builder.Services.AddSingleton(new HttpClient { BaseAddress = new Uri(baseAddress) });
 
