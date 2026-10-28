@@ -62,6 +62,36 @@ test("わざと崩した例は、各ルールの違反が出る", { timeout: TIM
   }
   const h1 = violations.find((v) => v.rule === "single-h1");
   assert.match(h1.message, /2 つ/);
+  // 表のセルの中で、文字の横にあるだけのリンクは、文中のリンクとして外さない
+  assert.ok(violations.some((v) => v.rule === "tap-target" && v.selector.includes("#cell-link")), "表のセルのリンクが測られていない");
+});
+
+test("画面の下の項目・Tab の直後の滑らかスクロール・無効な要素（既定は数えない）", { timeout: TIMEOUT }, async () => {
+  // scroll/: html に無条件の scroll-behavior: smooth。下の項目を Tab で通っても、途中位置の誤検出が出ない
+  const { violations } = await runLayoutCheck(config("scroll", { viewports: [360], menuEsc: undefined }));
+  assert.deepEqual(violations.map(formatViolation), []);
+});
+
+test("includeDisabled: true にすると、無効な要素（disabled・aria-disabled・pointer-events: none）も測る", { timeout: TIMEOUT }, async () => {
+  const { violations } = await runLayoutCheck(config("scroll", { viewports: [360], includeDisabled: true, menuEsc: undefined }));
+  const selectors = violations.map((v) => v.selector).join("\n");
+  assert.equal(violations.length, 3, selectors);
+  for (const name of ["small-disabled", "aria-off", "no-pointer"]) assert.ok(selectors.includes(name), `${name} が測られていない:\n${selectors}`);
+});
+
+test("allowStatus: 404 の画面を、404 のまま測れる（許していなければ計測できないエラー）", { timeout: TIMEOUT }, async () => {
+  const notFound = await startStaticServer(join(FIXTURES, "serve"), FIRST_PORT + 2, { notFoundFile: "404.html" });
+  try {
+    const base = { baseURL: notFound.origin, viewports: [360], browser: { channel: CHANNEL } };
+    const allowed = await runLayoutCheck({ ...base, pages: [{ path: "/missing", name: "404", allowStatus: [404] }], rules: { "tap-target": false } });
+    assert.equal(allowed.runs, 1);
+    await assert.rejects(
+      runLayoutCheck({ ...base, pages: ["/missing"] }),
+      (error) => error.name === "LayoutCheckRunError" && /HTTP 404/.test(error.message),
+    );
+  } finally {
+    await notFound.close();
+  }
 });
 
 test("除外（理由つき）で、その要素の違反が消える", { timeout: TIMEOUT }, async () => {

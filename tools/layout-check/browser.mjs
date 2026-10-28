@@ -11,6 +11,7 @@ import {
   isFocusVisible,
   isInlineLink,
   isOffscreen,
+  statusOk,
   tapHalfOffset,
   tapTargetOk,
 } from "./rules.mjs";
@@ -44,6 +45,13 @@ function installHelpers() {
     return false;
   };
   window.__layoutCheck = {
+    // 最も近い block の祖先（inline を飛ばす）が、表のセル・表の見出しでないか。文中のリンクかどうかの材料（isInlineLink）。
+    isInParagraph(el) {
+      let node = el.parentElement;
+      while (node && getComputedStyle(node).display === "inline") node = node.parentElement;
+      if (!node) return false;
+      return !/^table/.test(getComputedStyle(node).display);
+    },
     keyOf(el) {
       if (!ids.has(el)) ids.set(el, next++);
       return ids.get(el);
@@ -107,29 +115,81 @@ function measureTaps({ selector, half, excluded }) {
   const width = document.documentElement.clientWidth;
   const height = document.documentElement.clientHeight;
   const inViewport = (x, y) => x >= 0 && y >= 0 && x < width && y < height;
+  // 要素ごとに、その要素を中央へ寄せて測り、測り終えたら元の位置（window と、途中の scroll の箱）に戻す。
+  // こうしないと、下の方の要素を測った後の縦位置が次の判定と Tab の開始位置に残る。
+  const scrollSnapshot = (el) => {
+    const boxes = [];
+    for (let node = el.parentElement; node; node = node.parentElement) {
+      if (node.scrollTop !== 0 || node.scrollLeft !== 0 || node.scrollHeight > node.clientHeight) {
+        boxes.push({ node, top: node.scrollTop, left: node.scrollLeft });
+      }
+    }
+    return { x: window.scrollX, y: window.scrollY, boxes };
+  };
+  const restoreScroll = (snapshot) => {
+    for (const box of snapshot.boxes) box.node.scrollTo({ top: box.top, left: box.left, behavior: "instant" });
+    window.scrollTo({ left: snapshot.x, top: snapshot.y, behavior: "instant" });
+  };
   for (const el of document.querySelectorAll(selector)) {
     if (el.getClientRects().length === 0) continue;
+    const saved = scrollSnapshot(el);
     el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
     const r = el.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) continue;
+    if (r.width === 0 || r.height === 0) {
+      restoreScroll(saved);
+      continue;
+    }
     const cx = (r.left + r.right) / 2;
     const cy = (r.top + r.bottom) / 2;
     const points = [[cx, cy], [cx - half, cy], [cx + half, cy], [cx, cy - half], [cx, cy + half]].map(([x, y]) => {
       const at = inViewport(x, y) ? document.elementFromPoint(x, y) : null;
       return { tested: at !== null, hit: at !== null && el.contains(at) };
     });
+    const cs = getComputedStyle(el);
     out.push({
       selector: window.__layoutCheck.describe(el),
       width: Math.round(r.width),
       height: Math.round(r.height),
-      display: getComputedStyle(el).display,
+      display: cs.display,
       hasTextBefore: window.__layoutCheck.hasTextBefore(el),
       hasTextAfter: window.__layoutCheck.hasTextAfter(el),
+      inParagraph: window.__layoutCheck.isInParagraph(el),
+      // 無効（disabled・aria-disabled="true"・pointer-events: none。pointer-events は継承するので祖先も含む）。既定では数えない
+      disabled: el.matches(":disabled") || el.getAttribute("aria-disabled") === "true" || cs.pointerEvents === "none",
       points,
       excluded: excluded.some((s) => el.matches(s)),
     });
+    restoreScroll(saved);
   }
   return out;
+}
+
+/**
+ * Tab の直後の滑らかスクロールが止まるまで待つ。フォーカスされた要素の scroll の箱と window の位置が、2 フレーム続けて同じになれば止まったとみなす（上限 1 秒）。
+ * reducedMotion は prefers-reduced-motion の CSS にしか効かないので、無条件の scroll-behavior: smooth はこれで待つ。
+ */
+async function settleScroll() {
+  const read = () => {
+    const values = [window.scrollX, window.scrollY];
+    for (let node = document.activeElement; node && node !== document.documentElement; node = node.parentElement) {
+      if (node.scrollHeight > node.clientHeight || node.scrollWidth > node.clientWidth) values.push(node.scrollLeft, node.scrollTop);
+    }
+    return values.join(",");
+  };
+  const started = performance.now();
+  let last = read();
+  let stillFrames = 0;
+  while (performance.now() - started < 1000) {
+    await new Promise((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
+    const now = read();
+    if (now === last) {
+      stillFrames += 1;
+      if (stillFrames >= 2) return;
+    } else {
+      last = now;
+      stillFrames = 0;
+    }
+  }
 }
 
 /** Tab で止まった要素（フォーカス中）の計測。フォーカスを外した状態も測り、見えるフォーカスの変化を比べる。 */
@@ -215,7 +275,8 @@ export async function checkPageAtWidth({ context, config, pageInfo, width }) {
       const taps = await page.evaluate(measureTaps, { selector: TAP_SELECTOR, half, excluded: exclusions("tap-target") });
       for (const t of taps) {
         if (t.excluded) continue;
-        if (isInlineLink({ display: t.display, hasTextBefore: t.hasTextBefore, hasTextAfter: t.hasTextAfter })) continue;
+        if (t.disabled && !config.includeDisabled) continue;
+        if (isInlineLink({ display: t.display, hasTextBefore: t.hasTextBefore, hasTextAfter: t.hasTextAfter, inParagraph: t.inParagraph })) continue;
         if (!tapTargetOk(t.points)) {
           const min = config.tapTarget.minSize;
           push("tap-target", t.selector, `${t.width}x${t.height}px`, `押せる範囲が ${min}×${min}px 未満（中心から上下左右 ${half}px が自分に当たらない）`);
@@ -246,8 +307,11 @@ export async function checkPageAtWidth({ context, config, pageInfo, width }) {
 async function load(page, config, pageInfo, timeout) {
   const url = `${config.baseURL}${pageInfo.path}`;
   const response = await page.goto(url, { waitUntil: "load", timeout });
-  if (!response || !response.ok()) {
-    throw new LayoutCheckRunError(`ページを開けなかった: ${url}（${response ? `HTTP ${response.status()}` : "応答なし"}）。baseURL と pages を確かめる`);
+  if (!response || !statusOk(response.status(), pageInfo.allowStatus)) {
+    throw new LayoutCheckRunError(
+      `ページを開けなかった: ${url}（${response ? `HTTP ${response.status()}` : "応答なし"}）。baseURL と pages を確かめる` +
+        "（404 の画面を測るなら、そのページに allowStatus: [404] を書く）",
+    );
   }
   if (config.readySelector) {
     await page.waitForSelector(config.readySelector, { state: "attached", timeout });
@@ -261,6 +325,8 @@ async function walkTabStops(page, config, pageInfo, push, enabled) {
   let firstKey = null;
   for (let i = 0; i < config.focus.maxStops; i += 1) {
     await page.keyboard.press("Tab");
+    // Tab で動いた滑らかスクロールが止まってから測る（途中位置で測ると、画面の外に見える誤検出になる）
+    await page.evaluate(settleScroll);
     const stop = await page.evaluate(measureFocusStop, { focusExcluded, offscreenExcluded });
     if (stop.body) break;
     if (firstKey === null) firstKey = stop.key;

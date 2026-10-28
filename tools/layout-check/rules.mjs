@@ -43,9 +43,13 @@ export const DEFAULT_MAX_TAB_STOPS = 40;
 export const OFFSCREEN_LEFT_LIMIT = -100;
 export const DEFAULT_TIMEOUT_MS = 30000;
 
-/** 押せる範囲の判定に使う、中心からの距離（px）。44px の箱なら ±21.5（画素の中心どうし）。 */
+/**
+ * 押せる範囲の判定に使う、中心からの距離（px）。44px なら ±20（以前は ±21.5）。
+ * 隣と 44px 間隔で並ぶ要素（SNS のアイコンなど）は、境目が中心から 22px になる。±21.5 だと、サブピクセルの丸めで隣に当たって誤検出した（sample の SNS で確認）。
+ * ±20 なら境目までに 2px の余裕がある。これにより、40px の箱が通る（44px の規格からは 4px の緩和）。
+ */
 export function tapHalfOffset(minSize = TAP_MIN_SIZE) {
-  return minSize / 2 - 0.5;
+  return minSize / 2 - 2;
 }
 
 /**
@@ -61,10 +65,20 @@ export function tapTargetOk(points) {
 
 /**
  * 文中のリンク（段落の中で、前後に他の文字がある inline のリンク）か。タップの大きさの判定から外す。
- * @param {{ display: string, hasTextBefore: boolean, hasTextAfter: boolean }} info
+ * 表のセル（td・th）の中のリンクは、段落とみなさない（セルの中で文字が横にあっても外さない）。inParagraph は、ブラウザ側で「最も近い block の祖先が表のセルでない」かを測った値。
+ * @param {{ display: string, hasTextBefore: boolean, hasTextAfter: boolean, inParagraph: boolean }} info
  */
-export function isInlineLink({ display, hasTextBefore, hasTextAfter }) {
-  return display === "inline" && (hasTextBefore === true || hasTextAfter === true);
+export function isInlineLink({ display, hasTextBefore, hasTextAfter, inParagraph }) {
+  return display === "inline" && inParagraph === true && (hasTextBefore === true || hasTextAfter === true);
+}
+
+/**
+ * ページを開けた応答か。2xx は常に OK。それ以外は pages[].allowStatus に書いたものだけ OK（例: 404 の画面を測る）。
+ * @param {number} status HTTP のステータス
+ * @param {number[]} allowStatus 許すステータス
+ */
+export function statusOk(status, allowStatus = []) {
+  return (status >= 200 && status < 300) || allowStatus.includes(status);
 }
 
 /** 文字の大きさ（px）が下限以上か。 */
@@ -157,17 +171,29 @@ function fail(message) {
   throw new LayoutCheckConfigError(message);
 }
 
+function normalizeAllowStatus(value, index) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.some((code) => !Number.isInteger(code) || code < 100 || code > 599)) {
+    fail(`pages[${index}].allowStatus は HTTP のステータスの配列で書く（例: [404]）`);
+  }
+  return [...new Set(value)];
+}
+
 function normalizePages(pages) {
   if (!Array.isArray(pages) || pages.length === 0) fail("pages は 1 つ以上の配列で書く（例: [\"/\", { path: \"/works\", name: \"作品\" }]）");
   return pages.map((page, index) => {
     if (typeof page === "string") {
       if (!page.startsWith("/")) fail(`pages[${index}] は / で始まるパスで書く（${page}）`);
-      return { path: page, name: page };
+      return { path: page, name: page, allowStatus: [] };
     }
     if (!page || typeof page !== "object" || typeof page.path !== "string" || !page.path.startsWith("/")) {
-      fail(`pages[${index}] は / で始まるパスの文字列か、{ path, name } で書く`);
+      fail(`pages[${index}] は / で始まるパスの文字列か、{ path, name, allowStatus } で書く`);
     }
-    return { path: page.path, name: typeof page.name === "string" && page.name !== "" ? page.name : page.path };
+    return {
+      path: page.path,
+      name: typeof page.name === "string" && page.name !== "" ? page.name : page.path,
+      allowStatus: normalizeAllowStatus(page.allowStatus, index),
+    };
   });
 }
 
@@ -235,6 +261,8 @@ export function normalizeConfig(raw) {
   const font = raw.minFontSize ?? {};
   const focus = raw.focus ?? {};
   if (!Array.isArray(font.ignoreSelectors ?? [])) fail("minFontSize.ignoreSelectors は配列で書く");
+  if (raw.reducedMotion !== undefined && typeof raw.reducedMotion !== "boolean") fail("reducedMotion は true か false で書く（既定は true）");
+  if (raw.includeDisabled !== undefined && typeof raw.includeDisabled !== "boolean") fail("includeDisabled は true か false で書く（既定は false）");
   return {
     baseURL: baseURL.href.replace(/\/$/, ""),
     pages: normalizePages(raw.pages),
@@ -242,6 +270,8 @@ export function normalizeConfig(raw) {
     viewportHeight: positiveInteger(raw.viewportHeight, DEFAULT_VIEWPORT_HEIGHT, "viewportHeight"),
     rules: normalizeRules(raw.rules, menuEsc),
     exclusions: validateExclusions(raw.exclusions),
+    reducedMotion: raw.reducedMotion ?? true,
+    includeDisabled: raw.includeDisabled ?? false,
     tapTarget: {
       minSize: positiveInteger(tap.minSize, TAP_MIN_SIZE, "tapTarget.minSize"),
       maxWidth: positiveInteger(tap.maxWidth, TAP_MAX_WIDTH, "tapTarget.maxWidth"),

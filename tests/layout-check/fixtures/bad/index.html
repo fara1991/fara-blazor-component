@@ -33,6 +33,8 @@
   <h1>不良の例 1</h1>
   <h1 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">不良の例 2</h1>
   <p>本文の <a href="#inline">リンク</a> の続き。</p>
+  <!-- 表のセルの中の、文字の横にあるだけのリンク（文中ではないので、タップの大きさを測る。違反にする） -->
+  <table><tr><td>詳細は <a id="cell-link" href="#cell" style="font-size:12px">ここ</a></td></tr></table>
   <p class="tiny">10px の文字（違反にする）</p>
   <button id="small-button" type="button">小</button>
   <div style="width:520px;background:#333">はみ出す幅（横スクロールの違反にする）</div>
