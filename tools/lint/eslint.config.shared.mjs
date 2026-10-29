@@ -3,13 +3,16 @@
 // 使い方（各サイトのルートの eslint.config.mjs）:
 //   import shared, { createSharedConfig } from "./external/fara-blazor-component/tools/lint/eslint.config.shared.mjs";
 //   export default [
-//     ...shared,                                   // Node の JS（**/*.{js,mjs,cjs}）
-//     ...createSharedConfig({                      // ブラウザの JS を足す場合
+//     ...shared,                                   // Node の JS（wwwroot/js 以外）と、画面の JS（wwwroot/js・browser の環境）
+//     ...createSharedConfig({                      // 画面の JS を、HTML の <script> で読む古い形（script）として書き直す場合だけ足す
 //       files: ["wwwroot/js/**/*.js"],
 //       environments: ["browser"],
 //       sourceType: "script",
 //     }),
 //   ];
+//
+// 画面の JS（wwwroot/js）に Node のグローバル（process・require など）を当てない。同じファイルに node と browser の両方を当てると、
+// 誤った Node の API が no-undef で見つからないため。
 //
 // ルールは全サイトで同じ（sharedRules）。サイト固有の例外は、サイトの設定の overrides に理由つきで書く（eslint-disable では書かない）。
 // 依存: eslint と globals（kit の devDependency。各サイトも自分の devDependency に入れる）。
@@ -52,10 +55,12 @@ export const sharedIgnores = {
  * @param {string[]} [options.files] 対象の glob
  * @param {("node"|"browser")[]} [options.environments] 使うグローバル（node か browser）
  * @param {"module"|"script"} [options.sourceType] ES モジュールか、古い形の script（HTML の <script> で読む JS）
+ * @param {string[]} [options.ignores] files のうち、この設定から外す glob（省略時は外さない）
  * @param {Record<string, "readonly"|"writable"|"off">} [options.extraGlobals] 環境に無い実行環境のグローバル（例: Cloudflare Workers の HTMLRewriter）。理由をサイトの設定に書く
  */
 export function createSharedConfig({
   files = ["**/*.{js,mjs,cjs}"],
+  ignores,
   environments = ["node"],
   sourceType = "module",
   extraGlobals = {},
@@ -68,11 +73,22 @@ export function createSharedConfig({
   return [
     {
       files,
+      ...(ignores ? { ignores } : {}),
       languageOptions: { ecmaVersion: "latest", sourceType, globals: globalsForEnvironment },
       rules: sharedRules,
     },
   ];
 }
 
-/** 既定: Node の JS（tools・worker・build・tests など）。 */
-export default [sharedIgnores, ...createSharedConfig({ files: ["**/*.{js,mjs,cjs}"], environments: ["node"] })];
+/** 画面の JS の置き場（サイトの wwwroot/js）。Node のグローバルは当てず、browser の環境を当てる。 */
+const WEB_JS = "**/wwwroot/js/**";
+
+/**
+ * 既定: Node の JS（tools・worker・build・tests など。画面の JS を除く）と、画面の JS（wwwroot/js・browser の環境）。
+ * 画面の JS の sourceType は既定の module のまま（サイトの設定で script と書けば上書きされる。import を使う画面の JS を、script で誤って読まないため）。
+ */
+export default [
+  sharedIgnores,
+  ...createSharedConfig({ files: ["**/*.{js,mjs,cjs}"], ignores: [WEB_JS], environments: ["node"] }),
+  ...createSharedConfig({ files: [`${WEB_JS}/*.{js,mjs,cjs}`], environments: ["browser"] }),
+];
