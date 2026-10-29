@@ -2,6 +2,21 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 1.0.1
+
+2026-10-29。
+ESLint の共通設定の修正（`tools/lint/eslint.config.shared.mjs`）と、.NET の警告の削減。
+
+> **取り込むサイトへの注意（bot は必須）**: **bot は、取り込み時にルート `.editorconfig` の `[*.cs]` に `dotnet_diagnostic.CA1031.severity = warning` を足すこと。** 足さないと、アプリ本体（`FaraBotModerator.csproj`）と tests のビルドが CA1031 の 14 件で落ちる。足すと 14 件は warning に戻りビルドが通る。pokemon・album・avatar は影響なし、fara-labs は kit のファイルを読まないので影響なし。詳細は下の `dotnet.editorconfig` の項と `docs/lint.md`。
+
+- **.NET の警告を 0 件にした**（振る舞いは変えない）。`dotnet build -c Release --no-incremental` の警告は、kit 全体（Core・Razor・テスト・samples/MinimalSite）で 35 件 → 0 件。`MaintenanceInfo.LoadAsync` の標準エラーへの出力を `WriteLineAsync` にした（VSTHRD103）。意図して一般の例外を受ける 3 か所（`MaintenanceInfo.LoadAsync`・`SiteThemeState.TryLoadSync`・`SiteThemeState.InitializeAsync`）には、理由つきの `[SuppressMessage("CA1031")]` を付けた。テスト・サンプルの Dispose 漏れ・同期の待ち・xUnit の指摘も直した。
+- **CI**: `test` ジョブに `npm ci` を足した（#62 で足した `tests/lint/shared-config.test.mjs` が eslint を読むため、足りずに落ちていた）。
+- **`tools/lint/dotnet.editorconfig`**: `CA1031`・`CA2000`・`VSTHRD002`・`VSTHRD003`・`VSTHRD103` を warning（パッケージの既定）から error に上げた（kit は 0 件）。**サイト側の影響（5 サイトの origin/develop に、この PR の kit を入れて `dotnet build -c Release --no-incremental` した実測）**: 取り込んだときにビルドが落ちるのは **bot だけ**（アプリ本体 `FaraBotModerator.csproj` と tests で、CA1031 が 14 件 error になる。bot はルートの `Directory.Build.props` が kit の `dotnet.editorconfig` を `GlobalAnalyzerConfigFiles` で直接読み、ルート `.editorconfig` の `[*.cs]` に CA1031 の上書きが無いため）。bot は取り込み時に、ルート `.editorconfig` の `[*.cs]` に `dotnet_diagnostic.CA1031.severity = warning` を足す（足して再ビルドすると 14 件が warning に戻りビルドが通ることを確認済み。通常の `.editorconfig` が global config に勝つ）。pokemon・album・avatar は 0 件か、サイト側で error 済みで落ちない。fara-labs は kit のファイルを読まず `tools/lint/dotnet.site.editorconfig`（写し）を使うので影響しない（写しは kit の変更に追従しない）。
+
+- **修正**: 既定の `default` export（`...shared`）が、画面の JS（`**/wwwroot/js/**`）にも Node のグローバル（`process`・`require` など）を当てていた。そのため、画面の JS でそれらを使っても `no-undef` が出なかった。Node の JS は `wwwroot/js` を除き、画面の JS には browser の環境だけを当てるように分けた。
+- `createSharedConfig` に `ignores`（任意）を足した。省略時の挙動は変わらない。テスト `tests/lint/shared-config.test.mjs`（`npm run test:lint`・`npm test` に含む）を足した。
+- **サイト側の注意**: 既定の `...shared` を使うサイトは、画面の JS で `process`・`require`・`module`・`exports`・`Buffer`・`global`・`__dirname`・`__filename`・`setImmediate` を使っていると、kit を上げた後の `npm run lint` で `no-undef` が出る（`docs/lint.md` の 1 を参照）。labs・pokemon・album・avatar・bot の `wwwroot/js` は、新旧で比べて新たに落ちる箇所は 0 件（2026-10-29 時点）。
+
 ## 1.0.0
 
 2026-10-29。

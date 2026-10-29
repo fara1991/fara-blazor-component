@@ -60,13 +60,18 @@ public class MaintenanceInfoTests
         }
     }
 
-    private static HttpClient Client(FakeHandler handler) => new(handler) { BaseAddress = new Uri("https://pokemon.example/") };
+    // handler は呼び出し側が using で破棄する（HttpClient には破棄させない）
+    private static async Task<MaintenanceInfo> LoadInfoAsync(FakeHandler handler, TimeSpan? timeout = null)
+    {
+        using var http = new HttpClient(handler, disposeHandler: false) { BaseAddress = new Uri("https://pokemon.example/") };
+        return await MaintenanceInfo.LoadAsync(http, timeout);
+    }
 
     [Fact]
     public async Task Load_reads_the_state_from_the_maintenance_endpoint()
     {
-        var handler = new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"state\":\"on\",\"message\":\"20:00ごろ\"}") }));
-        var info = await MaintenanceInfo.LoadAsync(Client(handler));
+        using var handler = new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"state\":\"on\",\"message\":\"20:00ごろ\"}") }));
+        var info = await LoadInfoAsync(handler);
         Assert.Equal(new MaintenanceInfo(MaintenanceState.On, "20:00ごろ"), info);
         Assert.Equal("/api/maintenance", handler.RequestedPath);
     }
@@ -77,27 +82,27 @@ public class MaintenanceInfoTests
     [InlineData(HttpStatusCode.NotFound)]
     public async Task Load_treats_an_error_response_as_normal(HttpStatusCode status)
     {
-        var handler = new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent("{\"state\":\"on\"}") }));
-        Assert.Equal(MaintenanceInfo.Off, await MaintenanceInfo.LoadAsync(Client(handler)));
+        using var handler = new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent("{\"state\":\"on\"}") }));
+        Assert.Equal(MaintenanceInfo.Off, await LoadInfoAsync(handler));
     }
 
     [Fact]
     public async Task Load_treats_a_network_failure_as_normal()
     {
-        var handler = new FakeHandler((_, _) => throw new HttpRequestException("offline"));
-        Assert.Equal(MaintenanceInfo.Off, await MaintenanceInfo.LoadAsync(Client(handler)));
+        using var handler = new FakeHandler((_, _) => throw new HttpRequestException("offline"));
+        Assert.Equal(MaintenanceInfo.Off, await LoadInfoAsync(handler));
     }
 
     [Fact]
     public async Task Load_logs_only_the_type_name_of_an_unexpected_exception()
     {
-        var handler = new FakeHandler((_, _) => throw new InvalidOperationException("secret-detail-xyz"));
-        var stderr = new StringWriter();
+        using var handler = new FakeHandler((_, _) => throw new InvalidOperationException("secret-detail-xyz"));
+        using var stderr = new StringWriter();
         var original = Console.Error;
         Console.SetError(stderr);
         try
         {
-            Assert.Equal(MaintenanceInfo.Off, await MaintenanceInfo.LoadAsync(Client(handler)));
+            Assert.Equal(MaintenanceInfo.Off, await LoadInfoAsync(handler));
         }
         finally
         {
@@ -111,19 +116,19 @@ public class MaintenanceInfoTests
     [Fact]
     public async Task Load_does_not_log_a_network_failure_or_a_timeout()
     {
-        var failing = new FakeHandler((_, _) => throw new HttpRequestException("offline"));
-        var slow = new FakeHandler(async (_, ct) =>
+        using var failing = new FakeHandler((_, _) => throw new HttpRequestException("offline"));
+        using var slow = new FakeHandler(async (_, ct) =>
         {
             await Task.Delay(TimeSpan.FromSeconds(30), ct);
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
-        var stderr = new StringWriter();
+        using var stderr = new StringWriter();
         var original = Console.Error;
         Console.SetError(stderr);
         try
         {
-            Assert.Equal(MaintenanceInfo.Off, await MaintenanceInfo.LoadAsync(Client(failing)));
-            Assert.Equal(MaintenanceInfo.Off, await MaintenanceInfo.LoadAsync(Client(slow), TimeSpan.FromMilliseconds(50)));
+            Assert.Equal(MaintenanceInfo.Off, await LoadInfoAsync(failing));
+            Assert.Equal(MaintenanceInfo.Off, await LoadInfoAsync(slow, TimeSpan.FromMilliseconds(50)));
         }
         finally
         {
@@ -135,33 +140,33 @@ public class MaintenanceInfoTests
     [Fact]
     public async Task Load_treats_an_unexpected_exception_as_normal()
     {
-        var handler = new FakeHandler((_, _) => throw new InvalidOperationException("unexpected"));
-        Assert.Equal(MaintenanceInfo.Off, await MaintenanceInfo.LoadAsync(Client(handler)));
+        using var handler = new FakeHandler((_, _) => throw new InvalidOperationException("unexpected"));
+        Assert.Equal(MaintenanceInfo.Off, await LoadInfoAsync(handler));
     }
 
     [Fact]
     public async Task Load_gives_up_quickly_by_default()
     {
-        var handler = new FakeHandler(async (_, ct) =>
+        using var handler = new FakeHandler(async (_, ct) =>
         {
             await Task.Delay(TimeSpan.FromSeconds(30), ct);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"state\":\"on\"}") };
         });
         var watch = System.Diagnostics.Stopwatch.StartNew();
-        Assert.Equal(MaintenanceInfo.Off, await MaintenanceInfo.LoadAsync(Client(handler)));
+        Assert.Equal(MaintenanceInfo.Off, await LoadInfoAsync(handler));
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(4), "既定の待ち時間は 2 秒（起動を長く止めない）");
     }
 
     [Fact]
     public async Task Load_does_not_make_the_app_wait_for_a_slow_endpoint()
     {
-        var handler = new FakeHandler(async (_, ct) =>
+        using var handler = new FakeHandler(async (_, ct) =>
         {
             await Task.Delay(TimeSpan.FromSeconds(30), ct);   // キャンセルされるまで待つ
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"state\":\"on\"}") };
         });
         var watch = System.Diagnostics.Stopwatch.StartNew();
-        var info = await MaintenanceInfo.LoadAsync(Client(handler), TimeSpan.FromMilliseconds(100));
+        var info = await LoadInfoAsync(handler, TimeSpan.FromMilliseconds(100));
         Assert.Equal(MaintenanceInfo.Off, info);
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), "時間切れで、通常として起動する");
     }

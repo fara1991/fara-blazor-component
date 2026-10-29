@@ -1,6 +1,6 @@
 {
   "name": "fara-blazor-component",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Fara のサイトで共通に使う部品（Worker の共有 JS・静的ファイルの生成・CSP のテンプレートなどの Node テスト）。利用するサイトは git submodule で取り込む（CLAUDE.md 参照）",
   "engines": {
@@ -11,9 +11,10 @@
     "test:maintenance": "node --test worker/maintenance.test.mjs",
     "test:build": "node --test tests/build/build-pages.test.mjs tests/build/pokemon-equivalence.test.mjs tests/build/boot-indicator.test.mjs tests/build/hardening.test.mjs",
     "test:csp": "node --test tests/csp/render-headers.test.mjs tests/csp/limits.test.mjs",
-    "test": "node --test worker/report.test.mjs worker/report-rate-limit.test.mjs worker/maintenance.test.mjs worker/text.test.mjs worker/error-summary.test.mjs tests/build/build-pages.test.mjs tests/build/pokemon-equivalence.test.mjs tests/build/boot-indicator.test.mjs tests/build/hardening.test.mjs tests/csp/render-headers.test.mjs tests/csp/limits.test.mjs tests/js/kit-js.test.mjs tests/js/boot-indicator.test.mjs tests/js/scroll-progress.test.mjs tests/tools/maintenance-cli.test.mjs tests/tools/maintenance-all.test.mjs tests/tools/shared-constants.test.mjs tests/layout-check/rules.test.mjs tests/layout-check/serve-static.test.mjs",
+    "test": "node --test worker/report.test.mjs worker/report-rate-limit.test.mjs worker/maintenance.test.mjs worker/text.test.mjs worker/error-summary.test.mjs tests/build/build-pages.test.mjs tests/build/pokemon-equivalence.test.mjs tests/build/boot-indicator.test.mjs tests/build/hardening.test.mjs tests/csp/render-headers.test.mjs tests/csp/limits.test.mjs tests/js/kit-js.test.mjs tests/js/boot-indicator.test.mjs tests/js/scroll-progress.test.mjs tests/tools/maintenance-cli.test.mjs tests/tools/maintenance-all.test.mjs tests/tools/shared-constants.test.mjs tests/layout-check/rules.test.mjs tests/layout-check/serve-static.test.mjs tests/lint/shared-config.test.mjs",
     "test:cli": "node --test tests/tools/maintenance-cli.test.mjs tests/tools/maintenance-all.test.mjs",
     "test:js": "node --test tests/js/kit-js.test.mjs tests/js/boot-indicator.test.mjs tests/js/scroll-progress.test.mjs",
+    "test:lint": "node --test tests/lint/shared-config.test.mjs",
     "test:text": "node --test worker/text.test.mjs",
     "test:error-summary": "node --test worker/error-summary.test.mjs",
     "test:layout-check": "node --test tests/layout-check/integration.test.mjs",

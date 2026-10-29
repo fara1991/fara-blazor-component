@@ -17,11 +17,16 @@ builder.Services.AddFaraBlazorComponent(options =>
     options.Social.Add(new SiteSocialLink("github", "https://example.com/github"));
     options.Social.Add(new SiteSocialLink("twitter", "https://example.com/twitter"));
 });
-builder.Services.AddSingleton(new HttpClient { BaseAddress = new Uri(baseAddress) });
+// ファクトリで登録して、アプリの終了時に DI が破棄する
+builder.Services.AddSingleton(_ => new HttpClient { BaseAddress = new Uri(baseAddress) });
 
 // メンテナンスの状態（/api/maintenance）。読めなければ通常
-var http = new HttpClient { BaseAddress = new Uri(baseAddress) };
-builder.Services.AddSingleton(await MaintenanceInfo.LoadAsync(http));
+MaintenanceInfo maintenance;
+using (var http = new HttpClient { BaseAddress = new Uri(baseAddress) })
+{
+    maintenance = await MaintenanceInfo.LoadAsync(http);
+}
+builder.Services.AddSingleton(maintenance);
 
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");

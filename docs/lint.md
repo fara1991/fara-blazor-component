@@ -23,6 +23,13 @@
 
 環境（グローバル）は `globals` の `node`・`browser` から選ぶ。実行環境だけのグローバルは `extraGlobals`（例: Cloudflare Workers の `HTMLRewriter`）。
 
+既定の `default` export（`...shared`）は、次の 2 つに分けている。
+
+- Node の JS（`**/*.{js,mjs,cjs}`。ただし `**/wwwroot/js/**` を除く）: `node` の環境
+- 画面の JS（`**/wwwroot/js/**/*.{js,mjs,cjs}`）: `browser` の環境（`sourceType` は既定の `module`。サイトの設定で `sourceType: "script"` と書けば上書きされる）
+
+画面の JS に `node` の環境を当てると、`process`・`require` などの誤りが `no-undef` で見つからなくなるため、分けている（テスト: `tests/lint/shared-config.test.mjs`、`npm run test:lint`）。`createSharedConfig` は `ignores`（任意）を受け取る。
+
 ### kit 自身の設定
 
 `eslint.config.mjs`（kit のルート）。
@@ -45,7 +52,7 @@
    import shared, { createSharedConfig } from "./external/fara-blazor-component/tools/lint/eslint.config.shared.mjs";
 
    export default [
-     ...shared,                                              // Node の JS（**/*.{js,mjs,cjs}）
+     ...shared,                                              // Node の JS（wwwroot/js 以外）と、画面の JS（wwwroot/js・browser）
      ...createSharedConfig({                                 // Worker の HTMLRewriter のように、サイトだけの実行環境のグローバル
        files: ["worker/**/*.js"],
        environments: ["node"],
@@ -64,6 +71,9 @@
 **注意**: 共通設定は `globals` を import する。import はファイルの場所から探すので、**サイトの node_modules に `globals` が要る**（kit の devDependency は、submodule 側には入らない）。
 共通設定は `external/**`（取り込んだ kit）を lint の対象から外している。kit の JS は kit の CI で lint する（画面・Worker・Node で必要なグローバルが違うため、サイトの設定では誤った違反になる）。
 
+**サイト側の新たな lint 違反に注意（kit の更新で増える）**: 既定の `...shared` は、画面の JS（`wwwroot/js`）に **Node のグローバルを当てない**。以前は当たっていたため、画面の JS で `process`・`require`・`module`・`exports`・`Buffer`・`global`・`__dirname`・`__filename`・`setImmediate` を使うと、kit を上げた後の `npm run lint` で `no-undef` が出る。直す（ブラウザの API に書き換える。`import` と `require` の違いに注意）か、その JS を `wwwroot/js` の外に置く（Node として lint される）。
+この変更の時点（2026-10-29）で、サイト（labs・pokemon・album・avatar・bot）の `wwwroot/js` を、新旧の設定で lint して比べたところ、新たに落ちる箇所は 0 件だった。サイトの側の `eslint.config.mjs` は変えなくてよい（画面の JS の `sourceType: "script"` は、サイトの設定のままで効く）。
+
 ## 2. C#（アナライザー）
 
 ### 設定
@@ -81,9 +91,9 @@ kit の `Directory.Build.props` は kit の中のプロジェクトだけに効�
 | `VSTHRD100` | **error** | 0 | `async void`（イベント以外） |
 | `CA1816` | **error** | 0 | Dispose で `GC.SuppressFinalize` を呼んでいない |
 | `IDE0059` | **error** | 0 | 不要な代入 |
-| `CA1031` | warning | 3 | 一般の例外の catch。`src/FaraBlazorComponent.Core/MaintenanceInfo.cs`（`LoadAsync`）・`src/FaraBlazorComponent.Razor/Services/SiteThemeState.cs`（`TryLoadSync`・`InitializeAsync`）。一般の例外を受けて、起動や描画を止めない場所（意図した握りつぶし） |
-| `CA2000` | warning | 24 | Dispose 漏れ。大半はテストの `HttpClient`・`FakeHandler`・`StringWriter`（テスト用の使い捨て）。ノイズが多いため warning |
-| `VSTHRD002`・`VSTHRD003`・`VSTHRD103` | warning（パッケージの既定） | 4 | 同期の待ち・開始していない Task の待ち・同期の書き込み。`SiteLayoutTests`・`ReportFormViewTests`・`MaintenanceInfo.cs`。error にしない |
+| `CA1031` | **error** | 0 | 一般の例外の catch。意図して受ける 3 か所（`MaintenanceInfo.LoadAsync`・`SiteThemeState.TryLoadSync`・`SiteThemeState.InitializeAsync`。起動や描画を止めない場所）は、理由つきの `[SuppressMessage]` を 1 メンバーずつ付けた。サイト側は `.editorconfig`、または `global_level` の高い config で、重大度を上書きできる |
+| `CA2000` | **error** | 0 | Dispose 漏れ。テストは `using`・DI のファクトリ登録で破棄する |
+| `VSTHRD002`・`VSTHRD003`・`VSTHRD103` | **error** | 0 | 同期の待ち・開始していない Task の待ち・同期の書き込み |
 
 ### 確認していないもの（ラチェットに入れていない）
 

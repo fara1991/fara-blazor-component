@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FaraBlazorComponent.Core;
@@ -38,6 +39,8 @@ public sealed class SiteThemeState
     public event Func<Task>? Changed;
 
     /// <summary>保存された値を同期で読む（WebAssembly だけ）。読めたら true。描画の前に呼ぶ。</summary>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+        Justification = "localStorage が読めない理由（プライベートモード・拒否・JS の例外など）によらず、描画を止めずに light で続ける。")]
     public bool TryLoadSync(IJSInProcessRuntime sync)
     {
         if (_loaded) return true;
@@ -55,6 +58,8 @@ public sealed class SiteThemeState
     }
 
     /// <summary>保存された値を非同期で読む（同期が使えないときの版）。</summary>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+        Justification = "localStorage が読めない理由によらず、描画を止めずに light で続ける。")]
     public async Task InitializeAsync()
     {
         if (_loaded) return;
