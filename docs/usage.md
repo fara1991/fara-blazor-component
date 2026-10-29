@@ -41,7 +41,7 @@ Worker の変数（ダッシュボードの「変数とシークレット」、�
 
 - **旧名 `MAINTENANCE` は 0.3.0 から読まない**（残っていても何も起きない＝通常動作）。0.2.x 以前から上げるサイトは、`docs/changelog.md` の 0.3.0 の移行手順に従う。
 - 本番の公開前にお知らせを出す運用（`require-maintenance.mjs` 相当）や、公開と同時に `--var MAINTENANCE_MODE:true` を付けるワークフローも、新しい名前に合わせる。
-- 複数サイトの変数をまとめて見る・切り替えるには `tools/maintenance.mjs`（`status` は読み取り、`set` は deploy ワークフローを `gh` で実行。雛形と手順は `docs/maintenance-cli.md`）。
+- 複数サイトの変数をまとめて見る・切り替えるには `tools/maintenance.mjs`（`status` は読み取り、`set` は deploy ワークフローを `gh` で実行。雛形と手順は `docs/maintenance-cli.md`）。一括の切り替え・解除は kit の Actions「Set maintenance (all sites)」（対象サイトと各サイトのワークフローの対応表は `docs/maintenance-cli.md` の 0、一括解除の手順は同 3、個別の解除は同 1）。album は Actions で公開しないので対象外。
 
 ### 2.2 報告の回数制限（1 日 3 回まで・送信元ごと）
 

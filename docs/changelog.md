@@ -2,6 +2,20 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 未リリース
+
+> **この変更が master に入る（v1.0.2 として develop → master）までは、一括切替（Set maintenance (all sites)）を使わないこと。** master の旧版の `maintenance-sites.json` は誤ったまま（avatar の dev が `deploy.yml` で何も起きない、bot が存在しない `site.yml` で飛ばされる）。使うなら各サイトの Run workflow から個別に。
+
+- **レビュー対応**: `sites` が `,` だけなどで名前が 0 件になるときは、全サイト対象にせず拒否する（空白だけは空と同じ）。「本番の解除は develop も必須」の弱点（dev job の失敗で本番も止まる）と逃げ道（各サイトの Deploy (production) での個別解除）を docs に明記。
+
+メンテナンスの一括切替（`tools/maintenance-sites.json`・`tools/maintenance-all.mjs`・`.github/workflows/set-maintenance-all.yml`）を、各サイトの実ファイルに合わせた。バージョンは上げない。
+
+- **修正（対象の一覧が実態と合っていなかった）**: 2026-10-29 に、各リポジトリの `origin/develop` の `.github/workflows/` で確かめて直した。(1) **avatar の dev**: `deploy.yml` → `deploy-develop.yml`（`deploy.yml` のジョブは master 限定で、develop を指定しても何も起きなかった）。(2) **bot の dev / production**: 存在しない `site.yml` → dev は `deploy-develop.yml`、production は `deploy.yml`。pokemon・portfolio、Worker 名、リポジトリ名は実態どおりで変更なし。dev = `deploy-develop.yml`（Environment `develop`）、production = `deploy.yml`（Environment `production`）の対応を、テストが検査する。album は、公開を Actions で行わないので対象外のまま。
+- **追加（一括解除の仕様を明確にした）**: `maintenance_mode=false`（解除）は、メンテナンス（`true`）・お知らせ帯（`notice`）と同じ流れ（計画 → dev → 本番〔Environment `production-maintenance`・必須レビュワーの承認〕）で、dev・本番の全サイトに対して行える。`set-maintenance-all` に入力 **`sites`**（対象サイトをカンマ区切りで指定。空 = 4 サイトすべて。dev・本番の両方に効く）を追加した。**本番を `false` にするときは `develop` も同時に選ぶ**（dev を先に解除して確かめるため。master だけを選ぶと `validate` が拒否）。
+- **追加（計画に現在の状態を表示）**: dev job の計画（本番の承認より前）に、各サイトの公開 URL の `GET /api/maintenance` の結果（現在の状態）と、「これから起こること」（解除・すでに通常・文面だけの変更など）を出す。読み取りだけで、読めなくても警告にとどめて止めない。解除では「本番の解除は master の最新をすべて公開する」の注意も出す。`maintenance-sites.json` に `hosts`（`dev` / `production` の公開 URL）を追加。
+- **docs**: `docs/maintenance-cli.md` に「0. 対象のサイトと対応表」（リポジトリ・ワークフロー・Environment・Worker・URL・入力名・album 対象外の理由）、「一括解除」「個別のサイトを解除する手順」を追加し、古い記述（bot の `site.yml`、avatar・bot が 1 つのワークフロー、リポジトリが非公開、など）を直した。`CLAUDE.md` の「5 サイト」も 4 サイトに直した。
+- **テスト**: `tests/tools/maintenance-all.test.mjs`・`maintenance-cli.test.mjs` に、実態の対応表・解除の流れ・`sites`・現在の状態の表示（読めない場合を含む）・`hosts` の検査を追加（gh と fetch は差し替え。実際の切り替えは行わない）。
+
 ## 1.0.1
 
 2026-10-29。
