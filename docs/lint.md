@@ -91,7 +91,7 @@ kit の `Directory.Build.props` は kit の中のプロジェクトだけに効�
 | `VSTHRD100` | **error** | 0 | `async void`（イベント以外） |
 | `CA1816` | **error** | 0 | Dispose で `GC.SuppressFinalize` を呼んでいない |
 | `IDE0059` | **error** | 0 | 不要な代入 |
-| `CA1031` | **error** | 0 | 一般の例外の catch。意図して受ける 3 か所（`MaintenanceInfo.LoadAsync`・`SiteThemeState.TryLoadSync`・`SiteThemeState.InitializeAsync`。起動や描画を止めない場所）は、理由つきの `[SuppressMessage]` を 1 メンバーずつ付けた |
+| `CA1031` | **error** | 0 | 一般の例外の catch。意図して受ける 3 か所（`MaintenanceInfo.LoadAsync`・`SiteThemeState.TryLoadSync`・`SiteThemeState.InitializeAsync`。起動や描画を止めない場所）は、理由つきの `[SuppressMessage]` を 1 メンバーずつ付けた。サイト側は `.editorconfig`、または `global_level` の高い config で、重大度を上書きできる |
 | `CA2000` | **error** | 0 | Dispose 漏れ。テストは `using`・DI のファクトリ登録で破棄する |
 | `VSTHRD002`・`VSTHRD003`・`VSTHRD103` | **error** | 0 | 同期の待ち・開始していない Task の待ち・同期の書き込み |
 
