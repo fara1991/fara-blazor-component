@@ -27,6 +27,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install (devDependencies。tests/lint が eslint を読むため。版は package-lock.json のとおり)
+        run: npm ci
+
       - name: Test (Worker の共有 JS・build・csp・レイアウト計測の判定)
         run: npm test
 
