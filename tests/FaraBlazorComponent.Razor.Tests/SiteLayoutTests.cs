@@ -52,11 +52,11 @@ public class SiteLayoutTests : BlazorComponentTestContext
     }
 
     [Fact]
-    public void EscapeDoesNothingWhenThePhoneMenuIsClosed()
+    public async Task EscapeDoesNothingWhenThePhoneMenuIsClosed()
     {
         var cut = RenderLayout(mobile: true);
 
-        cut.InvokeAsync(() => cut.Instance.OnEscape()).Wait();
+        await cut.InvokeAsync(() => cut.Instance.OnEscape());
 
         Assert.DoesNotContain(JSInterop.Invocations, i => i.Identifier == "faraBlazorComponent.focusMenu");
     }
@@ -260,18 +260,18 @@ public class SiteLayoutTests : BlazorComponentTestContext
 
         var drawer = cut.Find("#fbc-sidebar");
         Assert.True(drawer.HasAttribute("inert"));
-        Assert.Equal(1, cut.FindAll("#fbc-sidebar .nav-item").Count);   // 中身は残す（閉じている間も DOM にある）
+        Assert.Single(cut.FindAll("#fbc-sidebar .nav-item"));   // 中身は残す（閉じている間も DOM にある）
     }
 
     [Fact]
-    public void OpeningThePhoneDrawerRemovesInertAndEscapePutsItBack()
+    public async Task OpeningThePhoneDrawerRemovesInertAndEscapePutsItBack()
     {
         var cut = RenderLayout(mobile: true);
 
         cut.Find(".fbc-menu-toggle").Click();
         Assert.False(cut.Find("#fbc-sidebar").HasAttribute("inert"));
 
-        cut.InvokeAsync(() => cut.Instance.OnEscape()).Wait();
+        await cut.InvokeAsync(() => cut.Instance.OnEscape());
 
         Assert.True(cut.Find("#fbc-sidebar").HasAttribute("inert"));
         Assert.Contains(JSInterop.Invocations, i => i.Identifier == "faraBlazorComponent.focusMenu");

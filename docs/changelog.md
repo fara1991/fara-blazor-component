@@ -4,7 +4,10 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 
 ## 未リリース
 
-ESLint の共通設定の修正（`tools/lint/eslint.config.shared.mjs`）。版は上げていない（リリースは別に切る）。
+ESLint の共通設定の修正（`tools/lint/eslint.config.shared.mjs`）と、.NET の警告の削減。版は上げていない（リリースは別に切る）。
+
+- **.NET の警告を 0 件にした**（振る舞いは変えない）。`dotnet build -c Release --no-incremental` の警告は、kit 全体（Core・Razor・テスト・samples/MinimalSite）で 35 件 → 0 件。`MaintenanceInfo.LoadAsync` の標準エラーへの出力を `WriteLineAsync` にした（VSTHRD103）。意図して一般の例外を受ける 3 か所（`MaintenanceInfo.LoadAsync`・`SiteThemeState.TryLoadSync`・`SiteThemeState.InitializeAsync`）には、理由つきの `[SuppressMessage("CA1031")]` を付けた。テスト・サンプルの Dispose 漏れ・同期の待ち・xUnit の指摘も直した。
+- **`tools/lint/dotnet.editorconfig`**: `CA1031`・`CA2000`・`VSTHRD002`・`VSTHRD003`・`VSTHRD103` を warning（パッケージの既定）から error に上げた（kit は 0 件）。この設定を取り込むサイトのうち、これらの違反が残るサイトは、取り込みを上げたときにビルドが落ちる。サイト側で `warning` に下げて上書きするか、先に直す（`docs/lint.md`）。kit の ProjectReference として kit のコードをビルドするだけのサイトは影響しない（kit のコードは 0 件）。
 
 - **修正**: 既定の `default` export（`...shared`）が、画面の JS（`**/wwwroot/js/**`）にも Node のグローバル（`process`・`require` など）を当てていた。そのため、画面の JS でそれらを使っても `no-undef` が出なかった。Node の JS は `wwwroot/js` を除き、画面の JS には browser の環境だけを当てるように分けた。
 - `createSharedConfig` に `ignores`（任意）を足した。省略時の挙動は変わらない。テスト `tests/lint/shared-config.test.mjs`（`npm run test:lint`・`npm test` に含む）を足した。

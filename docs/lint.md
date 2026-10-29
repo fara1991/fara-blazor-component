@@ -91,9 +91,9 @@ kit の `Directory.Build.props` は kit の中のプロジェクトだけに効�
 | `VSTHRD100` | **error** | 0 | `async void`（イベント以外） |
 | `CA1816` | **error** | 0 | Dispose で `GC.SuppressFinalize` を呼んでいない |
 | `IDE0059` | **error** | 0 | 不要な代入 |
-| `CA1031` | warning | 3 | 一般の例外の catch。`src/FaraBlazorComponent.Core/MaintenanceInfo.cs`（`LoadAsync`）・`src/FaraBlazorComponent.Razor/Services/SiteThemeState.cs`（`TryLoadSync`・`InitializeAsync`）。一般の例外を受けて、起動や描画を止めない場所（意図した握りつぶし） |
-| `CA2000` | warning | 24 | Dispose 漏れ。大半はテストの `HttpClient`・`FakeHandler`・`StringWriter`（テスト用の使い捨て）。ノイズが多いため warning |
-| `VSTHRD002`・`VSTHRD003`・`VSTHRD103` | warning（パッケージの既定） | 4 | 同期の待ち・開始していない Task の待ち・同期の書き込み。`SiteLayoutTests`・`ReportFormViewTests`・`MaintenanceInfo.cs`。error にしない |
+| `CA1031` | **error** | 0 | 一般の例外の catch。意図して受ける 3 か所（`MaintenanceInfo.LoadAsync`・`SiteThemeState.TryLoadSync`・`SiteThemeState.InitializeAsync`。起動や描画を止めない場所）は、理由つきの `[SuppressMessage]` を 1 メンバーずつ付けた |
+| `CA2000` | **error** | 0 | Dispose 漏れ。テストは `using`・DI のファクトリ登録で破棄する |
+| `VSTHRD002`・`VSTHRD003`・`VSTHRD103` | **error** | 0 | 同期の待ち・開始していない Task の待ち・同期の書き込み |
 
 ### 確認していないもの（ラチェットに入れていない）
 
