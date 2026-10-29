@@ -4,6 +4,8 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 
 ## 未リリース
 
+- **修正（Worker 名）**: fara-labs（portfolio）の Worker 名の変更に合わせ、`tools/maintenance-sites.json` の `workers` を `fara-portfolio` → `fara-labs`、`fara-portfolio-dev` → `fara-labs-dev` に直した（`docs/maintenance-cli.md` の表・雛形の例も）。fara-labs の `wrangler.jsonc`（develop）で確認済み。
+
 > **この変更が master に入る（v1.0.2 として develop → master）までは、一括切替（Set maintenance (all sites)）を使わないこと。** master の旧版の `maintenance-sites.json` は誤ったまま（avatar の dev が `deploy.yml` で何も起きない、bot が存在しない `site.yml` で飛ばされる）。使うなら各サイトの Run workflow から個別に。
 
 - **レビュー対応**: `sites` が `,` だけなどで名前が 0 件になるときは、全サイト対象にせず拒否する（空白だけは空と同じ）。「本番の解除は develop も必須」の弱点（dev job の失敗で本番も止まる）と逃げ道（各サイトの Deploy (production) での個別解除）を docs に明記。
