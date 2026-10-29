@@ -57,9 +57,14 @@ export function planFromEnv(env, sitesPath = join(here, "maintenance-sites.json"
   if (mode === "" && message === "") throw new UsageError("maintenance_mode か maintenance_message のどちらかを入れてください(両方が空だと、変えるものがありません)");
   const prodPicked = picked.some((st) => st.envName === "production");
   if (prodPicked && mode === "") throw new UsageError("master(本番)を選ぶときは maintenance_mode が必須です(message だけの変更は develop だけ)");
-  // 解除(false)は、その時点の master の内容がすべて公開されるので、dev を先に通す(dev で確かめてから本番)
+  // 解除(false)は、その時点の master の内容がすべて公開されるので、dev を先に通す(dev で確かめてから本番)。
+  // 弱点: dev job が失敗すると needs: dev で本番も動かない(develop のビルドが壊れた障害時に、本番だけを解除できない)。
+  // 逃げ道は、各サイトの Actions → Deploy (production) → Run workflow(maintenance_mode=false、master)での個別解除(docs/maintenance-cli.md の「個別のサイトを解除する手順」)
   if (prodPicked && mode === "false" && !picked.some((st) => st.envName === "dev")) throw new UsageError("本番を解除(maintenance_mode=false)するときは、develop も選んでください(dev を先に解除して確かめてから、本番を解除します)");
-  const names = [...new Set(String(env.SITES_INPUT ?? "").split(",").map((s) => s.trim()).filter(Boolean))];
+  const rawSites = String(env.SITES_INPUT ?? "");
+  const names = [...new Set(rawSites.split(",").map((s) => s.trim()).filter(Boolean))];
+  // 空白だけは空(全サイト)と同じ。「,」だけなどで名前が 0 件になるのは、全サイトを対象にしてしまわないよう拒否する
+  if (rawSites.trim() !== "" && names.length === 0) throw new UsageError("sites に有効なサイト名がありません(空にするか、pokemon,bot のようにサイト名を入れてください)");
   for (const n of names) if (!/^[\w-]{1,40}$/.test(n)) throw new UsageError(`sites の値が不正です(${JSON.stringify(n.slice(0, 40))})。サイト名をカンマ区切りで入れてください`);
 
   const sitesList = loadSites(sitesPath);

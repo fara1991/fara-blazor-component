@@ -432,3 +432,17 @@ test("現在の状態の表示: 想定外の応答は読めない扱い。長い
   await runAll({ ...base, GH_TOKEN: "tok_x_12345" }, { gh: fakeGh().gh, fetchImpl, sleep: async () => {}, log: (t) => out.push(t), error: (t) => out.push(t) }, { phase: "dev" });
   assert.doesNotMatch(out.join("\n"), /\u001b/);
 });
+
+test("sites: 区切りだけ(, / ' , ' / ,,)は拒否。空白だけは空と同じ(全サイト)。大文字小文字違い・album は不明なサイトで拒否", () => {
+  for (const v of [",", " , ", ",,", "Pokemon", "album"]) assert.throws(() => planFromEnv({ ...base, SITES_INPUT: v }), /./, JSON.stringify(v));
+  assert.throws(() => planFromEnv({ ...base, SITES_INPUT: "," }), /有効なサイト名がありません/);
+  assert.equal(planFromEnv({ ...base, SITES_INPUT: " " }).stages[0].sites.length, 4);
+});
+
+test("本番の段階: master にまだワークフローが無い(404)と全部飛ばされ、「実行できた対象が 1 つもありません」で失敗する(何も起動しない)", async () => {
+  const contents = Object.fromEntries(Object.values(REPOS).map((repo) => [`${repo}@master`, 404]));
+  const r = await go({ TARGET_DEVELOP: "false", TARGET_MASTER: "true", MAINTENANCE_MODE_INPUT: "notice" }, { contents }, { phase: "production" });
+  assert.equal(r.code, 1);
+  assert.equal(r.g.dispatches().length, 0);
+  assert.match(r.out, /実行できる対象が 1 つもありません|実行できた対象が 1 つもありません/);
+});

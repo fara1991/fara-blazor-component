@@ -13,6 +13,8 @@ Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTEN
 
 ## 0. 対象のサイトと対応表
 
+> **重要: この修正が kit の master に入る（v1.0.2 として develop → master）までは、一括切替（Set maintenance (all sites)）を使わないこと。** kit の master にある旧版の `tools/maintenance-sites.json` は、avatar の dev が `deploy.yml`（dev では何も起きない）、bot が存在しない `site.yml`（飛ばされる）のままで、実態と合っていない。それまでは、各サイトの Actions から個別に切り替える（下の 1・「個別のサイトを解除する手順」）。
+
 2026-10-29 に、各リポジトリの `origin/develop` の `.github/workflows/` で確かめた内容（`tools/maintenance-sites.json` はこの表と同じ。テストが dev = `deploy-develop.yml`・production = `deploy.yml` を検査する）。
 
 | サイト | リポジトリ | dev（ワークフロー名 / ファイル / Environment / Worker / URL） | production（ワークフロー名 / ファイル / Environment / Worker / URL） |
@@ -26,7 +28,8 @@ Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTEN
 - `workflow_dispatch` の入力: **dev** は `maintenance_mode`（choice: 空 / `true` / `notice` / `false`。空 = 変更しない）と `maintenance_message`（string、200 文字まで）の 2 つ。**production** はこの 2 つに加えて `skip_maintenance_check`（boolean。公開前の `MAINTENANCE_MODE=notice` の確認を飛ばす緊急用）と `first_publish`（boolean。Worker がまだ無いときの初回の公開だけ）。**一括切替・CLI が渡すのは `maintenance_mode` と `maintenance_message` だけ**（`skip_maintenance_check`・`first_publish` には触れない）
 - production で `maintenance_mode` を `true` / `notice` / `false` のどれかにして起動すると、`MAINTENANCE_MODE=notice` の確認（`Require MAINTENANCE_MODE=notice`）は行われない。**解除（`false`）は、このため確認なしで master の最新を公開する**
 - **album（`fara-vrc-photo-album`）は一括切替の対象外**: 公開を GitHub Actions では行わず（手元のアプリから公開）、起動するワークフローが無い（`.github/workflows/` は `build.yml` だけ）。album のメンテナンスの切り替えは、Cloudflare のダッシュボード（Worker の「変数とシークレット」の `MAINTENANCE_MODE`）か、手元の wrangler で行う
-- **2026-10-29 時点で、4 サイトの `master` には deploy 系のワークフローがまだ無い**（本番の初回の公開前）。この間、一括切替で `master` を選んでも、本番は事前確認（404）で「飛ばす」警告になる。各サイトの develop → master のマージのあとから、本番にも効く
+- **2026-10-29 時点（公開前）で、4 サイトの `master` には deploy 系のワークフローがまだ無い**。この間、`master` を選ぶと本番は全部「飛ばす」（事前確認が 404）になる。`develop` を省いた場合は、production job が「実行できた対象が 1 つもありません」で失敗する（承認の後に失敗する形になるが想定内）。各サイトの develop → master のマージのあとから、本番にも効く
+- **Worker 名の変更予定**: fara-labs（portfolio）の Worker 名は、近く `fara-portfolio` → `fara-labs`、`fara-portfolio-dev` → `fara-labs-dev` に変わる予定（別の PR が進行中）。**今はまだ直さない**（変更がマージされ、公開されてから、別の PR で直す）。直す場所: `tools/maintenance-sites.json` の portfolio の `workers.production` / `workers.dev` の 2 値と、この docs の 0 の表・対応表（対象のサイト）・雛形の例（`require-maintenance.mjs` と `WORKER_NAME`）
 
 ## 1. Actions の画面で実行する(第一の手段)
 
@@ -186,6 +189,10 @@ kit のリポジトリ(`fara1991/fara-blazor-component`)の Actions →「**Set 
 3. `dev` job の**計画**（ジョブサマリー）を読む: 各サイトの現在の状態（`/api/maintenance`）と「これから起こること」、飛ばすサイト。本番の行に「**本番の解除は、各サイトの master の最新の内容をすべて公開します**」の注意が出る。dev の解除が終わったら、確認用サイトで表示を確かめる
 4. `production` job の承認待ちになる。**Review deployments の画面**で、入力値（`master` ✔・`maintenance_mode=false`・`sites`）と、`dev` job のサマリー（計画・飛ばすサイト）、各サイトの master の最新のコードを確かめてから承認する（Environment `production-maintenance`・必須レビュワー）。承認するまで本番には何も起きない
 5. 承認後、各サイトの本番ワークフロー（`deploy.yml`）を `master` で 1 サイトずつ起動し、結果を待つ。1 つでも失敗したらそこで中断する（それ以降は実行しない）。完了後、各サイトの `/api/maintenance` が `off` になっていることを確かめる
+
+**なぜ develop も必須か、その弱点と逃げ道**: dev を先に解除すると、承認までの間に確認用サイトで表示を確かめる時間が取れる。一方で、`production` job は `needs: dev` なので、**dev job が失敗すると本番も動かない**（develop のビルドが壊れている障害時に、本番だけを解除できない）。その場合の**逃げ道**は、各サイトのリポジトリの Actions → **Deploy (production)** → Run workflow（**Use workflow from = `master`**、`maintenance_mode` = `false`）での個別解除（上の「個別のサイトを解除する手順」）。
+
+計画は dev job の時点のもので、承認までの間に状態が変わりうる（production job は事前確認をやり直す。現在の状態の表示は dev job の時点のまま）。
 
 注意: 一括解除は、事前確認で飛ばされたサイト（そのブランチに入力つきのワークフローが無い）には効かない。飛ばされたサイトは、上の「個別のサイトを解除する手順」で解除する。`sites` を指定したサイトだけが、dev・本番の両方で対象になる（本番の確認用の再入力 `production <サイト名>` も、選んだサイトだけ）。
 

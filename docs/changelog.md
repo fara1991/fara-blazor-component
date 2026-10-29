@@ -4,6 +4,10 @@ kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコ
 
 ## 未リリース
 
+> **この変更が master に入る（v1.0.2 として develop → master）までは、一括切替（Set maintenance (all sites)）を使わないこと。** master の旧版の `maintenance-sites.json` は誤ったまま（avatar の dev が `deploy.yml` で何も起きない、bot が存在しない `site.yml` で飛ばされる）。使うなら各サイトの Run workflow から個別に。
+
+- **レビュー対応**: `sites` が `,` だけなどで名前が 0 件になるときは、全サイト対象にせず拒否する（空白だけは空と同じ）。「本番の解除は develop も必須」の弱点（dev job の失敗で本番も止まる）と逃げ道（各サイトの Deploy (production) での個別解除）を docs に明記。
+
 メンテナンスの一括切替（`tools/maintenance-sites.json`・`tools/maintenance-all.mjs`・`.github/workflows/set-maintenance-all.yml`）を、各サイトの実ファイルに合わせた。バージョンは上げない。
 
 - **修正（対象の一覧が実態と合っていなかった）**: 2026-10-29 に、各リポジトリの `origin/develop` の `.github/workflows/` で確かめて直した。(1) **avatar の dev**: `deploy.yml` → `deploy-develop.yml`（`deploy.yml` のジョブは master 限定で、develop を指定しても何も起きなかった）。(2) **bot の dev / production**: 存在しない `site.yml` → dev は `deploy-develop.yml`、production は `deploy.yml`。pokemon・portfolio、Worker 名、リポジトリ名は実態どおりで変更なし。dev = `deploy-develop.yml`（Environment `develop`）、production = `deploy.yml`（Environment `production`）の対応を、テストが検査する。album は、公開を Actions で行わないので対象外のまま。
