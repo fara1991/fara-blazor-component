@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { planFromEnv, runAll, STAGES, ALLOWED_RUN_REF } from "../../tools/maintenance-all.mjs";
+import { readPublicState } from "../../tools/maintenance.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TIP = "a".repeat(40);
@@ -14,6 +15,18 @@ const OK = "on:\n  workflow_dispatch:\n    inputs:\n      maintenance_mode:\n   
 /** 入力の無い古いワークフロー（run の中に文字列があっても、入力とは数えない）。 */
 const OLD = "name: old\non: push\njobs:\n  a:\n    steps:\n      - run: echo maintenance_mode\n";
 const REPOS = { pokemon: "fara1991/fara-pokemon-battle-assistant", avatar: "fara1991/fara-avatar-modding-guide", bot: "fara1991/fara-bot-moderator", portfolio: "fara1991/fara-labs" };
+/** /api/maintenance の模擬。states: ホスト名(https:// 抜き)→ state。無ければ off。fail: そのホストは通信失敗。status: そのホストは HTTP エラー。 */
+function fakeFetch({ states = {}, fail = [], status = {} } = {}) {
+  const urls = [];
+  const fetchImpl = async (url, init) => {
+    urls.push({ url, method: init?.method });
+    const host = new URL(url).host;
+    if (fail.includes(host)) throw new TypeError("fetch failed");
+    if (status[host]) return { ok: false, status: status[host], json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => ({ state: states[host] ?? "off", message: states[host] && states[host] !== "off" ? "更新します" : "" }) };
+  };
+  return { fetchImpl, urls };
+}
 const base = { RUN_REF: "refs/heads/master", TARGET_DEVELOP: "true", TARGET_MASTER: "false", MAINTENANCE_MODE_INPUT: "notice", MAINTENANCE_MESSAGE_INPUT: "" };
 
 /**
@@ -52,14 +65,15 @@ function fakeGh({ contents = {}, failDispatch = {}, noTip = false } = {}) {
   return { gh, calls, dispatches };
 }
 
-async function go(envExtra, ghOpts, opts) {
+async function go(envExtra, ghOpts, opts, fetchOpts) {
   const g = fakeGh(ghOpts);
+  const f = fakeFetch(fetchOpts);
   const dir = mkdtempSync(join(tmpdir(), "mall-"));
   const summary = join(dir, "summary.md");
   writeFileSync(summary, "");
   const out = [];
-  const code = await runAll({ ...base, GH_TOKEN: "tok_x_12345", GITHUB_STEP_SUMMARY: summary, ...envExtra }, { gh: g.gh, sleep: async () => {}, log: (t) => out.push(t), error: (t) => out.push(t) }, opts);
-  return { code, g, out: out.join("\n"), summary: readFileSync(summary, "utf8") };
+  const code = await runAll({ ...base, GH_TOKEN: "tok_x_12345", GITHUB_STEP_SUMMARY: summary, ...envExtra }, { gh: g.gh, fetchImpl: f.fetchImpl, sleep: async () => {}, log: (t) => out.push(t), error: (t) => out.push(t) }, opts);
+  return { code, g, f, out: out.join("\n"), summary: readFileSync(summary, "utf8") };
 }
 
 const master = { TARGET_MASTER: "true", MAINTENANCE_MODE_INPUT: "true" };
@@ -87,6 +101,8 @@ test("入力の検査(注入防止): 不正な値は拒否する。master の実
     { MAINTENANCE_MESSAGE_INPUT: "a\nb" }, { MAINTENANCE_MESSAGE_INPUT: "a\u0007" }, { MAINTENANCE_MESSAGE_INPUT: "あ".repeat(201) },
     { MAINTENANCE_MODE_INPUT: "", MAINTENANCE_MESSAGE_INPUT: "" },
     { TARGET_MASTER: "true", MAINTENANCE_MODE_INPUT: "", MAINTENANCE_MESSAGE_INPUT: "x" }, // 本番は mode 必須
+    { TARGET_DEVELOP: "false", TARGET_MASTER: "true", MAINTENANCE_MODE_INPUT: "false" }, // 本番の解除は dev も選ぶ(dev を先に)
+    { SITES_INPUT: "nothing" }, { SITES_INPUT: "pokemon;id" }, { SITES_INPUT: "album" }, { SITES_INPUT: "pokemon,$(id)" },
   ];
   for (const extra of bad) assert.throws(() => planFromEnv({ ...base, ...extra }), /./, JSON.stringify(extra));
   const tricky = `$(id) "q" ; 'a' \`b\``;
@@ -118,11 +134,11 @@ test("develop と master の両方: dev を全部起動・成功してから本�
   assert.ok(lastDevWatch < firstMaster, "dev の結果を待ってから本番");
 });
 
-test("master だけ: 各サイトの本番のワークフローを master で起動する(mode 必須)", async () => {
-  const r = await go({ TARGET_DEVELOP: "false", ...master, MAINTENANCE_MODE_INPUT: "false" });
+test("master だけ(true / notice): 各サイトの本番のワークフローを master で起動する(mode 必須)", async () => {
+  const r = await go({ TARGET_DEVELOP: "false", ...master, MAINTENANCE_MODE_INPUT: "notice" });
   assert.equal(r.code, 0, r.out);
   assert.deepEqual(r.g.dispatches().map((x) => x.ref), ["master", "master", "master", "master"]);
-  assert.deepEqual(r.g.dispatches().map((x) => x.args[2]).sort(), ["deploy.yml", "deploy.yml", "deploy.yml", "site.yml"]);
+  assert.deepEqual(r.g.dispatches().map((x) => x.args[2]), ["deploy.yml", "deploy.yml", "deploy.yml", "deploy.yml"]);
   assert.ok(r.g.dispatches().every((x) => !x.args.some((a) => a.startsWith("maintenance_message"))));
 });
 
@@ -133,7 +149,7 @@ test("対象ブランチのワークフローが入力を受け取れない版�
   assert.equal(r.code, 0, r.out);
   assert.deepEqual(r.g.dispatches().map((x) => x.repo).sort(), [REPOS.bot, REPOS.pokemon, REPOS.portfolio].sort());
   assert.match(r.summary, /飛ばしたサイト\(警告\)/);
-  assert.match(r.summary, /- avatar \/ dev: .*fara-avatar-modding-guide の develop の deploy\.yml に、入力 maintenance_mode がまだ無い/);
+  assert.match(r.summary, /- avatar \/ dev: .*fara-avatar-modding-guide の develop の deploy-develop.yml に、入力 maintenance_mode がまだ無い/);
 });
 
 test("すべて飛ばされたら失敗(何も反映されない)。dispatch は 1 つも起動しない", async () => {
@@ -193,7 +209,7 @@ test("事前確認の URL は .github/workflows/ 以下(ファイル名だけだ
   assert.equal(urls.length, 8, "dev の 4 サイトを、plan と実行で 1 回ずつ");
   assert.ok(urls.every((u) => u.includes("/contents/.github/workflows/")), urls.join("\n"));
   assert.ok(urls.includes("repos/fara1991/fara-pokemon-battle-assistant/contents/.github/workflows/deploy-develop.yml?ref=develop"));
-  assert.ok(urls.includes("repos/fara1991/fara-bot-moderator/contents/.github/workflows/site.yml?ref=develop"));
+  assert.ok(urls.includes("repos/fara1991/fara-bot-moderator/contents/.github/workflows/deploy-develop.yml?ref=develop"));
 });
 
 const noPreflight = (ref) => Object.fromEntries(Object.values(REPOS).map((repo) => [`${repo}@${ref}`, 403]));
@@ -272,20 +288,22 @@ const jobBlock = (name) => {
   return m[1];
 };
 
-test("ワークフロー: トリガは workflow_dispatch だけ。入力は 2 つのチェックボックス(develop 既定 true)・mode・message。target_branch と sites は無い", () => {
+test("ワークフロー: トリガは workflow_dispatch だけ。入力は 2 つのチェックボックス(develop 既定 true)・sites・mode・message。target_branch は無い", () => {
   const on = /\non:\n([\s\S]*?)\npermissions:/.exec(yml)[1];
   assert.deepEqual([...on.matchAll(/^ {2}([a-z_]+):/gm)].map((m) => m[1]), ["workflow_dispatch"]);
   assert.doesNotMatch(yml, /pull_request|issue_comment|issues:|push:|workflow_run|schedule/);
   assert.match(yml, /permissions:\n {2}contents: read\n/);
   const inputs = [...on.matchAll(/^ {6}([a-z_]+):\n((?: {8}.*\n)+)/gm)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(inputs.map(([k]) => k), ["develop", "master", "maintenance_mode", "maintenance_message"]);
+  assert.deepEqual(inputs.map(([k]) => k), ["develop", "master", "sites", "maintenance_mode", "maintenance_message"]);
   const get = (k) => inputs.find(([n]) => n === k)[1];
   for (const [k, def] of [["develop", "true"], ["master", "false"]]) {
     assert.match(get(k), /type: boolean\n/);
     assert.match(get(k), new RegExp(`default: ${def}\\n`));
   }
   assert.match(get("maintenance_mode"), /type: choice\n/);
-  assert.doesNotMatch(yml, /target_branch|sites:|SITES_INPUT/);
+  assert.match(get("sites"), /type: string\n {8}default: ""\n/);
+  assert.doesNotMatch(yml, /target_branch/);
+  for (const name of ["validate", "dev", "production"]) assert.match(jobBlock(name), /SITES_INPUT: \$\{\{ inputs\.sites \}\}/, name);
 });
 
 test("ワークフロー: Environment は dev = develop-maintenance、本番 = production-maintenance。validate には付けない。待機は dev と本番で別の枠(cancel しない)", () => {
@@ -329,4 +347,88 @@ test("ワークフロー: validate は master 以外の ref で止まり、RUN_R
     assert.match(b, /TARGET_DEVELOP: \$\{\{ inputs\.develop \}\}/, name);
     assert.match(b, /TARGET_MASTER: \$\{\{ inputs\.master \}\}/, name);
   }
+});
+
+// ---- 一括解除(off)・サイトの指定・現在の状態の表示 ----
+
+const off = { TARGET_MASTER: "true", MAINTENANCE_MODE_INPUT: "false" };
+
+test("実態: 同梱の maintenance-sites.json の dev は deploy-develop.yml(develop)、production は deploy.yml(master)。4 サイトだけ・hosts あり", () => {
+  const p = planFromEnv({ ...base, ...off });
+  const sites = JSON.parse(readFileSync(join(root, "tools", "maintenance-sites.json"), "utf8")).sites;
+  assert.deepEqual(sites.map((s) => s.name), ["pokemon", "avatar", "bot", "portfolio"]);
+  for (const s of sites) {
+    assert.deepEqual(s.workflows, { dev: { file: "deploy-develop.yml", ref: "develop" }, production: { file: "deploy.yml", ref: "master" } }, s.name);
+    assert.match(s.hosts.dev, /^https:\/\//);
+    assert.match(s.hosts.production, /^https:\/\//);
+  }
+  assert.deepEqual(p.stages.map((s) => s.targets.map((t) => t.workflow.file)), [Array(4).fill("deploy-develop.yml"), Array(4).fill("deploy.yml")]);
+});
+
+test("一括解除: develop と master で false。dev の 4 サイト → 本番の 4 サイトの順に maintenance_mode=false を渡す。本番の再入力は選んだサイト名", async () => {
+  const r = await go({ ...off });
+  assert.equal(r.code, 0, r.out);
+  const d = r.g.dispatches();
+  assert.deepEqual(d.map((x) => x.ref), ["develop", "develop", "develop", "develop", "master", "master", "master", "master"]);
+  assert.ok(d.every((x) => x.args.includes("maintenance_mode=false") && !x.args.some((a) => a.startsWith("maintenance_message"))));
+  assert.match(r.out, /本番の解除は、各サイトの master の最新の内容をすべて公開します/);
+  assert.deepEqual(planFromEnv({ ...base, ...off }).stages[1].confirm, "production avatar,bot,pokemon,portfolio");
+});
+
+test("一括解除: 本番だけ(master のみ)での解除は拒否する(dev を先に)。notice / true の本番だけは従来どおり許す", async () => {
+  assert.throws(() => planFromEnv({ ...base, TARGET_DEVELOP: "false", ...off }), /develop も選んでください/);
+  assert.doesNotThrow(() => planFromEnv({ ...base, TARGET_DEVELOP: "false", TARGET_MASTER: "true", MAINTENANCE_MODE_INPUT: "notice" }));
+  const r = await go({ TARGET_DEVELOP: "false", ...off });
+  assert.equal(r.code, 2);
+  assert.equal(r.g.calls.length, 0, "gh は呼ばない");
+});
+
+test("sites: 指定したサイトだけを dev・本番の両方で起動する。本番の再入力もそのサイト名だけ", async () => {
+  const p = planFromEnv({ ...base, ...off, SITES_INPUT: " pokemon , bot,pokemon " });
+  assert.deepEqual(p.stages.map((s) => s.sites), [["pokemon", "bot"], ["pokemon", "bot"]]);
+  assert.equal(p.stages[1].confirm, "production bot,pokemon");
+  assert.deepEqual(p.stages[0].base.slice(0, 5), ["set", "--env", "dev", "--site", "pokemon,bot"]);
+  assert.deepEqual(p.summary.sites, ["pokemon", "bot"]);
+  const r = await go({ ...off, SITES_INPUT: "pokemon,bot" });
+  assert.equal(r.code, 0, r.out);
+  assert.deepEqual(r.g.dispatches().map((x) => [x.repo, x.ref]), [
+    [REPOS.pokemon, "develop"], [REPOS.bot, "develop"], [REPOS.pokemon, "master"], [REPOS.bot, "master"],
+  ]);
+  assert.deepEqual(r.f.urls.map((u) => new URL(u.url).host).sort(), ["pokemon-dev.fara-labs.com", "pokemon.fara-labs.com", "twitch-bot-dev.fara-labs.com", "twitch-bot.fara-labs.com"]);
+  assert.match(r.summary, /対象サイト: pokemon, bot/);
+  assert.equal(planFromEnv(base).summary.sites.length, 0, "空 = すべて");
+});
+
+test("計画: 各サイトの現在の状態(/api/maintenance の GET だけ)と、これから起こることを、実行より前に出す", async () => {
+  const r = await go({ ...off }, undefined, undefined, { states: { "pokemon.fara-labs.com": "on", "fara-labs.com": "notice", "dev.fara-labs.com": "on" } });
+  assert.equal(r.code, 0, r.out);
+  assert.ok(r.f.urls.every((u) => u.method === "GET" && u.url.endsWith("/api/maintenance")));
+  assert.equal(r.f.urls.length, 8);
+  assert.match(r.out, /\[pokemon\/production\] https:\/\/pokemon\.fara-labs\.com: 現在 メンテナンス中\(on\)/);
+  assert.match(r.out, /これから: 解除: メンテナンス中 → 通常\(master の最新がすべて公開される\)/);
+  assert.match(r.out, /\[portfolio\/production\] https:\/\/fara-labs\.com: 現在 お知らせ帯\(notice\)/);
+  assert.match(r.out, /\[bot\/dev\].*現在 通常\(off\)[\s\S]*?これから: すでに通常\(モードは変わらない。develop の最新を再公開\)/);
+  assert.ok(r.out.indexOf("== 現在の状態") < r.out.indexOf("== 実行 =="), "状態は実行より前");
+  assert.ok(r.out.indexOf("== 現在の状態") < r.out.indexOf("gh workflow run") || !r.out.includes("gh workflow run"), "計画の表示が先");
+  assert.match(r.summary, /現在 メンテナンス中\(on\)/);
+});
+
+test("現在の状態を読めなくても(通信失敗・HTTP エラー)警告にとどめ、処理は続ける。文面だけの変更は「モードは変えない」", async () => {
+  const r = await go({ ...off }, undefined, undefined, { fail: ["avatar.fara-labs.com"], status: { "twitch-bot-dev.fara-labs.com": 503 } });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /\[警告\] \[avatar\/production\] https:\/\/avatar\.fara-labs\.com: 現在の状態を確認できませんでした\(通信できない\)/);
+  assert.match(r.out, /\[警告\] \[bot\/dev\].*\(HTTP 503\)/);
+  assert.equal(r.g.dispatches().length, 8, "状態の確認の失敗で止めない");
+  const m = await go({ TARGET_MASTER: "false", MAINTENANCE_MODE_INPUT: "", MAINTENANCE_MESSAGE_INPUT: "文面だけ" });
+  assert.match(m.out, /これから: モードは変えない\(文面だけを変更\)/);
+});
+
+test("現在の状態の表示: 想定外の応答は読めない扱い。長い文面は切り、制御文字は出さない", async () => {
+  assert.deepEqual(await readPublicState("https://x.example", async () => ({ ok: true, status: 200, json: async () => ({ state: "weird" }) })), { ok: false, reason: "想定しない応答" });
+  const r = await readPublicState("https://x.example", async () => ({ ok: true, status: 200, json: async () => ({ state: "on", message: "a".repeat(500) }) }));
+  assert.equal(r.message.length, 200);
+  const out = [];
+  const fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ state: "on", message: "x\u001b[31my" }) });
+  await runAll({ ...base, GH_TOKEN: "tok_x_12345" }, { gh: fakeGh().gh, fetchImpl, sleep: async () => {}, log: (t) => out.push(t), error: (t) => out.push(t) }, { phase: "dev" });
+  assert.doesNotMatch(out.join("\n"), /\u001b/);
 });

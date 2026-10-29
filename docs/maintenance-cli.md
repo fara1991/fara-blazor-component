@@ -1,6 +1,6 @@
 # メンテナンス表示の切り替え（Actions の画面 / 一括変更 CLI）
 
-Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTENANCE_MESSAGE`（文面）を切り替える方法は 3 つ。**第一の手段は、GitHub Actions の「Run workflow」画面で入力して実行する方法**（スマホの GitHub アプリからも可）。Cloudflare のトークンも、手元の環境変数も要らない。5 サイトをまとめて切り替えたいときは、kit の Actions（3）か、手元の CLI（2。補助）を使う。
+Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTENANCE_MESSAGE`（文面）を切り替える方法は 3 つ。**第一の手段は、GitHub Actions の「Run workflow」画面で入力して実行する方法**（スマホの GitHub アプリからも可）。Cloudflare のトークンも、手元の環境変数も要らない。4 サイト（pokemon・avatar・bot・portfolio。album は対象外）をまとめて切り替えたいときは、kit の Actions（3）か、手元の CLI（2。補助）を使う。**対象のサイトと、各サイトの実際のワークフロー・Environment・Worker・入力名の対応は、下の「0. 対象のサイトと対応表」**。
 
 | 方法 | 使う場面 | 必要なもの |
 | --- | --- | --- |
@@ -11,14 +11,40 @@ Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTEN
 
 1・2・3 のどの方法でも、実際の反映は各サイトの deploy ワークフロー(`wrangler deploy --var ...`)が行う。いずれも同じ入力 `maintenance_mode` / `maintenance_message` を使う。**公開されるのは、実行するブランチ(dev = `develop`、本番 = `master`)の最新のコード**である点に注意する。
 
+## 0. 対象のサイトと対応表
+
+2026-10-29 に、各リポジトリの `origin/develop` の `.github/workflows/` で確かめた内容（`tools/maintenance-sites.json` はこの表と同じ。テストが dev = `deploy-develop.yml`・production = `deploy.yml` を検査する）。
+
+| サイト | リポジトリ | dev（ワークフロー名 / ファイル / Environment / Worker / URL） | production（ワークフロー名 / ファイル / Environment / Worker / URL） |
+| --- | --- | --- | --- |
+| pokemon | `fara-pokemon-battle-assistant` | Deploy (develop) / `deploy-develop.yml` / `develop` / `fara-pokemon-dev` / pokemon-dev.fara-labs.com | Deploy (production) / `deploy.yml` / `production` / `fara-pokemon` / pokemon.fara-labs.com |
+| avatar | `fara-avatar-modding-guide` | Deploy (develop) / `deploy-develop.yml` / `develop` / `fara-avatar-dev` / avatar-dev.fara-labs.com | Deploy (production) / `deploy.yml` / `production` / `fara-avatar` / avatar.fara-labs.com |
+| bot | `fara-bot-moderator`（サイトは `site/`） | Deploy (develop) / `deploy-develop.yml` / `develop` / `fara-twitch-bot-dev` / twitch-bot-dev.fara-labs.com | Deploy (production) / `deploy.yml` / `production` / `fara-twitch-bot` / twitch-bot.fara-labs.com |
+| portfolio | `fara-labs` | Deploy (develop) / `deploy-develop.yml` / `develop` / `fara-portfolio-dev` / dev.fara-labs.com | Deploy (production) / `deploy.yml` / `production` / `fara-portfolio` / fara-labs.com |
+
+- 4 サイトとも、ワークフローは dev と production で**別ファイル**。production のジョブは master 限定（`github.ref == 'refs/heads/master'`。portfolio は先頭の step `Require master`）で、develop を指定して起動しても何も起きない。**dev に切り替えるには、必ず `deploy-develop.yml` を使う**（以前の avatar の dev は `deploy.yml`、bot は存在しない `site.yml` を指していて、実態と合っていなかった）
+- `workflow_dispatch` の入力: **dev** は `maintenance_mode`（choice: 空 / `true` / `notice` / `false`。空 = 変更しない）と `maintenance_message`（string、200 文字まで）の 2 つ。**production** はこの 2 つに加えて `skip_maintenance_check`（boolean。公開前の `MAINTENANCE_MODE=notice` の確認を飛ばす緊急用）と `first_publish`（boolean。Worker がまだ無いときの初回の公開だけ）。**一括切替・CLI が渡すのは `maintenance_mode` と `maintenance_message` だけ**（`skip_maintenance_check`・`first_publish` には触れない）
+- production で `maintenance_mode` を `true` / `notice` / `false` のどれかにして起動すると、`MAINTENANCE_MODE=notice` の確認（`Require MAINTENANCE_MODE=notice`）は行われない。**解除（`false`）は、このため確認なしで master の最新を公開する**
+- **album（`fara-vrc-photo-album`）は一括切替の対象外**: 公開を GitHub Actions では行わず（手元のアプリから公開）、起動するワークフローが無い（`.github/workflows/` は `build.yml` だけ）。album のメンテナンスの切り替えは、Cloudflare のダッシュボード（Worker の「変数とシークレット」の `MAINTENANCE_MODE`）か、手元の wrangler で行う
+- **2026-10-29 時点で、4 サイトの `master` には deploy 系のワークフローがまだ無い**（本番の初回の公開前）。この間、一括切替で `master` を選んでも、本番は事前確認（404）で「飛ばす」警告になる。各サイトの develop → master のマージのあとから、本番にも効く
+
 ## 1. Actions の画面で実行する(第一の手段)
 
-1. サイトのリポジトリ → **Actions** → 対象のワークフロー(pokemon・portfolio は dev が「Deploy (develop)」、本番が「Deploy (production)」。avatar・bot は 1 つのワークフロー「Deploy」で、ブランチで dev / 本番が決まる)を開く。スマホの GitHub アプリでも、リポジトリ → Actions → ワークフロー → 「Run workflow」で同じ入力欄が出る
+1. サイトのリポジトリ → **Actions** → 対象のワークフロー(4 サイトとも、dev が「Deploy (develop)」、本番が「Deploy (production)」の別々のワークフロー。0 の表)を開く。スマホの GitHub アプリでも、リポジトリ → Actions → ワークフロー → 「Run workflow」で同じ入力欄が出る
 2. **Run workflow** を押し、**Use workflow from** でブランチを選ぶ(dev = `develop`、本番 = `master`)
 3. 入力欄に入れる:
    - `maintenance_mode`: `true` = 全体メンテナンス(全ページがメンテナンス画面・503)、`notice` = お知らせ帯、`false` = 通常、空 = 変更しない
    - `maintenance_message`: お知らせ・メンテナンス画面に出す文(200 文字まで・改行なし)。空 = 変更しない
 4. 実行する。終わったら、その実行のページ下部の**ジョブサマリー**に、設定した値と反映後の現在値(`MAINTENANCE_MODE` と `MAINTENANCE_MESSAGE`)が出る
+
+### 個別のサイトを解除する手順(各リポジトリの Run workflow)
+
+1 サイトだけ解除したいとき、または一括切替(3)が使えないとき（トークン未登録・master にまだワークフローが無い・事前確認で飛ばされた）の手順。**公開後（本番の公開を終えたあと）の解除は、この手順を第一に考える**。
+
+1. まず**dev**（`Deploy (develop)`）を `develop` で実行する: `maintenance_mode` = `false`、`maintenance_message` は空。ジョブサマリーの `MAINTENANCE_MODE` が `false` になり、確認用のサイトが通常表示になることを確かめる
+2. 次に**本番**（`Deploy (production)`）を、**Use workflow from = `master`** で実行する: `maintenance_mode` = `false`。`skip_maintenance_check`・`first_publish` は触れない。本番の Environment `production` に必須レビュワーを付けていれば、承認が要る
+3. **解除は、その時点の `master` の内容をすべて公開する**（`wrangler deploy` を伴うため）。実行の前に、`master` の最新に、公開してはいけない変更が入っていないか確かめる
+4. 終わったら、ジョブサマリーの現在値と、サイトの `/api/maintenance`（`{"state":"off",...}`）を確かめる
 
 本番を `notice` や `false` にしたいだけのとき、`maintenance_mode` を空にして `maintenance_message` だけを入れると、モードは変えずに文面だけを変える(本番を勝手にメンテナンス画面にはしない)。まず dev で試してから、本番で実行する。
 
@@ -65,11 +91,11 @@ export CLOUDFLARE_ACCOUNT_ID=...   # ダッシュボードの Workers & Pages �
 | サイト | dev（ワークフロー / ref / Worker） | production（ワークフロー / ref / Worker） |
 | --- | --- | --- |
 | pokemon | `deploy-develop.yml` / `develop` / `fara-pokemon-dev` | `deploy.yml` / `master` / `fara-pokemon` |
-| avatar | `deploy.yml` / `develop` / `fara-avatar-dev` | `deploy.yml` / `master` / `fara-avatar` |
-| bot | `site.yml` / `develop` / `fara-twitch-bot-dev` | `site.yml` / `master` / `fara-twitch-bot` |
+| avatar | `deploy-develop.yml` / `develop` / `fara-avatar-dev` | `deploy.yml` / `master` / `fara-avatar` |
+| bot | `deploy-develop.yml` / `develop` / `fara-twitch-bot-dev` | `deploy.yml` / `master` / `fara-twitch-bot` |
 | portfolio | `deploy-develop.yml` / `develop` / `fara-portfolio-dev` | `deploy.yml` / `master` / `fara-portfolio` |
 
-別の一覧を使うときは `--sites-file <パス>`。Worker を足すときは JSON にサイトを足す（dev だけのサイトも可）。
+`hosts`（`dev` / `production` の公開 URL）は、一括切替の計画で `/api/maintenance` を読むのに使う。環境・URL を含む全体の対応表は「0」。別の一覧を使うときは `--sites-file <パス>`。Worker を足すときは JSON にサイトを足す（dev だけのサイトも可）。
 
 ### `status` — 現在値の一覧
 
@@ -131,13 +157,14 @@ kit のリポジトリ(`fara1991/fara-blazor-component`)の Actions →「**Set 
 
 **Use workflow from は `master` のみ**(`validate` が検査する。develop など、ほかのブランチ上からは実行できない)。
 
-入力(反映先は**チェックボックス**で選ぶ。複数チェック可。サイトは常に 4 つすべて):
+入力(反映先は**チェックボックス**で選ぶ。複数チェック可。サイトは、既定では 4 つすべて。`sites` で絞れる):
 
 | 入力 | 値 |
 | --- | --- |
 | `develop`(チェック。既定 ON) | 各サイトの dev(`develop` ブランチ)に反映する |
 | `master`(チェック。既定 OFF) | 各サイトの本番(`master` ブランチ)に反映する。`maintenance_mode` が必須。承認が要る。**そのサイトの master の最新のコードが公開される** |
-| `maintenance_mode` | 空 / `true` = 全体メンテナンス(503) / `notice` = お知らせ帯 / `false` = 通常。空 = 変更しない(`master` では必須。message だけの変更は `develop` だけ) |
+| `sites` | 対象のサイト名をカンマ区切りで(`pokemon` / `avatar` / `bot` / `portfolio`。例: `pokemon,bot`)。空 = 4 サイトすべて。`develop`・`master` の**両方**に効く。知らない名前（`album` を含む）は `validate` で止まる |
+| `maintenance_mode` | 空 / `true` = 全体メンテナンス(503) / `notice` = お知らせ帯 / `false` = **解除**(通常に戻す)。空 = 変更しない(`master` では必須。message だけの変更は `develop` だけ。**`master` を `false` にするときは `develop` も同時に選ぶ**) |
 | `maintenance_message` | 文面(200 文字まで・改行なし)。空 = 変更しない |
 
 1 つもチェックしないと、`validate` で止まる。例: `develop` と `master` の両方をチェックすると、dev に反映し、成功したら本番に反映する。
@@ -145,10 +172,22 @@ kit のリポジトリ(`fara1991/fara-blazor-component`)の Actions →「**Set 
 動き:
 
 1. `validate` job: 入力を検査する(シークレットは渡さない)。実行元が `master` か、チェックボックスが 1 つ以上か、`maintenance_mode` / 文面(200 文字以内・制御文字なし)が正しいか、`master` を選んだとき mode があるか、を確かめる。通らなければ、後の job は動かない
-2. `dev` job(Environment `develop-maintenance`): まず**計画**(事前確認)を、選んだ**すべての対象(本番を含む)**について行い、飛ばすサイトと理由をジョブサマリーに出す(本番の承認画面より前に見える)。実行できる対象が 1 つも無ければ、ここで失敗する。そのあと、`develop` をチェックしていれば、dev を実行する(各サイトの dev 用ワークフローを起動し、結果を待つ)。**`master` だけを選んだときも、計画のためにこの job は動く**(`develop-maintenance` にレビュワーを付けていると、その承認が要る)
+2. `dev` job(Environment `develop-maintenance`): まず**計画**を、選んだ**すべての対象(本番を含む)**について行い、(a) 各サイトの**現在の状態**(公開 URL の `GET /api/maintenance`。読み取りだけ。Worker の `MAINTENANCE_MODE` の、いまの効き方 = 通常 / お知らせ帯 / メンテナンス中)と**これから起こること**(例: 「解除: メンテナンス中 → 通常(master の最新がすべて公開される)」「すでに通常(モードは変わらない。master の最新を再公開)」)、(b) 飛ばすサイトと理由、をジョブサマリーに出す(本番の承認画面より前に見える)。状態を読めなかったサイト（通信失敗・HTTP エラー）は警告にとどめ、処理は止めない。実行できる対象が 1 つも無ければ、ここで失敗する。そのあと、`develop` をチェックしていれば、dev を実行する(各サイトの dev 用ワークフローを起動し、結果を待つ)。**`master` だけを選んだときも、計画のためにこの job は動く**(`develop-maintenance` にレビュワーを付けていると、その承認が要る)
 3. `production` job(`master` をチェックしたときだけ。Environment `production-maintenance`): dev(develop をチェックしたとき)が**全部成功してから**、**承認(必須レビュワー)が済むまで動かない**。承認の画面(Review deployments)では、**入力値(チェックしたブランチ・`maintenance_mode` / `maintenance_message`)と、`dev` job のサマリーの計画(飛ばすサイト)、対象各サイトの master の最新のコード(公開される内容)を確認してから**承認する。承認後、各サイトの本番ワークフローを `master` で 1 サイトずつ起動し、結果を待つ
-4. 起動した run の特定・失敗で中断・サマリーは `set` のとおり。ジョブサマリーに、各サイトの run の URL と結果が出る
+4. 起動した run の特定・失敗で中断・サマリーは `set` のとおり。ジョブサマリーに、対象サイト・各サイトの run の URL と結果が出る
 5. `concurrency`(dev と本番で別の枠)で、同じ枠の job を同時に 2 つ動かさない。実行中のものは止めない。待てるのは 1 件だけで、さらに追加すると、古い待機は取り消される(最後に押したものだけが残る)
+
+### 一括解除(メンテナンス・お知らせ帯を解除して通常に戻す)
+
+`maintenance_mode` = `false` を、メンテナンス(`true`)・お知らせ帯(`notice`)と同じ流れ（**計画 → dev → 本番（承認つき）**）で、dev・本番の全サイト、または選んだサイトに対して行う。手順:
+
+1. kit の Actions →「Set maintenance (all sites)」→ Run workflow、**Use workflow from = `master`**
+2. `develop` ✔ と `master` ✔ の**両方**、`maintenance_mode` = `false`（`maintenance_message` は空）。特定のサイトだけなら `sites` に名前を入れる（例: `pokemon,portfolio`）。`master` だけを選んで `false` にすると、`validate` が拒否する（dev を先に解除して確かめるため）
+3. `dev` job の**計画**（ジョブサマリー）を読む: 各サイトの現在の状態（`/api/maintenance`）と「これから起こること」、飛ばすサイト。本番の行に「**本番の解除は、各サイトの master の最新の内容をすべて公開します**」の注意が出る。dev の解除が終わったら、確認用サイトで表示を確かめる
+4. `production` job の承認待ちになる。**Review deployments の画面**で、入力値（`master` ✔・`maintenance_mode=false`・`sites`）と、`dev` job のサマリー（計画・飛ばすサイト）、各サイトの master の最新のコードを確かめてから承認する（Environment `production-maintenance`・必須レビュワー）。承認するまで本番には何も起きない
+5. 承認後、各サイトの本番ワークフロー（`deploy.yml`）を `master` で 1 サイトずつ起動し、結果を待つ。1 つでも失敗したらそこで中断する（それ以降は実行しない）。完了後、各サイトの `/api/maintenance` が `off` になっていることを確かめる
+
+注意: 一括解除は、事前確認で飛ばされたサイト（そのブランチに入力つきのワークフローが無い）には効かない。飛ばされたサイトは、上の「個別のサイトを解除する手順」で解除する。`sites` を指定したサイトだけが、dev・本番の両方で対象になる（本番の確認用の再入力 `production <サイト名>` も、選んだサイトだけ）。
 
 ### 事前確認(入力を受け取れない版は、失敗させず飛ばす)
 
@@ -158,14 +197,14 @@ kit のリポジトリ(`fara1991/fara-blazor-component`)の Actions →「**Set 
 - 選んだ対象が**すべて飛ばされた**ら失敗(何も反映されなかったことが分かる)。一部だけなら成功で、飛ばしたサイトは警告として残る
 - ワークフローのファイルがその ref に無い(404)ときも飛ばす
 - PAT に **Contents: Read** が無いと、事前確認の GET が 403 になり、確かめられない。このときは飛ばさずに dispatch する。dispatch が **HTTP 422 `Unexpected inputs provided`**(そのサイトのその ref のワークフローが、入力を受け取れない版)で返ったら、**失敗にせず、そのサイトを「飛ばす(警告)」にして続行する**(サマリーにも出る。dev でも本番でも同じ)。422 以外のエラー(認証・ワークフロー不在・その他の 4xx / 5xx)は、従来どおり失敗で中断する。すべて飛ばされたら失敗、の規則は同じ
-- **Contents: Read-only が必要なリポジトリ**: 非公開のリポジトリ(**avatar と portfolio**)は、PAT に Contents: Read-only が無いと、事前確認の GET が 403 になる(公開のリポジトリは、トークンが無くても読めるが、PAT の権限が絞られていても通る場合がある)。付けておくと、事前確認で飛ばす判断ができ、起動した run のコミット照合もできる
+- **Contents: Read-only**: 4 つのリポジトリは、2026-10-29 時点ですべて公開（public）なので、事前確認の GET は読める。それでも PAT に Contents: Read-only を付けておくと、事前確認で飛ばす判断が確実にでき、起動した run のコミット照合もできる。リポジトリを非公開にした場合は、付けないと事前確認が 403 になる
 - 事前確認のパスは `.github/workflows/{ファイル名}`(ワークフローのファイルは、リポジトリの `.github/workflows/` の下にある)
-- 現状: 各サイトの master 側は、すべて未対応(各サイトの develop → master のマージまで)。この間、master をチェックすると、本番は飛ばされる旨の警告が出る。avatar の dev(develop の `deploy.yml`)は入力つきの版が入っているので、飛ばされずに反映される
+- 現状(2026-10-29): 4 サイトの dev(develop の `deploy-develop.yml`)は、入力つきの版が入っているので、飛ばされずに反映される。master 側には deploy 系のワークフローがまだ無い(各サイトの develop → master のマージまで)ので、この間、master をチェックすると、本番は飛ばされる旨の警告が出る
 
 ### 注意点
 
 1. **各サイトの対象ブランチに、入力つきのワークフローが入っている必要がある**(上のとおり、無いサイトは飛ばされる)。サイト側の develop → master のマージが済むまで、本番側はそのサイトに反映されない。サマリーの警告で確かめる
-2. **pokemon の本番は未作成の間**、master のワークフローが旧版(入力なし)なので、この Actions からは作れない(飛ばされる)。初回は pokemon の develop → master のマージ(master への push)で作る。push は `--var MAINTENANCE_MODE:true` を付けるので、メンテナンス画面のまま(非公開のまま)作られる。作ったあとの切り替えから、この Actions を使う
+2. **pokemon の本番は未作成の間**、master にワークフローが無い(または旧版で入力なし)ので、この Actions からは作れない(飛ばされる)。初回は pokemon の develop → master のマージ(master への push)で作る。push は `--var MAINTENANCE_MODE:true` を付けるので、メンテナンス画面のまま(非公開のまま)作られる。作ったあとの切り替えから、この Actions を使う
 3. 各サイトの `develop` 側は、新しい入力つきのワークフローが先に入るので、dev から使える
 
 ### 登録するもの(ユーザー向けの手順)
@@ -177,7 +216,7 @@ PAT は repository secret ではなく、**Environment のシークレット**�
 1. fine-grained PAT を作る: GitHub → 右上のアイコン → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
    - Resource owner: 自分(`fara1991`)
    - Repository access: **Only select repositories** → `fara-pokemon-battle-assistant`、`fara-avatar-modding-guide`、`fara-bot-moderator`、`fara-labs` の **4 つだけ**（album は、公開を Actions で行わなくなったので外した）
-   - Repository permissions: **Actions: Read and write**(Metadata: Read-only は自動で付く)。あわせて **Contents: Read-only を付けることを推奨**する。(a) 事前確認(入力を受け取れないサイトを飛ばす)ができる、(b) 起動した run が各ブランチの先頭のコミットのものかまで照合でき、取り違えを防げる(付けなくても動くが、その 2 つが働かない)
+   - Repository permissions: **Actions: Read and write**(`gh workflow run` と `gh run list` / `gh run watch` に必要。Metadata: Read-only は自動で付く)。あわせて **Contents: Read-only を付けることを推奨**する。(a) 事前確認(入力を受け取れないサイトを飛ばす)ができる、(b) 起動した run が各ブランチの先頭のコミットのものかまで照合でき、取り違えを防げる(付けなくても動くが、その 2 つが働かない)
    - 有効期限(Expiration): 必ず付ける(短めにして、切れたら作り直す)
 2. Environment を **2 つ**作る: **fara-blazor-component → Settings → Environments → New environment**
 
@@ -333,7 +372,7 @@ on:
 
 ### 4. 適用の手順（サイトごと）
 
-1. 上の入力・公開のステップ・実行後のサマリーのステップを、サイトの deploy ワークフロー（pokemon: `deploy.yml` と `deploy-develop.yml`、avatar: `deploy.yml`、bot: `site.yml`、portfolio: `deploy.yml` と `deploy-develop.yml`）に入れる。avatar と bot は 1 つのワークフローが dev と production の両方を担うので、ステップの `--env` の式（`github.ref_name == 'master' && 'production' || 'dev'`）はそのまま使い、`--var` の部分だけ置き換える
+1. 上の入力・公開のステップ・実行後のサマリーのステップを、サイトの deploy ワークフロー（4 サイトとも `deploy.yml` = production と `deploy-develop.yml` = dev）に入れる。dev と production は別ファイルで、`--env` はそれぞれ固定（dev は `--env develop`〔portfolio・pokemon〕または `--env dev`〔avatar・bot〕、production は `--env production`）。`--var` の部分だけ置き換える
 2. `require-maintenance.mjs` が読む変数名を `MAINTENANCE_MODE` にする（`b.name === "MAINTENANCE_MODE"`）。メッセージ・テストも合わせる
 3. ワークフローを参照しているテスト（`--var MAINTENANCE:true` の文字列を探すもの）を、新しい式に合わせる
 4. **ゲートが Worker の不在（404）をどう扱うか**を確かめる（`require-maintenance.mjs` の `run`）。まだ本番の Worker が無いサイト（例: pokemon）では、ゲートは Worker の不在（404）を失敗にする。初回の公開だけ、入力 `first_publish`（boolean）を true にして `ALLOW_MISSING_WORKER` を `1` または `true`（大文字小文字を区別しない。どちらも同じ意味）にして通す（下の「本番の初回」）。Worker 名の打ち違い・権限不足を、初回と取り違えないため

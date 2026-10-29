@@ -1,41 +1,93 @@
 {
-  "_comment": "一括変更 CLI（tools/maintenance.mjs）の対象。repo は GitHub のリポジトリ、workflows は env（dev / production）ごとの deploy ワークフローのファイル名と ref（dev = develop ブランチ、production = master）。workers は status で読む Worker 名（各サイトの wrangler.jsonc / wrangler.toml の name と同じ）。album（fara-vrc-photo-album）は載せていない: 公開を GitHub Actions では行わなくなった（2026-10-28。手元のアプリから公開する）ので、起動するワークフローが無い。",
+  "_comment": "一括変更 CLI（tools/maintenance.mjs）と kit の Actions「Set maintenance (all sites)」の対象。実ファイルに合わせてある（2026-10-29 に各リポジトリの origin/develop で確認）。repo は GitHub のリポジトリ、workflows は env（dev / production）ごとの deploy ワークフローのファイル名と ref（dev = develop ブランチの deploy-develop.yml〔Environment develop〕、production = master の deploy.yml〔Environment production。ジョブは master 限定〕）。workers は status で読む Worker 名（各サイトの wrangler の name と同じ）。hosts は公開 URL（計画で /api/maintenance を読み、現在の状態を表示するのに使う）。album（fara-vrc-photo-album）は載せていない: 公開を GitHub Actions では行わない（手元のアプリから公開）ので、起動するワークフローが無い。",
   "sites": [
     {
       "name": "pokemon",
       "repo": "fara1991/fara-pokemon-battle-assistant",
       "workflows": {
-        "dev": { "file": "deploy-develop.yml", "ref": "develop" },
-        "production": { "file": "deploy.yml", "ref": "master" }
+        "dev": {
+          "file": "deploy-develop.yml",
+          "ref": "develop"
+        },
+        "production": {
+          "file": "deploy.yml",
+          "ref": "master"
+        }
       },
-      "workers": { "production": "fara-pokemon", "dev": "fara-pokemon-dev" }
+      "workers": {
+        "production": "fara-pokemon",
+        "dev": "fara-pokemon-dev"
+      },
+      "hosts": {
+        "production": "https://pokemon.fara-labs.com",
+        "dev": "https://pokemon-dev.fara-labs.com"
+      }
     },
     {
       "name": "avatar",
       "repo": "fara1991/fara-avatar-modding-guide",
       "workflows": {
-        "dev": { "file": "deploy.yml", "ref": "develop" },
-        "production": { "file": "deploy.yml", "ref": "master" }
+        "dev": {
+          "file": "deploy-develop.yml",
+          "ref": "develop"
+        },
+        "production": {
+          "file": "deploy.yml",
+          "ref": "master"
+        }
       },
-      "workers": { "production": "fara-avatar", "dev": "fara-avatar-dev" }
+      "workers": {
+        "production": "fara-avatar",
+        "dev": "fara-avatar-dev"
+      },
+      "hosts": {
+        "production": "https://avatar.fara-labs.com",
+        "dev": "https://avatar-dev.fara-labs.com"
+      }
     },
     {
       "name": "bot",
       "repo": "fara1991/fara-bot-moderator",
       "workflows": {
-        "dev": { "file": "site.yml", "ref": "develop" },
-        "production": { "file": "site.yml", "ref": "master" }
+        "dev": {
+          "file": "deploy-develop.yml",
+          "ref": "develop"
+        },
+        "production": {
+          "file": "deploy.yml",
+          "ref": "master"
+        }
       },
-      "workers": { "production": "fara-twitch-bot", "dev": "fara-twitch-bot-dev" }
+      "workers": {
+        "production": "fara-twitch-bot",
+        "dev": "fara-twitch-bot-dev"
+      },
+      "hosts": {
+        "production": "https://twitch-bot.fara-labs.com",
+        "dev": "https://twitch-bot-dev.fara-labs.com"
+      }
     },
     {
       "name": "portfolio",
       "repo": "fara1991/fara-labs",
       "workflows": {
-        "dev": { "file": "deploy-develop.yml", "ref": "develop" },
-        "production": { "file": "deploy.yml", "ref": "master" }
+        "dev": {
+          "file": "deploy-develop.yml",
+          "ref": "develop"
+        },
+        "production": {
+          "file": "deploy.yml",
+          "ref": "master"
+        }
       },
-      "workers": { "production": "fara-portfolio", "dev": "fara-portfolio-dev" }
+      "workers": {
+        "production": "fara-portfolio",
+        "dev": "fara-portfolio-dev"
+      },
+      "hosts": {
+        "production": "https://fara-labs.com",
+        "dev": "https://dev.fara-labs.com"
+      }
     }
   ]
 }
