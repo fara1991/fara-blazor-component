@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 namespace FaraBlazorComponent.Core;
@@ -53,6 +54,8 @@ public sealed record MaintenanceInfo(MaintenanceState State, string Message)
     }
 
     /// <summary>アプリの起動時に状態を読む。時間がかかる・失敗するときは、通常として扱う（メンテナンスの確認のために、起動を待たせない）。</summary>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+        Justification = "起動時の確認なので、想定外の例外でもアプリの起動を止めない（通常として扱う）。型名だけを標準エラーに残す。想定内の失敗は上の catch で別に扱う。")]
     public static async Task<MaintenanceInfo> LoadAsync(HttpClient http, TimeSpan? timeout = null)
     {
         try
@@ -69,7 +72,7 @@ public sealed record MaintenanceInfo(MaintenanceState State, string Message)
         catch (Exception ex)
         {
             // 想定外の例外も起動は止めない（通常として扱う）。型名だけを標準エラーに残す（メッセージは出さない。起動の時点で見えるように）
-            Console.Error.WriteLine($"MaintenanceInfo.LoadAsync: 想定外の例外（{ex.GetType().Name}）。通常として扱います。");
+            await Console.Error.WriteLineAsync($"MaintenanceInfo.LoadAsync: 想定外の例外（{ex.GetType().Name}）。通常として扱います。");
             return Off;
         }
     }

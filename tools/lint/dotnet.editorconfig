@@ -1,7 +1,7 @@
 # kit の C# の静的解析（ラチェット）。global analyzer config（is_global = true）。
 # Directory.Build.props から GlobalAnalyzerConfigFiles で読む。global の設定はセクションを使わない（絶対パス以外のセクションは無視される）。
 #
-# 方針: 今の kit で違反が 0 件のルールだけ error（新しい違反を止める）。違反が残るルールは warning のまま（現状の件数は docs/lint.md）。
+# 方針: 今の kit で違反が 0 件のルールだけ error（新しい違反を止める）。違反が残るルールは warning のままにする（現状の件数は docs/lint.md）。現在は kit の違反がすべて 0 件。
 # error にする前に、わざと違反を入れたコードで「そのルールが実際に動く」ことを確かめている（docs/lint.md の「ルールが動くかの確認」）。
 is_global = true
 
@@ -11,6 +11,9 @@ dotnet_diagnostic.VSTHRD100.severity = error
 dotnet_diagnostic.CA1816.severity = error
 dotnet_diagnostic.IDE0059.severity = error
 
-# warning: 違反が残る（件数は docs/lint.md）。ノイズが多いため error にしない
-dotnet_diagnostic.CA1031.severity = warning
-dotnet_diagnostic.CA2000.severity = warning
+dotnet_diagnostic.CA1031.severity = error
+dotnet_diagnostic.CA2000.severity = error
+dotnet_diagnostic.VSTHRD002.severity = error
+dotnet_diagnostic.VSTHRD003.severity = error
+dotnet_diagnostic.VSTHRD103.severity = error
+# CA1031 は、意図して一般の例外を受ける箇所だけ、理由つきの [SuppressMessage] を 1 メンバーずつ付けている（一括の抑止はしない）

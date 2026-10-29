@@ -140,7 +140,7 @@ public class LayoutModesTests : BlazorComponentTestContext
         Assert.Equal(Services.GetRequiredService<SiteOptions>().StorageKey, calls[0].Arguments[0]);
         Assert.Equal(Services.GetRequiredService<SiteOptions>().SidebarKey, calls[0].Arguments[1]);
         cut.Render();
-        Assert.Single(JSInterop.Invocations.Where(i => i.Identifier == "faraBlazorComponent.checkConfig"));
+        Assert.Single(JSInterop.Invocations, i => i.Identifier == "faraBlazorComponent.checkConfig");
     }
 
     [Fact]

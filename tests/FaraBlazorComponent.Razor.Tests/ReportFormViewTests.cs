@@ -33,7 +33,8 @@ public class ReportFormViewTests : BlazorComponentTestContext
 
     public ReportFormViewTests()
     {
-        Services.AddSingleton(new HttpClient(_handler) { BaseAddress = new Uri("http://localhost/") });
+        // ファクトリで登録して、サービスの破棄時に DI が HttpClient（と _handler）を破棄する
+        Services.AddSingleton(_ => new HttpClient(_handler) { BaseAddress = new Uri("http://localhost/") });
         JSInterop.Setup<bool>("faraBlazorComponent.report.mount", _ => true).SetResult(true);
         JSInterop.Setup<string>("faraBlazorComponent.report.waitToken", _ => true).SetResult("token-123");
     }
@@ -262,8 +263,12 @@ public class ReportFormViewTests : BlazorComponentTestContext
     [Fact]
     public void WhileSendingTheButtonSaysSendingAndIsDisabled()
     {
-        var gate = new TaskCompletionSource<HttpResponseMessage>();
-        _handler.Respond = (_, _) => gate.Task;
+        var gate = new TaskCompletionSource<bool>();
+        _handler.Respond = async (_, ct) =>
+        {
+            await gate.Task.WaitAsync(ct);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        };
         var cut = RenderForm();
         FillValid(cut.Instance);
 
@@ -272,7 +277,7 @@ public class ReportFormViewTests : BlazorComponentTestContext
         cut.WaitForAssertion(() => Assert.Contains("送信中…", cut.Markup));
         Assert.True(cut.Find("button.mud-button-filled").HasAttribute("disabled"));
 
-        gate.SetResult(new HttpResponseMessage(HttpStatusCode.OK));
+        gate.SetResult(true);
         cut.WaitForAssertion(() => Assert.Contains("送信しました", cut.Markup));
     }
 
