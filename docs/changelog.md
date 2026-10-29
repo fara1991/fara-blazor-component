@@ -2,9 +2,12 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
-## 未リリース
+## 1.0.1
 
-ESLint の共通設定の修正（`tools/lint/eslint.config.shared.mjs`）と、.NET の警告の削減。版は上げていない（リリースは別に切る）。
+2026-10-29。
+ESLint の共通設定の修正（`tools/lint/eslint.config.shared.mjs`）と、.NET の警告の削減。
+
+> **取り込むサイトへの注意（bot は必須）**: **bot は、取り込み時にルート `.editorconfig` の `[*.cs]` に `dotnet_diagnostic.CA1031.severity = warning` を足すこと。** 足さないと、アプリ本体（`FaraBotModerator.csproj`）と tests のビルドが CA1031 の 14 件で落ちる。足すと 14 件は warning に戻りビルドが通る。pokemon・album・avatar は影響なし、fara-labs は kit のファイルを読まないので影響なし。詳細は下の `dotnet.editorconfig` の項と `docs/lint.md`。
 
 - **.NET の警告を 0 件にした**（振る舞いは変えない）。`dotnet build -c Release --no-incremental` の警告は、kit 全体（Core・Razor・テスト・samples/MinimalSite）で 35 件 → 0 件。`MaintenanceInfo.LoadAsync` の標準エラーへの出力を `WriteLineAsync` にした（VSTHRD103）。意図して一般の例外を受ける 3 か所（`MaintenanceInfo.LoadAsync`・`SiteThemeState.TryLoadSync`・`SiteThemeState.InitializeAsync`）には、理由つきの `[SuppressMessage("CA1031")]` を付けた。テスト・サンプルの Dispose 漏れ・同期の待ち・xUnit の指摘も直した。
 - **CI**: `test` ジョブに `npm ci` を足した（#62 で足した `tests/lint/shared-config.test.mjs` が eslint を読むため、足りずに落ちていた）。
