@@ -1,6 +1,6 @@
 {
   "name": "fara-blazor-component",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Fara のサイトで共通に使う部品（Worker の共有 JS・静的ファイルの生成・CSP のテンプレートなどの Node テスト）。利用するサイトは git submodule で取り込む（CLAUDE.md 参照）",
   "engines": {
