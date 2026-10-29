@@ -2,6 +2,14 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 未リリース
+
+ESLint の共通設定の修正（`tools/lint/eslint.config.shared.mjs`）。版は上げていない（リリースは別に切る）。
+
+- **修正**: 既定の `default` export（`...shared`）が、画面の JS（`**/wwwroot/js/**`）にも Node のグローバル（`process`・`require` など）を当てていた。そのため、画面の JS でそれらを使っても `no-undef` が出なかった。Node の JS は `wwwroot/js` を除き、画面の JS には browser の環境だけを当てるように分けた。
+- `createSharedConfig` に `ignores`（任意）を足した。省略時の挙動は変わらない。テスト `tests/lint/shared-config.test.mjs`（`npm run test:lint`・`npm test` に含む）を足した。
+- **サイト側の注意**: 既定の `...shared` を使うサイトは、画面の JS で `process`・`require`・`module`・`exports`・`Buffer`・`global`・`__dirname`・`__filename`・`setImmediate` を使っていると、kit を上げた後の `npm run lint` で `no-undef` が出る（`docs/lint.md` の 1 を参照）。labs・pokemon・album・avatar・bot の `wwwroot/js` は、新旧で比べて新たに落ちる箇所は 0 件（2026-10-29 時点）。
+
 ## 1.0.0
 
 2026-10-29。
