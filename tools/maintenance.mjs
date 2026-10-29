@@ -94,6 +94,9 @@ export function loadSites(path) {
     for (const [env, wf] of Object.entries(s.workflows ?? {})) {
       if (!ENVS.includes(env) || !SAFE.test(wf?.file ?? "") || !SAFE.test(wf?.ref ?? "")) throw new UsageError(`${path}: ${s.name} の workflows.${env} が不正です（file と ref）`);
     }
+    for (const [env, h] of Object.entries(s.hosts ?? {})) {
+      if (!ENVS.includes(env) || !/^https:\/\/[\w.-]+$/.test(h ?? "")) throw new UsageError(`${path}: ${s.name} の hosts.${env} が不正です（https://ホスト名 の形）`);
+    }
     if (s.workflows && !/^[\w.-]+\/[\w.-]+$/.test(s.repo ?? "")) throw new UsageError(`${path}: ${s.name} の repo は owner/name の形で書いてください`);
   }
   return data.sites;
@@ -115,9 +118,9 @@ export function selectTargets(sites, { env, sites: names }, { needWorkflow = fal
           if (env !== "all" && names.includes(s.name)) throw new UsageError(`${s.name} の ${e} のワークフローが maintenance-sites.json にありません`);
           continue;
         }
-        targets.push({ site: s.name, env: e, worker: s.workers[e], repo: s.repo, workflow: s.workflows[e] });
+        targets.push({ site: s.name, env: e, worker: s.workers[e], repo: s.repo, workflow: s.workflows[e], host: s.hosts?.[e] });
       } else if (s.workers[e]) {
-        targets.push({ site: s.name, env: e, worker: s.workers[e] });
+        targets.push({ site: s.name, env: e, worker: s.workers[e], host: s.hosts?.[e] });
       }
     }
   }
@@ -134,6 +137,30 @@ function makeIo({ env, log, error }) {
   const secrets = [env.CLOUDFLARE_API_TOKEN].filter((s) => typeof s === "string" && s.length >= 4);
   const redact = (text) => secrets.reduce((t, s) => t.split(s).join("***"), String(text));
   return { log: (t = "") => log(redact(t)), error: (t = "") => error(redact(t)) };
+}
+
+// ---- 公開 URL の /api/maintenance（読み取りだけ。認証なし） ----
+
+/** /api/maintenance の state の表示名。 */
+export const STATE_LABEL = { off: "通常", notice: "お知らせ帯", on: "メンテナンス中" };
+/** maintenance_mode の入力値と、反映後の state の対応。 */
+export const MODE_TO_STATE = { true: "on", notice: "notice", false: "off" };
+const STATE_TIMEOUT_MS = 10000;
+
+/**
+ * サイトの公開 URL の GET /api/maintenance を読む（Worker の MAINTENANCE_MODE の、いまの効き方）。失敗しても例外にしない（任意の確認）。
+ * @returns {Promise<{ ok: true, state: "off"|"notice"|"on", message: string } | { ok: false, reason: string }>}
+ */
+export async function readPublicState(host, fetchImpl = fetch) {
+  try {
+    const res = await fetchImpl(`${host}/api/maintenance`, { method: "GET", headers: { Accept: "application/json" }, signal: AbortSignal.timeout(STATE_TIMEOUT_MS) });
+    if (!res.ok) return { ok: false, reason: `HTTP ${res.status}` };
+    const body = await res.json();
+    if (!Object.hasOwn(STATE_LABEL, body?.state)) return { ok: false, reason: "想定しない応答" };
+    return { ok: true, state: body.state, message: typeof body.message === "string" ? body.message.slice(0, MAX_MESSAGE) : "" };
+  } catch (e) {
+    return { ok: false, reason: e?.name === "TimeoutError" ? "時間切れ" : "通信できない" };
+  }
 }
 
 // ---- status（Cloudflare API の GET だけ） ----

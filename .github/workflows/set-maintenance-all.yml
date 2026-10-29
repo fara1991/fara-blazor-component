@@ -2,7 +2,8 @@ name: Set maintenance (all sites)
 
 # 4 サイト(pokemon・avatar・bot・portfolio)のメンテナンス表示を、まとめて切り替える。
 # 各サイトの deploy ワークフローを gh workflow run で起動し(tools/maintenance.mjs の set)、各サイトが wrangler deploy --var で反映する。
-# 反映先は、対象ブランチのチェックボックスで選ぶ(複数可)。サイトは常に 4 つすべて。
+# 反映先は、対象ブランチのチェックボックスで選ぶ(複数可)。サイトは、既定では 4 つすべて。入力 sites で絞れる(例: pokemon,bot)。
+# メンテナンスにする(true)・お知らせ帯(notice)・解除(false)のどれも同じ流れ。解除(false)は、dev を先に解除し、本番は承認のあとに行う。
 #   develop = 各サイトの dev(確認用)、master = 各サイトの本番(そのブランチの最新のコードが公開される)
 # dev(develop)を先に全部起動し、全部成功したら、本番(master)を 1 サイトずつ起動する。
 #
@@ -14,7 +15,7 @@ name: Set maintenance (all sites)
 #   - 入力は環境変数で受け、tools/maintenance-all.mjs が検査する(シェルには埋め込まない)
 #   - SITES_DISPATCH_TOKEN(4 リポジトリに限定した fine-grained PAT)は、各 job の最後の step(gh を動かす step)にだけ渡す
 #   - 事前確認(計画): 対象ブランチのワークフローが入力 maintenance_mode を受け取れる版かを見て、受け取れないサイトは警告つきで飛ばす。
-#     dev job の計画で、本番を含む選んだ全対象の飛ばすサイトが、本番の承認画面より前にジョブサマリーに出る
+#     dev job の計画で、本番を含む選んだ全対象の飛ばすサイトと、各サイトの現在の状態(/api/maintenance)とこれから起こることが、本番の承認画面より前にジョブサマリーに出る
 on:
   workflow_dispatch:
     inputs:
@@ -26,8 +27,12 @@ on:
         description: "各サイトの本番(master ブランチ)に反映する。maintenance_mode が必須。承認が要る。master の最新のコードが公開される"
         type: boolean
         default: false
+      sites:
+        description: "対象のサイト名（カンマ区切り。pokemon / avatar / bot / portfolio）。空 = 4 サイトすべて。develop・master の両方に効く"
+        type: string
+        default: ""
       maintenance_mode:
-        description: "メンテナンス表示の切り替え。true = 全体メンテナンス（全ページがメンテナンス画面・503）、notice = お知らせ帯、false = 通常。空 = 変更しない（master を選ぶときは必須）"
+        description: "メンテナンス表示の切り替え。true = 全体メンテナンス（全ページがメンテナンス画面・503）、notice = お知らせ帯、false = 解除（通常に戻す。master の最新が公開される）。空 = 変更しない（master を選ぶときは必須。master を false にするときは develop も選ぶ）"
         type: choice
         options: ["", "true", "notice", "false"]
         default: ""
@@ -61,6 +66,7 @@ jobs:
           RUN_REF: ${{ github.ref }}
           TARGET_DEVELOP: ${{ inputs.develop }}
           TARGET_MASTER: ${{ inputs.master }}
+          SITES_INPUT: ${{ inputs.sites }}
           MAINTENANCE_MODE_INPUT: ${{ inputs.maintenance_mode }}
           MAINTENANCE_MESSAGE_INPUT: ${{ inputs.maintenance_message }}
 
@@ -85,6 +91,7 @@ jobs:
           RUN_REF: ${{ github.ref }}
           TARGET_DEVELOP: ${{ inputs.develop }}
           TARGET_MASTER: ${{ inputs.master }}
+          SITES_INPUT: ${{ inputs.sites }}
           MAINTENANCE_MODE_INPUT: ${{ inputs.maintenance_mode }}
           MAINTENANCE_MESSAGE_INPUT: ${{ inputs.maintenance_message }}
           GH_TOKEN: ${{ secrets.SITES_DISPATCH_TOKEN }}
@@ -109,6 +116,7 @@ jobs:
           RUN_REF: ${{ github.ref }}
           TARGET_DEVELOP: ${{ inputs.develop }}
           TARGET_MASTER: ${{ inputs.master }}
+          SITES_INPUT: ${{ inputs.sites }}
           MAINTENANCE_MODE_INPUT: ${{ inputs.maintenance_mode }}
           MAINTENANCE_MESSAGE_INPUT: ${{ inputs.maintenance_message }}
           GH_TOKEN: ${{ secrets.SITES_DISPATCH_TOKEN }}

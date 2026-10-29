@@ -470,12 +470,12 @@ test("雛形: 実行後のサマリーに、設定した値と反映後の現在
   assert.match(readFileSync(summary, "utf8"), /設定した値: MAINTENANCE_MODE=`\(変更なし\)` \/ MAINTENANCE_MESSAGE=`\(変更なし\)`/);
 });
 
-test("同梱の sites.json: avatar の dev(develop の deploy.yml)にも dispatch できる。--env に wasm-dev は無い", async () => {
+test("同梱の sites.json: avatar の dev(develop の deploy-develop.yml)にも dispatch できる。--env に wasm-dev は無い", async () => {
   const real = join(root, "tools", "maintenance-sites.json");
   const g = fakeGh();
   const r = await run(["set", "--env", "dev", "--site", "avatar", "--mode", "true", "--sites-file", real, "--apply"], { gh: g.gh });
   assert.equal(r.code, 0, r.all);
-  assert.deepEqual(g.dispatches().map((a) => [a[2], a[a.indexOf("--repo") + 1], a[a.indexOf("--ref") + 1]]), [["deploy.yml", "fara1991/fara-avatar-modding-guide", "develop"]]);
+  assert.deepEqual(g.dispatches().map((a) => [a[2], a[a.indexOf("--repo") + 1], a[a.indexOf("--ref") + 1]]), [["deploy-develop.yml", "fara1991/fara-avatar-modding-guide", "develop"]]);
   assert.equal((await run(["set", "--env", "wasm-dev", "--mode", "true", "--sites-file", real])).code, 2);
 });
 
@@ -572,4 +572,18 @@ test("事前確認の GET は .github/workflows/ 以下のパスを見る", asyn
   await run(["set", "--env", "dev", "--site", "pokemon", "--mode", "true", "--plan"], { gh: g.gh });
   const url = g.calls.find((a) => a[0] === "api" && a[1].includes("/contents/"))[1];
   assert.equal(url, "repos/o/pk/contents/.github/workflows/deploy-develop.yml?ref=develop");
+});
+
+test("maintenance-sites.json の hosts は https://ホスト名 の形だけ許す。targets に host が入る", async () => {
+  const { loadSites, selectTargets } = await import("../../tools/maintenance.mjs");
+  const mk = (hosts) => {
+    const f = join(dir, `hosts-${Math.random().toString(36).slice(2)}.json`);
+    writeFileSync(f, JSON.stringify({ sites: [{ name: "x", repo: "o/x", workflows: { dev: { file: "a.yml", ref: "develop" } }, workers: { dev: "x-dev" }, hosts }] }));
+    return f;
+  };
+  const ok = loadSites(mk({ dev: "https://x-dev.example.com" }));
+  assert.equal(selectTargets(ok, { env: "dev", sites: [] }, { needWorkflow: true })[0].host, "https://x-dev.example.com");
+  for (const bad of [{ dev: "http://x.example.com" }, { dev: "https://x.example.com/path" }, { dev: "https://x.example.com?a=b" }, { wasm: "https://x.example.com" }]) {
+    assert.throws(() => loadSites(mk(bad)), /hosts/, JSON.stringify(bad));
+  }
 });

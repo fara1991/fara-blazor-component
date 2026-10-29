@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 // kit のリポジトリの Actions「Set maintenance (all sites)」(.github/workflows/set-maintenance-all.yml) から呼ぶ。
 // 4 サイトの deploy ワークフローを、tools/maintenance.mjs の set で一括して起動する(dev 系を先に全部・全成功後に本番、失敗で中断、起動 run の特定、本番の確認は set のもの)。
+// メンテナンスにする(true)・お知らせ帯(notice)・解除(false)のどれも、同じ流れ: 計画(各サイトの現在の状態と、これから起こること)→ dev の実行 → 本番(承認つき)。
 //
-// 反映先は、対象ブランチのチェックボックス(boolean 入力)で選ぶ。サイトは常に 4 つすべて。
+// 反映先は、対象ブランチのチェックボックス(boolean 入力)で選ぶ。サイトは、既定では 4 つすべて。SITES_INPUT で絞れる。
 //   develop        → 各サイトの dev(develop ブランチ)
 //   master         → 各サイトの本番(master ブランチ)
 //
 // 入力は環境変数だけで受ける(ワークフローの inputs をシェルに埋め込まない):
 //   RUN_REF                   このワークフローを実行した kit の ref(github.ref)。refs/heads/master だけ許可
 //   TARGET_DEVELOP / TARGET_MASTER   "true" か "false"(チェックボックス)。1 つ以上 true
-//   MAINTENANCE_MODE_INPUT    空 / true / notice / false(master を選ぶときは必須)
+//   SITES_INPUT               対象のサイト名(カンマ区切り。例: pokemon,bot)。空 = 4 サイトすべて。dev・本番の両方に効く
+//   MAINTENANCE_MODE_INPUT    空 / true / notice / false(master を選ぶときは必須。false = 解除。解除で master を選ぶときは develop も選ぶ)
 //   MAINTENANCE_MESSAGE_INPUT 文面(200 文字まで・制御文字なし。空 = 変更しない)
 //   GH_TOKEN                  gh の認証(SITES_DISPATCH_TOKEN。ここでは読まない。gh が使う)
 //   GITHUB_STEP_SUMMARY       あれば、結果(各サイトの run の URL と結果、飛ばしたサイトと理由)を追記する
@@ -21,7 +23,7 @@
 import { appendFileSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { main, loadSites, selectTargets, validateMessage, UsageError, MODES } from "./maintenance.mjs";
+import { main, loadSites, selectTargets, validateMessage, readPublicState, printable, UsageError, MODES, STATE_LABEL, MODE_TO_STATE } from "./maintenance.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** チェックボックスの入力と set の --env の対応(この順 = dev 系を先に、本番は最後)。 */
@@ -34,7 +36,7 @@ export const ALLOWED_RUN_REF = "refs/heads/master";
 
 /**
  * 入力を検査して、段階ごとの set の引数を作る(検査に通らなければ UsageError)。
- * @returns {{ stages: {envName: string, branch: string, sites: string[], base: string[], confirm?: string}[], summary: {mode: string, message: string} }}
+ * @returns {{ stages: {envName: string, branch: string, sites: string[], targets: object[], base: string[], confirm?: string}[], summary: {mode: string, message: string, sites: string[]} }}
  */
 export function planFromEnv(env, sitesPath = join(here, "maintenance-sites.json")) {
   const runRef = String(env.RUN_REF ?? "");
@@ -53,23 +55,64 @@ export function planFromEnv(env, sitesPath = join(here, "maintenance-sites.json"
   const message = String(env.MAINTENANCE_MESSAGE_INPUT ?? "");
   if (message !== "") validateMessage(message);
   if (mode === "" && message === "") throw new UsageError("maintenance_mode か maintenance_message のどちらかを入れてください(両方が空だと、変えるものがありません)");
-  if (picked.some((st) => st.envName === "production") && mode === "") throw new UsageError("master(本番)を選ぶときは maintenance_mode が必須です(message だけの変更は develop だけ)");
+  const prodPicked = picked.some((st) => st.envName === "production");
+  if (prodPicked && mode === "") throw new UsageError("master(本番)を選ぶときは maintenance_mode が必須です(message だけの変更は develop だけ)");
+  // 解除(false)は、その時点の master の内容がすべて公開されるので、dev を先に通す(dev で確かめてから本番)。
+  // 弱点: dev job が失敗すると needs: dev で本番も動かない(develop のビルドが壊れた障害時に、本番だけを解除できない)。
+  // 逃げ道は、各サイトの Actions → Deploy (production) → Run workflow(maintenance_mode=false、master)での個別解除(docs/maintenance-cli.md の「個別のサイトを解除する手順」)
+  if (prodPicked && mode === "false" && !picked.some((st) => st.envName === "dev")) throw new UsageError("本番を解除(maintenance_mode=false)するときは、develop も選んでください(dev を先に解除して確かめてから、本番を解除します)");
+  const rawSites = String(env.SITES_INPUT ?? "");
+  const names = [...new Set(rawSites.split(",").map((s) => s.trim()).filter(Boolean))];
+  // 空白だけは空(全サイト)と同じ。「,」だけなどで名前が 0 件になるのは、全サイトを対象にしてしまわないよう拒否する
+  if (rawSites.trim() !== "" && names.length === 0) throw new UsageError("sites に有効なサイト名がありません(空にするか、pokemon,bot のようにサイト名を入れてください)");
+  for (const n of names) if (!/^[\w-]{1,40}$/.test(n)) throw new UsageError(`sites の値が不正です(${JSON.stringify(n.slice(0, 40))})。サイト名をカンマ区切りで入れてください`);
 
   const sitesList = loadSites(sitesPath);
   const stages = picked.map((st) => {
-    const targets = selectTargets(sitesList, { env: st.envName, sites: [] }, { needWorkflow: true });
+    const targets = selectTargets(sitesList, { env: st.envName, sites: names }, { needWorkflow: true });
     const sites = [...new Set(targets.map((t) => t.site))];
     const base = ["set", "--env", st.envName];
+    if (names.length > 0) base.push("--site", names.join(","));
     if (mode !== "") base.push("--mode", mode);
     if (message !== "") base.push("--message", message);
     base.push("--allow-empty");
     // 本番の確認は、このワークフローでは GitHub の Environment の承認(必須レビュワー)が担う。set が求める再入力は、選んだ対象のサイト名から作る
-    return { envName: st.envName, branch: st.branch, sites, base, confirm: st.envName === "production" ? `production ${[...sites].sort().join(",")}` : undefined };
+    return { envName: st.envName, branch: st.branch, sites, targets, base, confirm: st.envName === "production" ? `production ${[...sites].sort().join(",")}` : undefined };
   });
-  return { stages, summary: { mode, message } };
+  return { stages, summary: { mode, message, sites: names } };
 }
 
 const fence = (text) => text.replaceAll("`", "'");
+
+/** 現在の state と、これから設定する mode から、「これから起こること」の説明を作る。 */
+export function describeChange(current, mode, branch) {
+  if (mode === "") return "モードは変えない(文面だけを変更)";
+  const next = MODE_TO_STATE[mode];
+  if (current === undefined) return `${STATE_LABEL[next]}にする(${branch} の最新を再公開)`;
+  if (current === next) return `すでに${STATE_LABEL[next]}(モードは変わらない。${branch} の最新を再公開)`;
+  if (next === "off") return `解除: ${STATE_LABEL[current]} → 通常(${branch} の最新がすべて公開される)`;
+  return `${STATE_LABEL[current]} → ${STATE_LABEL[next]}(${branch} の最新を再公開)`;
+}
+
+/** 計画の一部: 対象の各サイトの現在の状態(公開 URL の /api/maintenance。読み取りだけ・失敗しても止めない)と、これから起こること。 */
+async function showStates(plan, fetchImpl, log) {
+  log("== 現在の状態(各サイトの /api/maintenance を読み取り。まだ何も変えていません) ==");
+  for (const stage of plan.stages) {
+    for (const t of stage.targets) {
+      const label = `[${t.site}/${t.env}]`;
+      if (!t.host) { log(`  ${label} 公開 URL が maintenance-sites.json に無いため、現在の状態を確認できません`); continue; }
+      const s = await readPublicState(t.host, fetchImpl);
+      if (!s.ok) {
+        log(`  [警告] ${label} ${t.host}: 現在の状態を確認できませんでした(${s.reason})。処理は続けます`);
+        log(`    これから: ${describeChange(undefined, plan.summary.mode, stage.branch)}`);
+        continue;
+      }
+      log(`  ${label} ${t.host}: 現在 ${STATE_LABEL[s.state]}(${s.state})${s.message ? ` 文面=${printable(s.message)}` : ""}`);
+      log(`    これから: ${describeChange(s.state, plan.summary.mode, stage.branch)}`);
+    }
+  }
+  if (plan.summary.mode === "false" && plan.stages.some((s) => s.envName === "production")) log("  [注意] 本番の解除は、各サイトの master の最新の内容をすべて公開します。公開してはいけない変更が master に入っていないか確かめてから承認してください");
+}
 
 /**
  * @param {object} deps main に渡す依存(gh・sleep・now・log・error・sitesPath)
@@ -107,6 +150,7 @@ export async function runAll(env, deps = {}, { phase = "all" } = {}) {
     if (doPlan) {
       // 計画: 選んだすべての対象(本番を含む)を事前確認して、飛ばすサイトを先に見せる(本番の承認画面より前)
       log("== 計画(事前確認。まだ何も実行していません) ==");
+      await showStates(plan, deps.fetchImpl ?? fetch, log);
       let runnable = 0;
       for (const stage of plan.stages) {
         const { c, report } = await call(stage, "plan");
@@ -146,6 +190,7 @@ export async function runAll(env, deps = {}, { phase = "all" } = {}) {
     const lines = [
       `### メンテナンス表示を一括で切り替え${title ? ` — ${title}` : ""} (${code === 0 ? "成功" : "失敗・中断"})`,
       plan ? `- 反映先: ${plan.stages.map((s) => `\`${s.branch}\`(${s.sites.join(", ")})`).join(" / ")}` : "- 入力を検査できませんでした",
+      plan ? `- 対象サイト: ${plan.summary.sites.length > 0 ? plan.summary.sites.join(", ") : "すべて"}` : "",
       plan ? `- 設定した値: MAINTENANCE_MODE=\`${plan.summary.mode || "(変更なし)"}\` / MAINTENANCE_MESSAGE=\`${fence(plan.summary.message) || "(変更なし)"}\`` : "",
       ...(skippedAll.length > 0 ? ["", "**飛ばしたサイト(警告)**: 対象ブランチのワークフローが入力を受け取れない版のため、反映されません", ...skippedAll.map((x) => `- ${x.site} / ${x.env}: ${fence(x.reason)}`)] : []),
       "",
