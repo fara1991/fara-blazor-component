@@ -81,8 +81,8 @@
         }
       },
       "workers": {
-        "production": "fara-portfolio",
-        "dev": "fara-portfolio-dev"
+        "production": "fara-labs",
+        "dev": "fara-labs-dev"
       },
       "hosts": {
         "production": "https://fara-labs.com",

@@ -22,14 +22,14 @@ Worker の変数 `MAINTENANCE_MODE`（`true` / `notice` / `false`）と `MAINTEN
 | pokemon | `fara-pokemon-battle-assistant` | Deploy (develop) / `deploy-develop.yml` / `develop` / `fara-pokemon-dev` / pokemon-dev.fara-labs.com | Deploy (production) / `deploy.yml` / `production` / `fara-pokemon` / pokemon.fara-labs.com |
 | avatar | `fara-avatar-modding-guide` | Deploy (develop) / `deploy-develop.yml` / `develop` / `fara-avatar-dev` / avatar-dev.fara-labs.com | Deploy (production) / `deploy.yml` / `production` / `fara-avatar` / avatar.fara-labs.com |
 | bot | `fara-bot-moderator`（サイトは `site/`） | Deploy (develop) / `deploy-develop.yml` / `develop` / `fara-twitch-bot-dev` / twitch-bot-dev.fara-labs.com | Deploy (production) / `deploy.yml` / `production` / `fara-twitch-bot` / twitch-bot.fara-labs.com |
-| portfolio | `fara-labs` | Deploy (develop) / `deploy-develop.yml` / `develop` / `fara-portfolio-dev` / dev.fara-labs.com | Deploy (production) / `deploy.yml` / `production` / `fara-portfolio` / fara-labs.com |
+| portfolio | `fara-labs` | Deploy (develop) / `deploy-develop.yml` / `develop` / `fara-labs-dev` / dev.fara-labs.com | Deploy (production) / `deploy.yml` / `production` / `fara-labs` / fara-labs.com |
 
 - 4 サイトとも、ワークフローは dev と production で**別ファイル**。production のジョブは master 限定（`github.ref == 'refs/heads/master'`。portfolio は先頭の step `Require master`）で、develop を指定して起動しても何も起きない。**dev に切り替えるには、必ず `deploy-develop.yml` を使う**（以前の avatar の dev は `deploy.yml`、bot は存在しない `site.yml` を指していて、実態と合っていなかった）
 - `workflow_dispatch` の入力: **dev** は `maintenance_mode`（choice: 空 / `true` / `notice` / `false`。空 = 変更しない）と `maintenance_message`（string、200 文字まで）の 2 つ。**production** はこの 2 つに加えて `skip_maintenance_check`（boolean。公開前の `MAINTENANCE_MODE=notice` の確認を飛ばす緊急用）と `first_publish`（boolean。Worker がまだ無いときの初回の公開だけ）。**一括切替・CLI が渡すのは `maintenance_mode` と `maintenance_message` だけ**（`skip_maintenance_check`・`first_publish` には触れない）
 - production で `maintenance_mode` を `true` / `notice` / `false` のどれかにして起動すると、`MAINTENANCE_MODE=notice` の確認（`Require MAINTENANCE_MODE=notice`）は行われない。**解除（`false`）は、このため確認なしで master の最新を公開する**
 - **album（`fara-vrc-photo-album`）は一括切替の対象外**: 公開を GitHub Actions では行わず（手元のアプリから公開）、起動するワークフローが無い（`.github/workflows/` は `build.yml` だけ）。album のメンテナンスの切り替えは、Cloudflare のダッシュボード（Worker の「変数とシークレット」の `MAINTENANCE_MODE`）か、手元の wrangler で行う
 - **2026-10-29 時点（公開前）で、4 サイトの `master` には deploy 系のワークフローがまだ無い**。この間、`master` を選ぶと本番は全部「飛ばす」（事前確認が 404）になる。`develop` を省いた場合は、production job が「実行できた対象が 1 つもありません」で失敗する（承認の後に失敗する形になるが想定内）。各サイトの develop → master のマージのあとから、本番にも効く
-- **Worker 名の変更予定**: fara-labs（portfolio）の Worker 名は、近く `fara-portfolio` → `fara-labs`、`fara-portfolio-dev` → `fara-labs-dev` に変わる予定（別の PR が進行中）。**今はまだ直さない**（変更がマージされ、公開されてから、別の PR で直す）。直す場所: `tools/maintenance-sites.json` の portfolio の `workers.production` / `workers.dev` の 2 値と、この docs の 0 の表・対応表（対象のサイト）・雛形の例（`require-maintenance.mjs` と `WORKER_NAME`）
+- **Worker 名の変更（反映済み）**: fara-labs（portfolio）の Worker 名は `fara-portfolio` → `fara-labs`、`fara-portfolio-dev` → `fara-labs-dev` に変わった（fara-labs の PR #88）。確認用の `fara-labs-dev` は存在する。本番の `fara-labs` は公開前でまだ存在しない。
 
 ## 1. Actions の画面で実行する(第一の手段)
 
@@ -96,7 +96,7 @@ export CLOUDFLARE_ACCOUNT_ID=...   # ダッシュボードの Workers & Pages �
 | pokemon | `deploy-develop.yml` / `develop` / `fara-pokemon-dev` | `deploy.yml` / `master` / `fara-pokemon` |
 | avatar | `deploy-develop.yml` / `develop` / `fara-avatar-dev` | `deploy.yml` / `master` / `fara-avatar` |
 | bot | `deploy-develop.yml` / `develop` / `fara-twitch-bot-dev` | `deploy.yml` / `master` / `fara-twitch-bot` |
-| portfolio | `deploy-develop.yml` / `develop` / `fara-portfolio-dev` | `deploy.yml` / `master` / `fara-portfolio` |
+| portfolio | `deploy-develop.yml` / `develop` / `fara-labs-dev` | `deploy.yml` / `master` / `fara-labs` |
 
 `hosts`（`dev` / `production` の公開 URL）は、一括切替の計画で `/api/maintenance` を読むのに使う。環境・URL を含む全体の対応表は「0」。別の一覧を使うときは `--sites-file <パス>`。Worker を足すときは JSON にサイトを足す（dev だけのサイトも可）。
 
@@ -312,7 +312,7 @@ on:
       # mode に true / notice / false のどれかを指定した手動実行（maintenance-cli の set）は、操作した人の意思なので、確認を飛ばす
       - name: Require MAINTENANCE_MODE=notice
         if: ${{ !contains(fromJSON('["true","notice","false"]'), inputs.maintenance_mode) }}
-        run: node .github/scripts/require-maintenance.mjs fara-portfolio
+        run: node .github/scripts/require-maintenance.mjs fara-labs
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -370,7 +370,7 @@ on:
         env:
           MAINTENANCE_MODE_INPUT: ${{ inputs.maintenance_mode }}
           MAINTENANCE_MESSAGE_INPUT: ${{ inputs.maintenance_message }}
-          WORKER_NAME: fara-portfolio
+          WORKER_NAME: fara-labs
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
 ```
