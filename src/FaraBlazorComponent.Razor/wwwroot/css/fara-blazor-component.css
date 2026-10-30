@@ -417,9 +417,9 @@ html .mud-nav-link:focus-visible {
         padding-bottom: calc(var(--fbc-bottombar-height, 3.5rem) + env(safe-area-inset-bottom, 0px));
     }
 
-    /* セーフエリアの余白は下のタブバーが持つので、フッターには足さない */
+    /* セーフエリアの余白は下のタブバーが持つので、フッターには足さない。ただし、一番下の行（© と SNS）のリンクの当たり判定（44px）が下のタブバーに重ならないよう、1rem の余白は残す */
     .fbc-page.fbc-has-bottombar .fbc-footer {
-        padding-bottom: 0.5rem;
+        padding-bottom: 1rem;
     }
 }
 

@@ -231,7 +231,7 @@
     /// <summary>スマホかどうか（768px 未満）。スマホは、サイドバーを、ハンバーガーで開く一時的なメニューにする。</summary>
     private bool Mobile => mobile;
 
-    private bool DrawerOpen => Mobile ? mobileOpen : (Effective == Mode.Rail ? false : desktopOpen);
+    private bool DrawerOpen => Mobile ? mobileOpen : desktopOpen;
 
     /// <summary>
     /// サイドバーの属性。スマホで閉じている間は inert（画面の外にある項目を Tab で通らず、支援技術からも外す。開くと外れる）。
@@ -251,9 +251,10 @@
     protected override void OnInitialized()
     {
         Nav.LocationChanged += OnLocationChanged;
+        // Rail（PC）は開閉しない（常に細い列）。保存された開閉は読まず、閉じた状態（Mini）で固定する
+        if (Effective == Mode.Rail) desktopOpen = false;
         if (JS is IJSInProcessRuntime sync)
         {
-            // Rail は開閉しない（常に細い列）ので、保存された開閉は読まない
             if (Effective != Mode.Rail)
             {
                 try { desktopOpen = sync.Invoke<string?>("localStorage.getItem", Site.SidebarKey) != "1"; }

@@ -327,7 +327,7 @@ test("fara-blazor-component: focusById は id の要素にフォーカスする�
 
 function dropdownFixture() {
     const removedWin = [];
-    const s = runKit({ window: { innerWidth: 360, removeEventListener: (t, fn) => removedWin.push(t) } });
+    const s = runKit({ window: { innerWidth: 360, removeEventListener: (t) => removedWin.push(t) } });
     const root = element("nav", { id: "root" });
     const toggle = element("button", { id: "toggle" });
     toggle.getBoundingClientRect = () => ({ left: 300, bottom: 50 });
