@@ -1,0 +1,28 @@
+@inherits LayoutComponentBase
+@inject MaintenanceInfo Maintenance
+
+@* Rail + BottomBar の例（bot 向け）。PC は常時表示の細いレール、スマホは下のタブバー（ハンバーガーは出ない） *@
+<SiteLayout Body="@Body" Maintenance="Maintenance" NavMode="NavMode.Rail">
+    <DrawerContent>
+        <SiteRailNav Groups="NavGroups" />
+    </DrawerContent>
+    <BottomBar>
+        <SiteRailNav Groups="NavGroups" />
+    </BottomBar>
+    <HeaderEnd>
+        <ThemeSwitch />
+    </HeaderEnd>
+</SiteLayout>
+
+@code {
+    private static readonly IReadOnlyList<SiteNavGroup> NavGroups = new[]
+    {
+        new SiteNavGroup(null, new[]
+        {
+            new SiteNavItem("rail", "ホーム", Icons.Material.Filled.Home, Exact: true),
+            new SiteNavItem("rail/commands", "コマンド", Icons.Material.Filled.Terminal),
+            new SiteNavItem("rail/guide", "使い方", Icons.Material.Filled.MenuBook),
+            new SiteNavItem("report", "連絡", Icons.Material.Filled.MailOutline),
+        }),
+    };
+}

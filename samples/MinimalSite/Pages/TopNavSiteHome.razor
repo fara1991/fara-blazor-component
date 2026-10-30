@@ -1,0 +1,10 @@
+@page "/topnav"
+@layout SiteTopNavLayout
+<PageTitle>SiteTopNav の例 | Minimal Site</PageTitle>
+
+<h1>SiteTopNav の例</h1>
+<p>aria-current は自動で付きます。</p>
+@for (var i = 1; i <= 30; i++)
+{
+    <p class="sample-line">本文の段落 @i。ナビの形（レール・下のタブバー・全高のサイドバー・上部ナビ）を確かめるための、少し長めの文章です。</p>
+}

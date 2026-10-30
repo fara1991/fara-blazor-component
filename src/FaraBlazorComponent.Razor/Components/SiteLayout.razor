@@ -6,6 +6,8 @@
 @inherits LayoutComponentBase
 @implements IDisposable
 @using Microsoft.AspNetCore.Components.Routing
+@* NavMode は、このコンポーネントのパラメーター名と同じなので、列挙型には別名（Mode）で触る *@
+@using Mode = FaraBlazorComponent.Razor.NavMode
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject SiteOptions Site
@@ -18,7 +20,7 @@
 <MudLayout Class="@PageClassName">
     <MudAppBar Fixed="true" Elevation="0" Gutters="false" Class="fbc-header">
         <ScrollProgress />
-        @if (HasMenu)
+        @if (ShowHamburger)
         {
             <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Class="fbc-menu-toggle" OnClick="ToggleDrawer"
                            aria-label="メニューの表示・非表示" aria-controls="fbc-sidebar" aria-expanded="@(DrawerOpen ? "true" : "false")" title="メニューの表示・非表示" />
@@ -55,8 +57,10 @@
     {
         @* PC: 隠すと、アイコンだけの細い列になる。マウスを乗せている間は広がる（Mini）。スマホ: ハンバーガーで開く一時的なメニュー。
            Breakpoint は Sm（既定の Md だと、768〜959px で Mini が画面の外に消えるため） *@
-        <MudDrawer Open="DrawerOpen" OpenChanged="OnDrawerOpenChanged" Variant="@(Mobile ? DrawerVariant.Temporary : DrawerVariant.Mini)" OpenMiniOnHover="true" Breakpoint="Breakpoint.Sm"
-                   ClipMode="@(Mobile ? DrawerClipMode.Never : DrawerClipMode.Always)" Elevation="0" Class="fbc-sidebar" UserAttributes="@DrawerAttributes">
+        @* Rail（PC）: 常に細い列（Open=false の Mini。マウスを乗せても広がらない）。FullHeight（PC）: ヘッダーの下ではなく、画面の最上部から（ClipMode=Never。MudBlazor が、開閉に合わせてヘッダーをずらす）。
+           広げたサイドバーがヘッダーのハンバーガーを覆って押せなくなるので、マウスを乗せて広げる動きは使わない（開閉はハンバーガーだけ） *@
+        <MudDrawer Open="DrawerOpen" OpenChanged="OnDrawerOpenChanged" Variant="@(Mobile ? DrawerVariant.Temporary : DrawerVariant.Mini)" OpenMiniOnHover="@(!RailDesktop && !FullHeightDesktop)" Breakpoint="Breakpoint.Sm"
+                   ClipMode="@(Mobile || FullHeightDesktop ? MudBlazor.DrawerClipMode.Never : MudBlazor.DrawerClipMode.Always)" Elevation="0" Class="@DrawerClass" UserAttributes="@DrawerAttributes">
             @if (Mobile)
             {
                 @* スマホ: ドロワーが画面の左上（ヘッダーのハンバーガーの位置）を覆うため、ハンバーガーは押せない。閉じる手段をドロワーの中に置く（Esc・背景タップと同じ後始末） *@
@@ -69,7 +73,7 @@
             {
                 @DrawerContent(CloseOnNavigate)
             }
-            else if (!ShowDrawer && TopNav is not null)
+            else if (!DrawerEnabled && Effective != Mode.None && TopNav is not null)
             {
                 <div class="fbc-topnav-drawer">@TopNav</div>
             }
@@ -83,6 +87,12 @@
         <div id="fbc-search-sheet" class="fbc-search-sheet" @onkeydown="OnSheetKeyDown">
             @SearchSheet(CloseSearchEvent)
         </div>
+    }
+
+    @if (BottomBarShown)
+    {
+        @* スマホの下のタブバー（画面の下に固定。本文の外）。本文の下の余白（.fbc-has-bottombar）で、フッターが隠れない *@
+        <div class="fbc-bottombar">@BottomBar</div>
     }
 
     <MudMainContent>
@@ -116,7 +126,21 @@
     [Parameter] public RenderFragment? TopNav { get; set; }
 
     /// <summary>
-    /// サイドバー（ドロワー）を出すか。既定は出す。false にすると、サイドバーもハンバーガーも描かない（上部ナビだけの構成）。
+    /// ナビの出し方（<see cref="NavMode"/>）。省略（null）のときは <see cref="ShowDrawer"/> で決まる（true なら Drawer、false なら Top）。指定したときは、ShowDrawer より優先する。
+    /// </summary>
+    [Parameter] public NavMode? NavMode { get; set; }
+
+    /// <summary>
+    /// スマホの画面の下に固定するタブバーの中身（例: SiteRailNav）。省略すると出さない。MudMainContent の外に描く。
+    /// NavMode=Rail のときは、これがあるスマホではハンバーガーとサイドバーを出さない。
+    /// </summary>
+    [Parameter] public RenderFragment? BottomBar { get; set; }
+
+    /// <summary>PC のサイドバーの高さ。既定の BelowHeader は従来どおり（ヘッダーの下から）。FullHeight は画面の最上部から全高で、ヘッダーはサイドバーの右だけ。スマホには影響しない。</summary>
+    [Parameter] public SiteDrawerClipMode DrawerClipMode { get; set; } = SiteDrawerClipMode.BelowHeader;
+
+    /// <summary>
+    /// サイドバー（ドロワー）を出すか。既定は出す。NavMode を指定したときは、そちらが優先する。false にすると、サイドバーもハンバーガーも描かない（上部ナビだけの構成）。
     /// ただし CollapseTopNavOnMobile が true なら、スマホだけはハンバーガーで開くメニュー（TopNav を縦に並べて入れる）を出す。
     /// </summary>
     [Parameter] public bool ShowDrawer { get; set; } = true;
@@ -146,13 +170,44 @@
     [Parameter] public bool MobilePageScroll { get; set; }
 
     private string PageClassName =>
-        "fbc-page" + (ShowDrawer ? "" : " fbc-no-drawer") + (MobilePageScroll ? " fbc-page-scroll" : "") + (string.IsNullOrWhiteSpace(PageClass) ? "" : " " + PageClass);
+        "fbc-page" + (DrawerEnabled ? "" : " fbc-no-drawer") + (MobilePageScroll ? " fbc-page-scroll" : "")
+        + (Effective == Mode.Rail ? " fbc-nav-rail" : "") + (FullHeightDesktop ? " fbc-clip-full" : "") + (BottomBarShown ? " fbc-has-bottombar" : "")
+        + (string.IsNullOrWhiteSpace(PageClass) ? "" : " " + PageClass);
 
-    /// <summary>メニュー（ハンバーガーとドロワー）を出すか。サイドバーがあるか、スマホで上部ナビを畳むとき。</summary>
-    private bool HasMenu => ShowDrawer || (CollapseTopNavOnMobile && TopNav is not null && Mobile);
+    /// <summary>実際に使うナビの出し方。NavMode が指定されていればそれ、無ければ ShowDrawer から決める（従来の挙動）。</summary>
+    private Mode Effective => NavMode ?? (ShowDrawer ? Mode.Drawer : Mode.Top);
+
+    /// <summary>サイドバー（ナビとしてのドロワー）を使う構成か（Drawer と Rail）。</summary>
+    private bool DrawerEnabled => Effective is Mode.Drawer or Mode.Rail;
+
+    /// <summary>PC の常時表示のレール（Rail の PC）。開閉も、マウスを乗せて広げることも無い。</summary>
+    private bool RailDesktop => Effective == Mode.Rail && !Mobile;
+
+    /// <summary>PC で、サイドバーを画面の最上部から全高にするか（スマホは一時的なメニューなので対象外）。</summary>
+    private bool FullHeightDesktop => DrawerClipMode == SiteDrawerClipMode.FullHeight && !Mobile && HasMenu;
+
+    /// <summary>スマホの下のタブバーを出すか（BottomBar があるスマホだけ）。</summary>
+    private bool BottomBarShown => BottomBar is not null && Mobile;
+
+    /// <summary>
+    /// メニュー（ドロワー）を描くか。サイドバーがあるか、スマホで上部ナビを畳むとき。
+    /// Rail は、下のタブバーがあるスマホでは描かない（タブバーがナビになる）。None は描かない。
+    /// </summary>
+    private bool HasMenu => Effective switch
+    {
+        Mode.Drawer => true,
+        Mode.Rail => !BottomBarShown,
+        Mode.Top => CollapseTopNavOnMobile && TopNav is not null && Mobile,
+        _ => false,
+    };
+
+    /// <summary>ハンバーガーのボタンを出すか。メニューがあり、かつ PC の常時表示のレールではないとき。</summary>
+    private bool ShowHamburger => HasMenu && !RailDesktop;
 
     /// <summary>上部ナビをヘッダーに出すか（畳んでいるスマホでは、メニューの中に入る）。</summary>
-    private bool TopNavInHeader => TopNav is not null && !ShowDrawer && !(CollapseTopNavOnMobile && Mobile);
+    private bool TopNavInHeader => TopNav is not null && Effective == Mode.Top && !(CollapseTopNavOnMobile && Mobile);
+
+    private string DrawerClass => "fbc-sidebar" + (RailDesktop ? " fbc-sidebar-rail" : "");
 
     // 保存された PC の開閉（SiteOptions.SidebarKey が "1" なら隠す）
     private bool desktopOpen = true;
@@ -176,7 +231,7 @@
     /// <summary>スマホかどうか（768px 未満）。スマホは、サイドバーを、ハンバーガーで開く一時的なメニューにする。</summary>
     private bool Mobile => mobile;
 
-    private bool DrawerOpen => Mobile ? mobileOpen : desktopOpen;
+    private bool DrawerOpen => Mobile ? mobileOpen : (Effective == Mode.Rail ? false : desktopOpen);
 
     /// <summary>
     /// サイドバーの属性。スマホで閉じている間は inert（画面の外にある項目を Tab で通らず、支援技術からも外す。開くと外れる）。
@@ -198,8 +253,12 @@
         Nav.LocationChanged += OnLocationChanged;
         if (JS is IJSInProcessRuntime sync)
         {
-            try { desktopOpen = sync.Invoke<string?>("localStorage.getItem", Site.SidebarKey) != "1"; }
-            catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* localStorage が使えないときは、開いたままにする */ }
+            // Rail は開閉しない（常に細い列）ので、保存された開閉は読まない
+            if (Effective != Mode.Rail)
+            {
+                try { desktopOpen = sync.Invoke<string?>("localStorage.getItem", Site.SidebarKey) != "1"; }
+                catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* localStorage が使えないときは、開いたままにする */ }
+            }
             try
             {
                 self = DotNetObjectReference.Create(this);

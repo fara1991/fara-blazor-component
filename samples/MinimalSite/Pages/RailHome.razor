@@ -1,0 +1,10 @@
+@page "/rail"
+@layout RailLayout
+<PageTitle>Rail の例 | Minimal Site</PageTitle>
+
+<h1>Rail の例</h1>
+<p>PC は常時表示のレール、スマホは下のタブバーです。</p>
+@for (var i = 1; i <= 30; i++)
+{
+    <p class="sample-line">本文の段落 @i。ナビの形（レール・下のタブバー・全高のサイドバー・上部ナビ）を確かめるための、少し長めの文章です。</p>
+}

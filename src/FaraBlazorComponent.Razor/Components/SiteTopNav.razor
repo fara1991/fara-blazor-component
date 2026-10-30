@@ -1,0 +1,187 @@
+@* 上部ナビ（v1.1.0）。SiteLayout の TopNav スロットに置く。項目の並び + 「もっと見る」のドロップダウン。
+   - 現在のページの項目には aria-current="page" を自動で付ける（SiteNavItem.Href で判定。SiteNavMenu と同じ決まり）。
+   - VisibleCount を決めると、先頭のその数だけを並べ、残りは「もっと見る」に入れる（省略すると全部並べる）。
+   - 画面の幅が CollapseBelowPx（既定 768）より狭いときは、全部を「もっと見る」（開閉ボタン）に畳む。
+   - ドロップダウン: ボタンで開閉。Esc で閉じてボタンに戻る。↑↓・Home・End で項目を移る。外をクリック・フォーカスが外へ出ると閉じる。画面の移動でも閉じる。
+   項目は <a href>（OnClick なし）。選べない項目（Disabled）は、リンクにしない *@
+@implements IDisposable
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<nav id="@rootId" class="fbc-topnav" aria-label="@AriaLabel">
+    @if (!collapsed)
+    {
+        <ul class="fbc-topnav-list">
+            @foreach (var item in Inline)
+            {
+                <li>@ItemMarkup(item)</li>
+            }
+        </ul>
+    }
+    @if (Overflow.Count > 0)
+    {
+        <div class="fbc-topnav-more" @onkeydown="OnKeyDown">
+            <button id="@toggleId" type="button" class="fbc-topnav-link fbc-topnav-more-toggle@(OverflowHasCurrent ? " active" : "")"
+                    aria-haspopup="true" aria-expanded="@(open ? "true" : "false")" aria-controls="@panelId" @onclick="Toggle">
+                <span>@MoreLabel</span>
+                <span class="fbc-topnav-caret" aria-hidden="true"></span>
+            </button>
+            <ul id="@panelId" class="fbc-topnav-panel" hidden="@(!open)">
+                @foreach (var item in Overflow)
+                {
+                    <li>@ItemMarkup(item)</li>
+                }
+            </ul>
+        </div>
+    }
+</nav>
+
+@code {
+    /// <summary>項目の並び（SiteNavItem。Href は相対パス、"" がホーム）。</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<SiteNavItem> Items { get; set; } = Array.Empty<SiteNavItem>();
+
+    /// <summary>ナビの名前（スクリーンリーダー向け）。</summary>
+    [Parameter] public string AriaLabel { get; set; } = "メインメニュー";
+
+    /// <summary>ドロップダウンのボタンの文字。</summary>
+    [Parameter] public string MoreLabel { get; set; } = "もっと見る";
+
+    /// <summary>横に並べる項目の数（先頭から）。残りは「もっと見る」に入る。省略（null）は全部並べる。</summary>
+    [Parameter] public int? VisibleCount { get; set; }
+
+    /// <summary>この幅（px）より狭い画面では、全部を「もっと見る」に畳む。既定 768（SiteLayout のスマホの境目と同じ）。</summary>
+    [Parameter] public int CollapseBelowPx { get; set; } = 768;
+
+    private readonly string rootId = "fbc-topnav-" + Guid.NewGuid().ToString("N")[..8];
+    private string toggleId => rootId + "-toggle";
+    private string panelId => rootId + "-panel";
+    private readonly string watchKey = Guid.NewGuid().ToString("N");
+
+    private bool collapsed;
+    private bool open;
+    private bool watching;
+    private bool watchingOutside;
+    private DotNetObjectReference<SiteTopNav>? self;
+
+    private IReadOnlyList<SiteNavItem> Inline => collapsed ? Array.Empty<SiteNavItem>() : Items.Take(VisibleCount ?? Items.Count).ToList();
+
+    private IReadOnlyList<SiteNavItem> Overflow => collapsed ? Items : Items.Skip(VisibleCount ?? Items.Count).ToList();
+
+    private bool OverflowHasCurrent => Overflow.Any(i => !i.Disabled && IsCurrent(i));
+
+    private bool IsCurrent(SiteNavItem item) => SiteNavCurrent.IsCurrent(Nav.ToBaseRelativePath(Nav.Uri), item);
+
+    private RenderFragment ItemMarkup(SiteNavItem item) => builder =>
+    {
+        if (item.Disabled)
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", "fbc-topnav-link fbc-topnav-link-disabled");
+            builder.AddAttribute(2, "aria-disabled", "true");
+            if (!string.IsNullOrEmpty(item.Title)) builder.AddAttribute(3, "title", item.Title);
+            builder.AddContent(4, item.Label);
+            builder.CloseElement();
+            return;
+        }
+        var current = IsCurrent(item);
+        builder.OpenElement(10, "a");
+        builder.AddAttribute(11, "class", "fbc-topnav-link" + (current ? " active" : ""));
+        builder.AddAttribute(12, "href", item.Href);
+        if (current) builder.AddAttribute(13, "aria-current", "page");
+        if (!string.IsNullOrEmpty(item.Title)) builder.AddAttribute(14, "title", item.Title);
+        builder.AddContent(15, item.Label);
+        builder.CloseElement();
+    };
+
+    /// <summary>最初の描画の前に、畳む幅かどうかを同期で決める（非同期だと、並んだ状態で一度描かれてから畳んで見える）。</summary>
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+        if (JS is IJSInProcessRuntime sync)
+        {
+            try
+            {
+                self = DotNetObjectReference.Create(this);
+                collapsed = sync.Invoke<bool>("faraBlazorComponent.watchWidth", self, watchKey, CollapseBelowPx);
+                watching = true;
+            }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、並べたまま */ }
+        }
+    }
+
+    [JSInvokable]
+    public void OnCollapsedChanged(bool matches)
+    {
+        if (collapsed == matches) return;
+        collapsed = matches;
+        open = false;
+        StateHasChanged();
+        _ = WatchDropdownAsync();
+    }
+
+    /// <summary>外をクリックした・フォーカスが外へ出た（JS から）。</summary>
+    [JSInvokable]
+    public void CloseFromOutside()
+    {
+        if (!open) return;
+        open = false;
+        watchingOutside = false;
+        StateHasChanged();
+    }
+
+    private async Task Toggle()
+    {
+        open = !open;
+        await WatchDropdownAsync();
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is not ("Escape" or "Esc") || !open) return;
+        open = false;
+        await WatchDropdownAsync();
+        await Js("faraBlazorComponent.focusById", toggleId);
+    }
+
+    /// <summary>開いているあいだだけ、JS に外のクリック・フォーカスの監視と、↑↓ の移動を頼む。開いたときは、パネルをボタンの下に置く。</summary>
+    private async Task WatchDropdownAsync()
+    {
+        if (open && !watchingOutside)
+        {
+            watchingOutside = true;
+            await Js("faraBlazorComponent.dropdownOpen", rootId, toggleId, panelId, self, watchKey);
+        }
+        else if (!open && watchingOutside)
+        {
+            watchingOutside = false;
+            await Js("faraBlazorComponent.dropdownClose", watchKey);
+        }
+    }
+
+    private async Task Js(string identifier, params object?[] args)
+    {
+        try { await JS.InvokeVoidAsync(identifier, args); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException) { /* JS が使えないときは、位置・フォーカスを動かさない（開閉の状態は合っている） */ }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // ページが移ったら、ドロップダウンは閉じる。現在のページの強調も更新する
+        open = false;
+        _ = InvokeAsync(async () =>
+        {
+            await WatchDropdownAsync();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+        if (watching) _ = Js("faraBlazorComponent.unwatchWidth", watchKey);
+        watching = false;
+        if (watchingOutside) _ = Js("faraBlazorComponent.dropdownClose", watchKey);
+        watchingOutside = false;
+        self?.Dispose();
+    }
+}

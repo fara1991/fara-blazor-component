@@ -1,0 +1,63 @@
+@* アイコン + 小さなラベルを縦に並べたナビ（v1.1.0）。2 か所で使う:
+   - SiteLayout の NavMode=Rail の DrawerContent（PC の常時表示のレール。細い列に縦に並ぶ）
+   - SiteLayout の BottomBar（スマホの下のタブバー。横に等分に並ぶ）
+   現在のページの項目には aria-current="page" を付ける（見た目の強調のクラス .active も付く）。項目は <a href>（OnClick なし）。
+   見出し（SiteNavGroup.Title）は出さない（細い列・タブバーには入らない）。選べない項目（Disabled）は、リンクにしない *@
+@implements IDisposable
+@inject NavigationManager Nav
+
+<nav class="fbc-rail" aria-label="@AriaLabel">
+    <ul class="fbc-rail-list">
+        @foreach (var group in Groups)
+        {
+            @foreach (var item in group.Items)
+            {
+                var current = !item.Disabled && SiteNavCurrent.IsCurrent(Nav.ToBaseRelativePath(Nav.Uri), item);
+                <li class="fbc-rail-item">
+                    @if (item.Disabled)
+                    {
+                        <span class="fbc-rail-link fbc-rail-link-disabled" aria-disabled="true" title="@item.Title">
+                            @RailIcon(item)
+                            <span class="fbc-rail-label">@item.Label</span>
+                        </span>
+                    }
+                    else
+                    {
+                        <a class="fbc-rail-link@(current ? " active" : "")" href="@item.Href" aria-current="@(current ? "page" : null)" title="@item.Title">
+                            @RailIcon(item)
+                            <span class="fbc-rail-label">@item.Label</span>
+                        </a>
+                    }
+                </li>
+            }
+        }
+    </ul>
+</nav>
+
+@code {
+    /// <summary>見出しと項目の並び（SiteNavMenu と同じ形。見出しは出さない）。</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<SiteNavGroup> Groups { get; set; } = Array.Empty<SiteNavGroup>();
+
+    /// <summary>ナビの名前（スクリーンリーダー向け）。レールとタブバーを同時に出さないので、既定のままでよい。</summary>
+    [Parameter] public string AriaLabel { get; set; } = "メインメニュー";
+
+    private static RenderFragment RailIcon(SiteNavItem item) => builder =>
+    {
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", "fbc-rail-icon");
+        builder.AddAttribute(2, "aria-hidden", "true");
+        if (!string.IsNullOrEmpty(item.Icon))
+        {
+            builder.OpenComponent<MudIcon>(3);
+            builder.AddAttribute(4, "Icon", item.Icon);
+            builder.CloseComponent();
+        }
+        builder.CloseElement();
+    };
+
+    protected override void OnInitialized() => Nav.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

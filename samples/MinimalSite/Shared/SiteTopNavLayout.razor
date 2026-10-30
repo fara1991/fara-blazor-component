@@ -1,0 +1,24 @@
+@inherits LayoutComponentBase
+@inject MaintenanceInfo Maintenance
+
+@* SiteTopNav の例（avatar 向け）。aria-current は自動。先頭の 3 件だけ並べ、残りは「もっと見る」。768px より狭いと全部が「もっと見る」に畳まれる *@
+<SiteLayout Body="@Body" Maintenance="Maintenance" NavMode="NavMode.Top">
+    <TopNav>
+        <SiteTopNav Items="Items" VisibleCount="3" />
+    </TopNav>
+    <HeaderEnd>
+        <ThemeSwitch />
+    </HeaderEnd>
+</SiteLayout>
+
+@code {
+    private static readonly IReadOnlyList<SiteNavItem> Items = new[]
+    {
+        new SiteNavItem("topnav", "ホーム", Exact: true),
+        new SiteNavItem("topnav/guide", "ガイド"),
+        new SiteNavItem("topnav/tools", "ツール"),
+        new SiteNavItem("topnav/faq", "よくある質問"),
+        new SiteNavItem("report", "問い合わせ"),
+        new SiteNavItem("privacy", "プライバシー"),
+    };
+}

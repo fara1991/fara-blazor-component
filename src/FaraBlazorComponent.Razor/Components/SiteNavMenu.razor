@@ -39,8 +39,8 @@
 
     /// <summary>
     /// 現在のページかどうかの判定。項目の Href が空（ホーム）は、そのページにいるときだけ active。
-    /// それ以外は、Href で始まるページ（下位のページも含む）で active。
+    /// それ以外は、Href で始まるページ（下位のページも含む）で active（Exact なら、完全に同じページだけ）。
     /// </summary>
     private static NavLinkMatch MatchFor(SiteNavItem item) =>
-        item.Href.Trim('/').Length == 0 ? NavLinkMatch.All : NavLinkMatch.Prefix;
+        item.Exact || item.Href.Trim('/').Length == 0 ? NavLinkMatch.All : NavLinkMatch.Prefix;
 }

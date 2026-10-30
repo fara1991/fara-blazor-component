@@ -294,6 +294,135 @@ html .mud-nav-link:focus-visible {
     opacity: 0;
 }
 
+/* ---- Rail（SiteLayout の NavMode=Rail。v1.1.0）----
+   PC: 常に表示する細い列（Open=false の Mini。マウスを乗せても広がらない）。幅は --fbc-rail-width（既定 4.75rem）。
+   アイコン + 小さなラベル（12px）の縦並び。項目は SiteRailNav。ラベルは 4〜5 文字までなら 1 行、超えると折り返す。 */
+.fbc-page.fbc-nav-rail {
+    --mud-drawer-width-mini-left: var(--fbc-rail-width, 4.75rem);
+}
+
+.fbc-rail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0.5rem 0;
+    list-style: none;
+}
+
+.fbc-rail-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    box-sizing: border-box;
+    min-height: 3.5rem;
+    margin: 0 0.4rem;
+    padding: 0.4rem 0.2rem;
+    border-radius: 10px;
+    color: #ece6f7;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    text-align: center;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.fbc-rail-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.fbc-rail-link.active {
+    background-color: rgba(255, 255, 255, 0.25);
+    color: #fff;
+}
+
+.fbc-rail-link-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.fbc-rail-icon {
+    display: inline-flex;
+    flex: none;
+}
+
+.fbc-rail-label {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.fbc-rail-icon:empty {
+    display: none;
+}
+
+/* 一時的なメニュー（Rail でも下のタブバーが無いスマホ）の中では、普通のナビの項目と同じ横並びにする */
+.fbc-sidebar:not(.fbc-sidebar-rail) .fbc-rail-link {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    min-height: 44px;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.9rem;
+    text-align: left;
+}
+
+/* ---- FullHeight（SiteLayout の DrawerClipMode=FullHeight。v1.1.0）----
+   PC のサイドバーは、ヘッダーの下ではなく画面の最上部から全高（MudBlazor の ClipMode=Never）。ヘッダーのずらし（サイドバーの開閉・細い列の幅に合わせた margin-left と幅）は、
+   MudBlazor が layout のクラス（mud-drawer-*-clipped-never）で行うので、ここでは上書きしない。サイドバーはヘッダーの高さの分だけ上に伸びるので、項目の上に余白を足す。 */
+.fbc-page.fbc-clip-full .fbc-sidebar .mud-drawer-content {
+    padding-top: 0.5rem;
+}
+
+/* ---- 下のタブバー（SiteLayout の BottomBar。v1.1.0。スマホだけ）----
+   画面の下に固定（本文の外）。高さは --fbc-bottombar-height（既定 3.5rem）+ セーフエリア。
+   本文の下に同じ高さの余白を足すので、フッターが隠れない（MobilePageScroll の true / false どちらでも）。 */
+.fbc-bottombar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1030;
+    box-sizing: border-box;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background-color: #1a0d33;
+    background-image: var(--fbc-bottombar-bg, var(--fbc-sidebar-bg));
+    border-top: 1px solid rgba(200, 170, 255, 0.14);
+}
+
+.fbc-bottombar .fbc-rail-list {
+    flex-direction: row;
+    gap: 0;
+    padding: 0;
+}
+
+.fbc-bottombar .fbc-rail-item {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.fbc-bottombar .fbc-rail-link {
+    height: var(--fbc-bottombar-height, 3.5rem);
+    min-height: 44px;
+    margin: 0 0.15rem;
+    justify-content: center;
+    padding: 0.2rem 0.1rem;
+    border-radius: 8px;
+}
+
+@media (max-width: 767.98px) {
+    .fbc-page.fbc-has-bottombar .mud-main-content {
+        box-sizing: border-box;
+        padding-bottom: calc(var(--fbc-bottombar-height, 3.5rem) + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* セーフエリアの余白は下のタブバーが持つので、フッターには足さない */
+    .fbc-page.fbc-has-bottombar .fbc-footer {
+        padding-bottom: 0.5rem;
+    }
+}
+
 /* ページ全体は画面の高さに収める（PC もスマホも同じ）。ヘッダーとフッターは動かず、本文の領域（.fbc-content・.fbc-pane-scroll）だけがスクロールする */
 /* PC: ページ全体はスクロールさせず、画面の高さに収める。一覧や長い本文の中だけがスクロールする */
 .fbc-page.mud-layout {
@@ -381,6 +510,100 @@ html .fbc-page.fbc-no-drawer .mud-main-content {
 .fbc-topnav-drawer .fbc-topnav-link {
     color: var(--fbc-sidebar-text);
     padding: 0.6rem 0.75rem;
+}
+
+/* SiteTopNav（v1.1.0）。項目の並び + 「もっと見る」。パネルは、ヘッダーの overflow に切られないよう fixed（位置は JS が、ボタンの下に置く）。
+   ヘッダーは常に暗い地なので、パネルも暗い色で固定（白い文字で AA） */
+.fbc-topnav {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.fbc-topnav-list {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.fbc-topnav-link.active {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.fbc-topnav-link-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.fbc-topnav-more {
+    flex: 0 0 auto;
+}
+
+.fbc-topnav-more-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 0;
+    background: transparent;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.fbc-topnav-caret {
+    width: 0;
+    height: 0;
+    border-left: 0.3rem solid transparent;
+    border-right: 0.3rem solid transparent;
+    border-top: 0.35rem solid currentColor;
+}
+
+.fbc-topnav-more-toggle[aria-expanded="true"] .fbc-topnav-caret {
+    transform: rotate(180deg);
+}
+
+.fbc-topnav-panel {
+    z-index: 1050;
+    min-width: 12rem;
+    margin: 0;
+    padding: 0.35rem;
+    list-style: none;
+    border: 1px solid rgba(200, 170, 255, 0.22);
+    border-radius: 10px;
+    background: #1f1038;
+    box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.6);
+}
+
+.fbc-topnav-panel[hidden] {
+    display: none;
+}
+
+.fbc-topnav-panel .fbc-topnav-link {
+    display: block;
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 0.7rem 0.8rem;
+}
+
+@media (max-width: 599.98px) {
+    .fbc-topnav .fbc-topnav-link {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+    }
+
+    .fbc-topnav-panel .fbc-topnav-link {
+        display: flex;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .fbc-topnav-caret {
+        transition: transform 0.15s ease;
+    }
 }
 
 /* 枠の中だけがスクロールする（問い合わせなどの画面の枠） */
