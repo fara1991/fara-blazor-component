@@ -2,7 +2,7 @@
    - 現在のページの項目には aria-current="page" を自動で付ける（SiteNavItem.Href で判定。SiteNavMenu と同じ決まり）。
    - VisibleCount を決めると、先頭のその数だけを並べ、残りは「もっと見る」に入れる（省略すると全部並べる）。
    - 画面の幅が CollapseBelowPx（既定 768）より狭いときは、全部を「もっと見る」（開閉ボタン）に畳む。
-   - ドロップダウン: ボタンで開閉。Esc で閉じてボタンに戻る。↑↓・Home・End で項目を移る。外をクリック・フォーカスが外へ出ると閉じる。画面の移動でも閉じる。
+   - ドロップダウン: ボタンで開閉（aria-expanded・aria-controls。リンクの一覧なので aria-haspopup は付けない）。Esc で閉じてボタンに戻る。↑↓・Home・End で項目を移る。外をクリック・フォーカスが外へ出ると閉じる。画面の移動でも閉じる。
    項目は <a href>（OnClick なし）。選べない項目（Disabled）は、リンクにしない *@
 @implements IDisposable
 @inject NavigationManager Nav
@@ -22,7 +22,7 @@
     {
         <div class="fbc-topnav-more" @onkeydown="OnKeyDown">
             <button id="@toggleId" type="button" class="fbc-topnav-link fbc-topnav-more-toggle@(OverflowHasCurrent ? " active" : "")"
-                    aria-haspopup="true" aria-expanded="@(open ? "true" : "false")" aria-controls="@panelId" @onclick="Toggle">
+                    aria-expanded="@(open ? "true" : "false")" aria-controls="@panelId" @onclick="Toggle">
                 <span>@MoreLabel</span>
                 <span class="fbc-topnav-caret" aria-hidden="true"></span>
             </button>

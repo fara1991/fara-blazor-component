@@ -461,9 +461,10 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
 
 - `VisibleCount`: 横に並べる先頭の数。残りは「もっと見る」に入る（省略 = 全部並べる。「もっと見る」も出ない）。
 - `CollapseBelowPx`（既定 768）: **この幅（px）より狭い画面では、全部を「もっと見る」に畳む**。SiteLayout 全体のスマホの境目（768px）は CSS の media query と JS に固定されていて変えられない。`CollapseBelowPx` は `SiteTopNav` の畳む幅だけを変える（SiteLayout の `Mobile` とは別）。
-- ドロップダウン: ボタンは `aria-haspopup`・`aria-expanded`・`aria-controls`。**Esc** で閉じてボタンにフォーカスを戻す。**↑↓・Home・End** で項目を移る（端で回る）。外をクリックする・Tab でパネルの外へ出ると閉じる。ページが移っても閉じる。パネルは `position: fixed` でボタンの下に置く（ヘッダーの `overflow` に切られない）。閉じた状態のパネルは `hidden`（Tab の対象外）。
+- ドロップダウン: ボタンは `aria-expanded`・`aria-controls`（中身はリンクの一覧なので、role=menu を意味する `aria-haspopup` は付けない）。**Esc** で閉じてボタンにフォーカスを戻す。**↑↓・Home・End** で項目を移る（端で回る）。外をクリックする・Tab でパネルの外へ出ると閉じる。ページが移っても閉じる。パネルは `position: fixed` でボタンの下に置く（ヘッダーの `overflow` に切られない）。閉じた状態のパネルは `hidden`（Tab の対象外）。
 - 「もっと見る」の中に現在のページがあるとき、ボタンも強調（`.active`）する。選べない項目（`Disabled`）はリンクにしない。
 - 項目の `Exact`（`SiteNavItem`）は、レールと同じ（8.3.1）。
+- `SiteTopNav` は、自分で畳む（`CollapseBelowPx`）。`SiteLayout` の `CollapseTopNavOnMobile="true"` とは併用しない（併用すると、スマホでは、ハンバーガーで開くメニューの中に `SiteTopNav` が入り、その中でも畳まれる）。スマホを「もっと見る」に畳むなら `CollapseTopNavOnMobile` は付けず、ヘッダーの横スクロールの既定のままにする。
 
 ### 8.3.4 `NavMode` と `ShowDrawer` の関係
 

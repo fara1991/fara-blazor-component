@@ -569,7 +569,8 @@ public class SiteTopNavTests : BlazorComponentTestContext
         var cut = RenderNav(visible: 2);
         var toggle = cut.Find(".fbc-topnav-more-toggle");
         Assert.Equal(cut.Find(".fbc-topnav-panel").Id, toggle.GetAttribute("aria-controls"));
-        Assert.Equal("true", toggle.GetAttribute("aria-haspopup"));
+        // リンクの一覧（ナビの開閉）なので、role=menu を意味する aria-haspopup は付けない
+        Assert.Null(toggle.GetAttribute("aria-haspopup"));
 
         toggle.Click();
 
