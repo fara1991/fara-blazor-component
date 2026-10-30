@@ -2,6 +2,20 @@
 
 kit は SemVer のタグ（`vX.Y.Z`）で切る。各サイトは、タグのコミットに固定して使う。破壊的変更（API・名前空間・ファイル名）はメジャーを上げる。
 
+## 1.1.0（候補）
+
+画面枠の拡張（SiteLayout）。**後方互換**: 追加のパラメーターの既定値は、従来の挙動と同じ（既存の使い方は変えなくてよい）。
+
+- **追加（`SiteLayout.NavMode`）**: `Drawer`（従来）・`Rail`（PC は常時表示の細いアイコンのレール。ハンバーガー・開閉の保存なし）・`Top`（`ShowDrawer="false"` と同じ）・`None`。省略（null）のときは `ShowDrawer` で決まる。指定すれば `ShowDrawer` より優先。
+- **追加（`SiteLayout.BottomBar`）**: スマホの画面の下に固定するタブバー（`MudMainContent` の外）。本文の下の余白とセーフエリア（`env(safe-area-inset-bottom)`）で、フッターが隠れない（`MobilePageScroll` の true / false のどちらでも）。`Rail` + `BottomBar` のスマホは、ハンバーガーとサイドバーを出さない。
+- **追加（`SiteLayout.DrawerClipMode`）**: `BelowHeader`（従来）・`FullHeight`（PC のサイドバーが画面の最上部から全高。ヘッダーはサイドバーの右だけ）。型名は MudBlazor の `DrawerClipMode` との衝突を避けて `SiteDrawerClipMode`。`FullHeight` のときはマウスを乗せて広げる動きを使わない（広げたサイドバーがハンバーガーを覆うため）。
+- **追加（`SiteRailNav`）**: アイコン + 小さなラベルのナビ（レールとタブバーの両方に使う）。`aria-current="page"` を自動で付ける。
+- **追加（`SiteTopNav`）**: 上部ナビ（項目の並び + 「もっと見る」。`VisibleCount`・`CollapseBelowPx`〔既定 768〕。Esc・↑↓・Home・End・外のクリックで閉じる）。`aria-current="page"` を自動で付ける。
+- **追加（`SiteNavItem.Exact`）**: 現在のページの判定を、完全に同じページだけにする（省略可。`SiteNavMenu` も従う）。
+- **JS**: `faraBlazorComponent.watchWidth`・`unwatchWidth`・`dropdownOpen`・`dropdownClose`・`focusById` を追加（既存の関数は変えない）。
+- **CSS**: `.fbc-rail*`・`.fbc-bottombar`・`.fbc-topnav*`・`.fbc-nav-rail`・`.fbc-clip-full`・`.fbc-has-bottombar` と、変数 `--fbc-rail-width`・`--fbc-bottombar-height`・`--fbc-bottombar-bg` を追加。既存のクラス・規則は変えない。
+- **サンプル・テスト**: `samples/MinimalSite` に Rail + BottomBar（`/rail`）・FullHeight（`/full`）・SiteTopNav（`/topnav`）を追加。`layout-check.nav-modes.config.mjs` で CI が計測（違反 0 件）。bUnit（`NavModeTests`）と JS のテストを追加。既存のテストは変更なしで通る。
+
 ## 1.0.2
 
 2026-10-29。メンテナンスの一括切替の修正と、fara-labs の Worker 名の反映。

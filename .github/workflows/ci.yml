@@ -77,11 +77,14 @@ jobs:
 
       - name: Serve (公開用の静的ファイルを配る)
         run: |
-          node tools/layout-check/serve-static.mjs "$RUNNER_TEMP/minimal-site/wwwroot" 8830 &
+          node tools/layout-check/serve-static.mjs "$RUNNER_TEMP/minimal-site/wwwroot" 8830 --spa &
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:8830/ > /dev/null && break; sleep 1; done
 
       - name: Layout check (samples/MinimalSite の / を計測。タップの大きさ 0 件を含む)
         run: node tools/layout-check/cli.mjs --config samples/MinimalSite/layout-check.config.mjs
+
+      - name: "Layout check (samples/MinimalSite の新しいナビ。Rail + BottomBar・FullHeight・SiteTopNav)"
+        run: node tools/layout-check/cli.mjs --config samples/MinimalSite/layout-check.nav-modes.config.mjs
 
   dotnet:
     strategy:

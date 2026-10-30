@@ -323,10 +323,12 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
 
 | 部品 | 役目 | 主なパラメータ |
 | --- | --- | --- |
-| `SiteLayout` | ヘッダー・サイドバー（PC は Mini、スマホは一時的なメニュー）・本文・フッター・お知らせ帯。サイドバーなしの上部ナビにもできる（8.3） | `Brand` `SearchBox` `HeaderEnd` `MobileHeaderActions` `SearchSheet` `DrawerContent` `TopNav` `ShowDrawer` `CollapseTopNavOnMobile` `Maintenance` `CustomTheme` `PageClass` |
+| `SiteLayout` | ヘッダー・サイドバー（PC は Mini、スマホは一時的なメニュー）・本文・フッター・お知らせ帯。サイドバーなしの上部ナビ（8.3）・常時表示のレール + 下のタブバー（8.3.1）・全高のサイドバー（8.3.2）にもできる | `Brand` `SearchBox` `HeaderEnd` `MobileHeaderActions` `SearchSheet` `DrawerContent` `TopNav` `ShowDrawer` `CollapseTopNavOnMobile` `NavMode` `BottomBar` `DrawerClipMode` `Maintenance` `CustomTheme` `PageClass` `MobilePageScroll` |
 | `MudProviders` | MudBlazor の土台（テーマ・ポップアップ・ダイアログ・通知） | `CustomTheme` |
 | `ThemeSwitch` | ライト／ダーク（スイッチ。`AsButton` で文字のボタン） | `AsButton` `LightLabel` `DarkLabel` |
 | `SiteNavMenu` | サイドバーの項目（見出しと項目は `SiteNavGroup`・`SiteNavItem`） | `Groups` `Top` |
+| `SiteRailNav` | アイコン + 小さなラベルのナビ（`NavMode=Rail` のレール・`BottomBar` のタブバー。8.3.1）。`aria-current` は自動 | `Groups` `AriaLabel` |
+| `SiteTopNav` | 上部ナビ（項目の並び + 「もっと見る」。8.3.3）。`aria-current` は自動 | `Items` `VisibleCount` `CollapseBelowPx` `AriaLabel` `MoreLabel` |
 | `SiteFooter` | フッター（サイト名・問い合わせ・プライバシー・©・SNS）。`<footer>`（contentinfo）として、本文の外に置く | （`SiteOptions` から） |
 | `ReportFormView` | 「作者へ報告」（問い合わせ）のフォーム。Turnstile・送信の状態・noindex | `Title` `Lead` `From` `NoIndex` `UnavailableNote` `MessagePlaceholder` `ContactHint` `Timeout` `ContactRequired` `ContactFormat` `ContactLabel` `ContactPlaceholder` |
 | `NotFoundView` | 404（ページが見つからない） | `Code` `Title` `Lead` `HomeHref` `HomeText` `NoIndex` |
@@ -380,6 +382,102 @@ builder.RootComponents.Add<HeadOutlet>("head::after");   // 報告・404 の noi
 - `ShowDrawer=false`: サイドバーもハンバーガーも描かない。上部ナビは PC のヘッダーに横に並ぶ（幅が足りないときは横にスクロール）。
 - `CollapseTopNavOnMobile=true`: スマホだけは、ハンバーガーで開く一時的なメニューに上部ナビを入れる（縦に並ぶ）。畳まないときは、スマホのヘッダーに横スクロールで出す。
 - サイトごとに 1 つのレイアウトを作り、ページは `@layout` で選ぶ（サンプル: `samples/MinimalSite/Shared/TopNavLayout.razor`）。
+
+### 8.3.1 常時表示のレール + 下のタブバー（v1.1.0。bot 向け）
+
+`NavMode="NavMode.Rail"` にすると、PC は**常に表示する細いアイコンのレール**になる（アイコン + 小さなラベルの縦並び。広がらず、ハンバーガーも無く、開閉の保存〔localStorage〕も使わない）。スマホの下に固定のタブバーを出すなら、`BottomBar` に同じナビを渡す。
+
+```razor
+<SiteLayout Body="@Body" Maintenance="Maintenance" NavMode="NavMode.Rail">
+    <DrawerContent>
+        <SiteRailNav Groups="NavGroups" />      @* PC: 常時表示のレール *@
+    </DrawerContent>
+    <BottomBar>
+        <SiteRailNav Groups="NavGroups" />      @* スマホ: 下のタブバー *@
+    </BottomBar>
+    <HeaderEnd><ThemeSwitch /></HeaderEnd>
+</SiteLayout>
+
+@code {
+    private static readonly IReadOnlyList<SiteNavGroup> NavGroups = new[]
+    {
+        new SiteNavGroup(null, new[]
+        {
+            new SiteNavItem("", "ホーム", Icons.Material.Filled.Home),
+            new SiteNavItem("commands", "コマンド", Icons.Material.Filled.Terminal),
+            new SiteNavItem("guide", "使い方", Icons.Material.Filled.MenuBook),
+        }),
+    };
+}
+```
+
+- **PC**: Mini のサイドバーを `Open=false`・`OpenMiniOnHover=false` で固定する（常に細い列）。幅は CSS 変数 `--fbc-rail-width`（既定 4.75rem）。ハンバーガーは出さない。
+- **スマホ**: `BottomBar` があれば、ハンバーガーもサイドバーも出さず、下のタブバーがナビになる（`MudMainContent` の外・画面の下に固定）。`BottomBar` が無ければ、ふつうのハンバーガー + 一時的なメニュー（`SiteRailNav` は、そのメニューの中では横並びの項目になる）。
+- **下のタブバーの高さと余白**: 高さは `--fbc-bottombar-height`（既定 3.5rem）+ `env(safe-area-inset-bottom)`（ホームバーの分）。本文の下に同じ高さの余白（`.fbc-has-bottombar`）を足すので、フッターは隠れない（`MobilePageScroll` が true / false のどちらでも）。色は `--fbc-bottombar-bg`（既定は `--fbc-sidebar-bg`）。
+- **タブバーは `NavMode` に関係なく、`BottomBar` を渡せばスマホだけに出る**（`NavMode.Drawer` + `BottomBar` なら、ハンバーガーも残る）。PC には出ない。
+- **ラベルは 4〜5 文字**（12px・細い列の幅に収まる長さ）。超えると折り返す。項目は 44px 以上の高さ。見出し（`SiteNavGroup.Title`）は出さない。選べない項目（`Disabled`）はリンクにしない。
+- **`aria-current="page"`** は `SiteRailNav` が自動で付ける（`SiteNavMenu` と同じ判定: `Href` が空のホームは完全一致、それ以外は下位のページも現在）。ホーム以外で「上位の項目だけ」を現在にしたいときは `new SiteNavItem("guide", "ガイド", Exact: true)`（v1.1.0 で足した `Exact`）。
+- `<nav>` はレールとタブバーを同時には描かない（PC かスマホのどちらか）ので、既定の `aria-label`（メインメニュー）のままでよい。
+
+### 8.3.2 全高のサイドバー（v1.1.0。album 向け）
+
+`DrawerClipMode="SiteDrawerClipMode.FullHeight"` にすると、PC のサイドバーが**画面の最上部から全高**になり、ヘッダーはサイドバーの右（本文の側）だけになる。
+
+```razor
+<SiteLayout Body="@Body" Maintenance="Maintenance" DrawerClipMode="SiteDrawerClipMode.FullHeight">
+    <DrawerContent><SiteNavMenu Groups="NavGroups" /></DrawerContent>
+    <HeaderEnd><ThemeSwitch /></HeaderEnd>
+</SiteLayout>
+```
+
+- 既定の `BelowHeader` は従来どおり（ヘッダーの下からサイドバー）。**スマホは `FullHeight` でも変わらない**（一時的なメニュー）。`NavMode` が Top / None のようにサイドバーを使わないときは何も起きない。
+- 実装は、MudBlazor の `ClipMode=Never`。ヘッダーを、サイドバーの開閉（230px）と細い列（56px）の幅に合わせてずらすのは MudBlazor 自身の CSS（`mud-drawer-*-clipped-never .mud-appbar`）で、kit は上書きしない（`!important` なし）。kit が足すのは、項目の上の余白だけ。サンプルサイトを実際に描画して、開いたとき・細い列のとき・スマホで、ヘッダーとサイドバーが重ならず、z-index（サイドバー 1100・ヘッダー 1040）も干渉しないことを確かめた。
+- **マウスを乗せて広げる動き（`OpenMiniOnHover`）は使わない**: 広げたサイドバーが、ヘッダーのハンバーガー（サイドバーのすぐ右）を覆って押せなくなるため。開閉はハンバーガーだけ。細い列のアイコンには `title` が付く。
+- サイドバーの開閉は、従来どおり localStorage（`SidebarKey`）に保存する。
+
+### 8.3.3 上部ナビ（`SiteTopNav`。v1.1.0。avatar 向け）
+
+`SiteTopNav` は、`TopNav` スロットに置く部品。項目の並びと「もっと見る」のドロップダウンを持ち、現在のページに `aria-current="page"` を自動で付ける。
+
+```razor
+<SiteLayout Body="@Body" Maintenance="Maintenance" NavMode="NavMode.Top">
+    <TopNav>
+        <SiteTopNav Items="NavItems" VisibleCount="4" CollapseBelowPx="768" />
+    </TopNav>
+    <HeaderEnd><ThemeSwitch /></HeaderEnd>
+</SiteLayout>
+
+@code {
+    private static readonly IReadOnlyList<SiteNavItem> NavItems = new[]
+    {
+        new SiteNavItem("", "ホーム"),
+        new SiteNavItem("guide", "ガイド"),
+        new SiteNavItem("tools", "ツール"),
+        new SiteNavItem("faq", "よくある質問"),
+        new SiteNavItem("report", "問い合わせ"),
+    };
+}
+```
+
+- `VisibleCount`: 横に並べる先頭の数。残りは「もっと見る」に入る（省略 = 全部並べる。「もっと見る」も出ない）。
+- `CollapseBelowPx`（既定 768）: **この幅（px）より狭い画面では、全部を「もっと見る」に畳む**。SiteLayout 全体のスマホの境目（768px）は CSS の media query と JS に固定されていて変えられない。`CollapseBelowPx` は `SiteTopNav` の畳む幅だけを変える（SiteLayout の `Mobile` とは別）。
+- ドロップダウン: ボタンは `aria-expanded`・`aria-controls`（中身はリンクの一覧なので、role=menu を意味する `aria-haspopup` は付けない）。**Esc** で閉じてボタンにフォーカスを戻す。**↑↓・Home・End** で項目を移る（端で回る）。外をクリックする・Tab でパネルの外へ出ると閉じる。ページが移っても閉じる。パネルは `position: fixed` でボタンの下に置く（ヘッダーの `overflow` に切られない）。閉じた状態のパネルは `hidden`（Tab の対象外）。
+- 「もっと見る」の中に現在のページがあるとき、ボタンも強調（`.active`）する。選べない項目（`Disabled`）はリンクにしない。
+- 項目の `Exact`（`SiteNavItem`）は、レールと同じ（8.3.1）。
+- `SiteTopNav` は、自分で畳む（`CollapseBelowPx`）。`SiteLayout` の `CollapseTopNavOnMobile="true"` とは併用しない（併用すると、スマホでは、ハンバーガーで開くメニューの中に `SiteTopNav` が入り、その中でも畳まれる）。スマホを「もっと見る」に畳むなら `CollapseTopNavOnMobile` は付けず、ヘッダーの横スクロールの既定のままにする。
+
+### 8.3.4 `NavMode` と `ShowDrawer` の関係
+
+| `NavMode` | 意味 |
+| --- | --- |
+| 省略（null） | 従来どおり `ShowDrawer` で決まる（true = Drawer、false = Top）。既存のサイトは何も変えなくてよい |
+| `Drawer` | サイドバー（PC は Mini でマウスを乗せると広がる。スマホは一時的なメニュー）。従来の既定 |
+| `Rail` | 8.3.1 |
+| `Top` | サイドバーなし・`TopNav` をヘッダーに出す（`ShowDrawer="false"` と同じ。`CollapseTopNavOnMobile` も効く） |
+| `None` | サイドバーも上部ナビも描かない（`TopNav` を渡しても出さない） |
+
+- `NavMode` を指定したときは、`ShowDrawer` より優先する（`ShowDrawer` は後方互換のために残す）。
+- 型名について: MudBlazor の `DrawerClipMode` と衝突しないよう、サイドバーの高さの列挙型は **`SiteDrawerClipMode`**（パラメーター名は `DrawerClipMode`）。
 
 ### 8.4 確認用サイトへの切り替え（自動）
 

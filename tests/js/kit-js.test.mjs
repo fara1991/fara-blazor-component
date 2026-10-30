@@ -290,6 +290,122 @@ test("fara-blazor-component: OnEscape の送信が失敗しても、未処理の
     await new Promise((resolve) => setTimeout(resolve, 20));
 });
 
+test("fara-blazor-component: watchWidth は、指定の幅（px）より狭いかを返し、変わったら OnCollapsedChanged を送る", () => {
+    const queries = [];
+    let fire = null;
+    const s = runKit({ matchMedia: (q) => { queries.push(q); return { matches: true, addEventListener(_t, fn) { fire = fn; } }; } });
+    const calls = [];
+    const ref = { invokeMethodAsync: (name, v) => { calls.push([name, v]); return Promise.resolve(); } };
+    assert.equal(s.win.faraBlazorComponent.watchWidth(ref, "w1", 900), true);
+    assert.deepEqual(queries, ["(max-width: 899.98px)"]);
+    fire({ matches: false });
+    assert.deepEqual(calls, [["OnCollapsedChanged", false]]);
+});
+
+test("fara-blazor-component: unwatchWidth は監視を外す。同じ key の二重の登録は、前のを外す", () => {
+    const removed = [];
+    const s = runKit({ matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener(_t, fn) { removed.push(fn); } }) });
+    const ref = { invokeMethodAsync() { return Promise.resolve(); } };
+    s.win.faraBlazorComponent.watchWidth(ref, "w2", 768);
+    s.win.faraBlazorComponent.watchWidth(ref, "w2", 768);
+    assert.equal(removed.length, 1, "二重の登録は、前のを外す");
+    s.win.faraBlazorComponent.unwatchWidth("w2");
+    assert.equal(removed.length, 2);
+    s.win.faraBlazorComponent.unwatchWidth("w2");
+    assert.equal(removed.length, 2, "外した後の unwatchWidth は何もしない");
+});
+
+test("fara-blazor-component: focusById は id の要素にフォーカスする（無ければ何もしない）", () => {
+    const s = runKit();
+    const btn = element("button", { id: "target" });
+    s.doc.body.appendChild(btn);
+    s.win.faraBlazorComponent.focusById("none");
+    assert.equal(s.doc.activeElement, null);
+    s.win.faraBlazorComponent.focusById("target");
+    assert.equal(s.doc.activeElement, btn);
+});
+
+function dropdownFixture() {
+    const removedWin = [];
+    const s = runKit({ window: { innerWidth: 360, removeEventListener: (t) => removedWin.push(t) } });
+    const root = element("nav", { id: "root" });
+    const toggle = element("button", { id: "toggle" });
+    toggle.getBoundingClientRect = () => ({ left: 300, bottom: 50 });
+    const panel = element("ul", { id: "panel" });
+    Object.defineProperty(panel, "offsetWidth", { value: 192 });
+    const items = [element("a"), element("a"), element("a")];
+    panel.querySelectorAll = () => items;
+    items.forEach((a) => panel.appendChild(a));
+    root.appendChild(toggle);
+    root.appendChild(panel);
+    s.doc.body.appendChild(root);
+    const keydown = [];
+    root.addEventListener = (type, fn) => { if (type === "keydown") keydown.push(fn); };
+    root.removeEventListener = (type, fn) => { const i = keydown.indexOf(fn); if (i >= 0) keydown.splice(i, 1); };
+    const sent = [];
+    const ref = { invokeMethodAsync: (name) => { sent.push(name); return Promise.resolve(); } };
+    return { s, root, toggle, panel, items, keydown, sent, ref, removedWin };
+}
+
+test("fara-blazor-component: dropdownOpen はパネルをボタンの下（fixed）に置き、画面の端にはみ出さない", () => {
+    const f = dropdownFixture();
+    f.s.win.faraBlazorComponent.dropdownOpen("root", "toggle", "panel", f.ref, "d1");
+    assert.equal(f.panel.style.position, "fixed");
+    assert.equal(f.panel.style.top, "54px");
+    assert.equal(f.panel.style.left, "160px", "360 - 192 - 8");
+});
+
+test("fara-blazor-component: dropdown の ↑↓・Home・End で項目を移り、外のクリック・フォーカスで CloseFromOutside を送る", () => {
+    const f = dropdownFixture();
+    f.s.win.faraBlazorComponent.dropdownOpen("root", "toggle", "panel", f.ref, "d2");
+    let prevented = 0;
+    const key = (k, extra = {}) => f.keydown.forEach((fn) => fn({ key: k, preventDefault() { prevented++; }, ...extra }));
+    key("ArrowDown");
+    assert.equal(f.s.doc.activeElement, f.items[0]);
+    key("ArrowDown");
+    assert.equal(f.s.doc.activeElement, f.items[1]);
+    key("End");
+    assert.equal(f.s.doc.activeElement, f.items[2]);
+    key("ArrowDown");
+    assert.equal(f.s.doc.activeElement, f.items[0], "最後の次は先頭");
+    key("ArrowUp");
+    assert.equal(f.s.doc.activeElement, f.items[2], "先頭の前は最後");
+    key("Home");
+    assert.equal(f.s.doc.activeElement, f.items[0]);
+    assert.equal(prevented, 6, "移ったときは、画面のスクロールを止める");
+    key("a");
+    assert.equal(prevented, 6, "他のキーには触らない");
+    // 中のクリックでは閉じない。外のクリックで閉じ、監視も外れる
+    f.s.docListeners.pointerdown.forEach((fn) => fn({ target: f.toggle }));
+    assert.deepEqual(f.sent, []);
+    f.s.docListeners.pointerdown.forEach((fn) => fn({ target: element("div") }));
+    assert.deepEqual(f.sent, ["CloseFromOutside"]);
+    assert.equal(f.s.docListeners.pointerdown.length, 0);
+    assert.equal(f.s.docListeners.focusin.length, 0);
+    assert.equal(f.keydown.length, 0);
+});
+
+test("fara-blazor-component: dropdown は最後の項目から Tab で外へ出ると閉じる。dropdownClose で監視が外れる", () => {
+    const f = dropdownFixture();
+    f.s.win.faraBlazorComponent.dropdownOpen("root", "toggle", "panel", f.ref, "d3");
+    f.items[2].focus();
+    f.keydown.forEach((fn) => fn({ key: "Tab", shiftKey: false, preventDefault() { assert.fail("Tab は止めない"); } }));
+    assert.deepEqual(f.sent, ["CloseFromOutside"]);
+
+    const g = dropdownFixture();
+    g.s.win.faraBlazorComponent.dropdownOpen("root", "toggle", "panel", g.ref, "d4");
+    g.s.win.faraBlazorComponent.dropdownClose("d4");
+    assert.equal(g.s.docListeners.pointerdown.length, 0);
+    assert.equal(g.keydown.length, 0);
+    assert.deepEqual(g.removedWin, ["resize"]);
+});
+
+test("fara-blazor-component: dropdown の要素が見つからないときは何も登録しない", () => {
+    const s = runKit();
+    s.win.faraBlazorComponent.dropdownOpen("none", "none", "none", { invokeMethodAsync() { return Promise.resolve(); } }, "d5");
+    assert.equal(s.docListeners.pointerdown, undefined);
+});
+
 test("fara-blazor-component: focusMenu はメニューボタン（.fbc-menu-toggle）にフォーカスを戻す", () => {
     const s = runKit();
     const btn = element("button", { id: "" });

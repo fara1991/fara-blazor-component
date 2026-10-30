@@ -19,6 +19,7 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 ## C# 共通コードのルール
 
 - 公開の型・メンバーを変えるときは、利用中のサイト（pokemon など）のビルドが通るか確かめてから
+- `SiteLayout.razor` を変えるときは、pokemon の `MainLayoutStartupTests`（kit のソースの文字列を読む。`private bool DrawerOpen => Mobile ? mobileOpen : desktopOpen;`・`OnInitialized` の中身など）が通るかも確かめる。5 サイトの develop を clone し、`external/fara-blazor-component` を作業ブランチに差し替えて `dotnet test` する（v1.1.0 で確認）
 - サイト固有の値（ホスト名・サイト名・作者）は kit に入れない。`SiteLinks.DevelopHost` のように、各サイトが起動時に設定する
 
 ## 共有ファイルのルール
