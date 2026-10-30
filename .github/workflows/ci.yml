@@ -83,7 +83,7 @@ jobs:
       - name: Layout check (samples/MinimalSite の / を計測。タップの大きさ 0 件を含む)
         run: node tools/layout-check/cli.mjs --config samples/MinimalSite/layout-check.config.mjs
 
-      - name: Layout check (samples/MinimalSite の新しいナビ: Rail + BottomBar・FullHeight・SiteTopNav)
+      - name: "Layout check (samples/MinimalSite の新しいナビ。Rail + BottomBar・FullHeight・SiteTopNav)"
         run: node tools/layout-check/cli.mjs --config samples/MinimalSite/layout-check.nav-modes.config.mjs
 
   dotnet:
