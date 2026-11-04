@@ -6,8 +6,8 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 
 - 作業ブランチは `develop` から作成する（`master` から切らない）
 - 作業ブランチの PR は `develop` 向けに作る
-- `master` へは `develop` からのみマージする。マージはユーザーが行う（Claude は PR の作成までで、マージしない）
-- PR を develop にマージする前に独立レビューを通し、指摘を直してから
+- PR を develop にマージする前に独立レビューを通し、指摘を直してから。develop へは、CI とレビューが済めば Claude がマージしてよい
+- `master` へは `develop` からのみマージする。master へのマージはユーザーが行う。Claude は develop → master の PR を作り、本文に確認ポイントをまとめる
 - 公開のタグ（`vX.Y.Z`）はユーザーが判断して切る
 
 ## 目的と使われ方
@@ -54,7 +54,7 @@ Fara のサイト（Pokémon Battle Assistant・Avatar Modding Guide ほか）�
 
 ## 変更の流れ
 
-1. kit に PR（テストを付ける）→ 独立レビュー → develop にマージ（ユーザー）→ タグ
+1. kit に PR（テストを付ける）→ 独立レビュー → develop にマージ → タグ（ユーザーが判断）
 2. 各サイトで、submodule をそのタグのコミットに上げる PR（develop 向け）→ 確認用で確認 → master への反映はユーザーが判断
 
 ## 確認
